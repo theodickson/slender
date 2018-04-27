@@ -1,7 +1,10 @@
 package slender
 
+//TODO - resolution inc unresolved type handling
+
 sealed trait KeyExpr {
   def keyType: KeyType
+  def resolve
 }
 
 case object UnitKeyExpr extends KeyExpr {
@@ -24,7 +27,9 @@ case class BoxedRingExpr(r: RingExpr) extends KeyExpr {
   def keyType = BoxedRing(r.ringType)
 }
 
-sealed trait VarKeyExpr extends KeyExpr
+sealed trait VarKeyExpr extends KeyExpr {
+  def name: String
+}
 
 case class ResolvedVarKeyExpr(name: String, keyType: KeyType) extends VarKeyExpr
 

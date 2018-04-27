@@ -1,5 +1,7 @@
 package slender
 
+//TODO - unresolved type handling in pairs etc.
+
 sealed trait KeyType {
   type Type
   def pair(k: KeyType): KeyType = KeyPair(this, k)

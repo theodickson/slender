@@ -2,7 +2,11 @@ package slender
 
 sealed trait RingType {
 
-  def pair(r: RingType): RingType = RingPairType(this, r)
+  def pair(r: RingType): RingType = (this,r) match {
+    case (UnresolvedRingType, _) => UnresolvedRingType
+    case (_, UnresolvedRingType) => UnresolvedRingType(this, r)
+    case _ => RingPairType(this, r)
+  }
 
   def dot(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType,_) => UnresolvedRingType
@@ -36,11 +40,13 @@ sealed trait RingType {
   }
 
   def _1: RingType = this match {
+    case UnresolvedRingType => UnresolvedRingType
     case RingPairType(_1, _) => _1
     case _ => throw new IllegalArgumentException("Cannot project non-pair type rings")
   }
 
   def _2: RingType = this match {
+    case UnresolvedRingType => UnresolvedRingType
     case RingPairType(_, _2) => _2
     case _ => throw new IllegalArgumentException("Cannot project non-pair type rings")
   }

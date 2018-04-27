@@ -8,6 +8,7 @@ class DslTests extends FunSuite {
 
   val stringCounts1 = Collection(DomStringType, IntType, "stringCounts1")
   val stringCounts2 = Collection(DomStringType, IntType, "stringCounts2")
+  val bagOfBags = Bag(BoxedRing(MappingType(DomStringType, IntType)), "bagOfBags")
   val intCounts = Collection(DomIntType, IntType, "intCount")
 
   val const = IntExpr(1)
@@ -23,17 +24,19 @@ class DslTests extends FunSuite {
   }
 
   test("Simple for comprehension works") {
-    assert(
-      For("x" <-- stringCounts1).Collect(IntExpr(1)) ==
-      Sum(stringCounts1 * {"x" ==> IntExpr(1)})
-    )
+//    assert(
+//      For("x" <-- stringCounts1).Collect(IntExpr(1)) ==
+//      Sum(stringCounts1 * {"x" ==> IntExpr(1)})
+//    )
   }
 
-//  test("Simple yield works") {
-//    assert(
-//      For("x" <-- stringCounts1).Yield("x" -> IntExpr(2))
-//    )
-//  }
+  test("Simple yield works") {
+      val q = For ("x" <-- bagOfBags) Collect (
+        For ("y" <-- fromK("x")) Yield "y"
+      )
+      println(q)
+    assert(true)
+  }
 
 
 }
