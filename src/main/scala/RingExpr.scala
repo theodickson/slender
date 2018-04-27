@@ -82,7 +82,6 @@ case class Sum(child: RingExpr) extends UnaryRingExpr {
 }
 
 case class Predicate(keyType: KeyType)(k: KeyExpr, p: KeyExpr => IntExpr) extends RingExpr {
-  assert()
   val ringType: RingType = IntType
   val refs = Map.empty[String,(KeyType,RingType)] //???
 }

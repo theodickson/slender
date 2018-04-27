@@ -20,13 +20,6 @@ object dsl {
 
   case class UnresolvedInfMapping(varName: String, value: RingExpr)
 
-//  implicit class StringContextImplicits(val sc: StringContext) {
-//    def $(args: Any*): String = sc.parts.toList match {
-//      case s::Nil => s
-//      case _ => ???
-//    }
-//  }
-
   implicit class StringImplicits(s: String) {
     def <--(r: MappingRingExpr): (VarKeyExpr,MappingRingExpr) =
       (VarKeyExpr(s, r.keyType),r)
