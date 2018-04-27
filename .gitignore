@@ -1,3 +1,5 @@
 .idea*
 target/*
 metastore_db/*
+project/*
+derby.log
