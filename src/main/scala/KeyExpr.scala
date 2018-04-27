@@ -20,4 +20,14 @@ case class KeyPairExpr(l: KeyExpr, r: KeyExpr) extends KeyExpr {
   def keyType = l.keyType.pair(r.keyType)
 }
 
-case class VarKeyExpr(name: String, keyType: KeyType) extends KeyExpr
+case class BoxedRingExpr(r: RingExpr) extends KeyExpr {
+  def keyType = BoxedRing(r.ringType)
+}
+
+sealed trait VarKeyExpr extends KeyExpr
+
+case class ResolvedVarKeyExpr(name: String, keyType: KeyType) extends VarKeyExpr
+
+case class UnresolvedVarKeyExpr(name: String) extends VarKeyExpr {
+  def keyType = UnresolvedKeyType
+}

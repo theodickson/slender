@@ -1,23 +1,33 @@
 package slender
 
-
 sealed trait KeyType {
+  type Type
   def pair(k: KeyType): KeyType = KeyPair(this, k)
 }
-case object UnitType extends KeyType
 
-case object DomStringType extends KeyType
+case object UnitType extends KeyType {
+  type Type = Unit
+}
 
-case object DomIntType extends KeyType
+case object DomIntType extends KeyType {
+  type Type = Int
+}
+
+case object DomStringType extends KeyType {
+  type Type = String
+}
 
 case class KeyPair(k1: KeyType, k2: KeyType) extends KeyType {
+  type Type = (k1.Type, k2.Type)
   def _1: KeyType = k1
   def _2: KeyType = k2
 }
+
 case class Label(ref: String) extends KeyType
 
 case class BoxedRing(r: RingType) extends KeyType
 
+case object UnresolvedKeyType extends KeyType
 //sealed trait KeyType[T <: KeyType[T]] {
 //  def pair[T1 <: KeyType[T1]](k: KeyType[T1]): KeyPair[KeyType[T], KeyType[T1]] = KeyPair(this, k)
 //}

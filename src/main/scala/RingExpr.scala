@@ -6,7 +6,14 @@ import scala.reflect.Manifest
 sealed trait RingExpr {
   def ringType: RingType
   def refs: Map[String,(KeyType,RingType)]
+
+  //def resolve: RingExpr
   //free var check?
+}
+
+trait NullaryRingExpr extends RingExpr {
+  def refs = Map.empty[String,(KeyType,RingType)]
+  def resolve: this.type = this
 }
 
 trait UnaryRingExpr extends RingExpr {
@@ -29,10 +36,10 @@ trait MappingRingExpr extends RingExpr {
 
 trait FiniteMappingRingExpr extends MappingRingExpr
 
-case class IntExpr(value: Int) extends RingExpr {
+case class IntExpr(value: Int) extends NullaryRingExpr {
   val ringType = IntType
-  val refs = Map.empty[String,(KeyType,RingType)]
 }
+
 case class SimpleCollection(keyType: KeyType, ref: String) extends FiniteMappingRingExpr {
   val valueType = IntType
   val refs = Map(ref -> (keyType,ringType))
@@ -44,7 +51,7 @@ case class Collection(keyType: KeyType, valueType: RingType, ref: String) extend
 
 case class InfMapping(key: VarKeyExpr, value: RingExpr) extends MappingRingExpr {
   //checks on vars in ring expr?
-  def keyType = key.keyType
+  val keyType = key.keyType
   val valueType = value.ringType
   val refs = value.refs //Possibly not always true and quite a problem if so
 }
@@ -93,7 +100,6 @@ case class Sng(k: KeyExpr, r: RingExpr) extends MappingRingExpr {
   val valueType = r.ringType
   val refs = r.refs //???
 }
-
 
 
 

@@ -5,6 +5,8 @@ sealed trait RingType {
   def pair(r: RingType): RingType = RingPairType(this, r)
 
   def dot(r: RingType): RingType = (this,r) match {
+    case (UnresolvedRingType,_) => UnresolvedRingType
+    case (_,UnresolvedRingType) => UnresolvedRingType
     case (IntType,IntType) => IntType
     case (MappingType(k,r),IntType) => MappingType(k, r.dot(IntType))
     case (MappingType(k1,r1),MappingType(k2,r2)) => MappingType(k1.pair(k2), r1.dot(r2))
@@ -12,15 +14,23 @@ sealed trait RingType {
   }
 
   def *(r: RingType): RingType = (this,r) match {
+    case (UnresolvedRingType,_) => UnresolvedRingType
+    case (_,UnresolvedRingType) => UnresolvedRingType
     case (IntType,IntType) => IntType
     case (MappingType(k1,r1),MappingType(k2,r2)) if (k1 == k2) => MappingType(k1, r1.dot(r2))
     case _ => throw new IllegalArgumentException("Invalid ring types for * operation.")
   }
 
-  def +(r: RingType): RingType = if (this == r) this else
-    throw new IllegalArgumentException("Can only add ring values of the same type")
+  def +(r: RingType): RingType = (this,r) match {
+    case (UnresolvedRingType,_) => UnresolvedRingType
+    case (_,UnresolvedRingType) => UnresolvedRingType
+    case (r1,r2) if (r1 == r2) => r1
+    case _ => throw new IllegalArgumentException("Can only add ring values of the same type")
+  }
+
 
   def sum: RingType = this match {
+    case UnresolvedRingType => UnresolvedRingType
     case MappingType(_,r) => r
     case _ => throw new IllegalArgumentException("Only MappingType ring expressions may be summed.")
   }
@@ -43,6 +53,7 @@ case class RingPairType(l: RingType, r: RingType) extends RingType
 
 case class MappingType(key: KeyType, ring: RingType) extends RingType
 
+case object UnresolvedRingType extends RingType
 
 //unresolved key expressions only appear in the LHS of an InfMapping. They are naturally resolved upon
 //introduction in a For expression. In explicit usage of infinite mappings, they are resolved when the

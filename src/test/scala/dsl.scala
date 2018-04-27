@@ -28,11 +28,10 @@ class DslTests extends FunSuite {
       Sum(stringCounts1 * {"x" ==> IntExpr(1)})
     )
   }
-//
-//  test("For comprehension with predicate") {
+
+//  test("Simple yield works") {
 //    assert(
-//      For("x" <-- intCounts).Collect(Predicate(DomIntType)(VarKeyExpr("x", DomIntType), x => IntExpr(x.i))) ==
-//        Sum(stringCounts1 * {"x" ==> IntExpr(1)})
+//      For("x" <-- stringCounts1).Yield("x" -> IntExpr(2))
 //    )
 //  }
 
