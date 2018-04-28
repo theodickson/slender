@@ -4,7 +4,7 @@ sealed trait RingType {
 
   def pair(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType, _) => UnresolvedRingType
-    case (_, UnresolvedRingType) => UnresolvedRingType(this, r)
+    case (_, UnresolvedRingType) => UnresolvedRingType
     case _ => RingPairType(this, r)
   }
 
@@ -13,6 +13,7 @@ sealed trait RingType {
     case (_,UnresolvedRingType) => UnresolvedRingType
     case (IntType,IntType) => IntType
     case (MappingType(k,r),IntType) => MappingType(k, r.dot(IntType))
+    case (IntType, MappingType(k,r)) => MappingType(k, IntType.dot(r))
     case (MappingType(k1,r1),MappingType(k2,r2)) => MappingType(k1.pair(k2), r1.dot(r2))
     case (r1,r2) => throw new IllegalArgumentException(s"Invalid ring types for dot operation: $r1 . $r2")
   }
@@ -31,7 +32,6 @@ sealed trait RingType {
     case (r1,r2) if (r1 == r2) => r1
     case _ => throw new IllegalArgumentException("Can only add ring values of the same type")
   }
-
 
   def sum: RingType = this match {
     case UnresolvedRingType => UnresolvedRingType
@@ -53,52 +53,25 @@ sealed trait RingType {
 
 }
 
-case object IntType extends RingType
+case object IntType extends RingType {
+  override def toString = "Int"
+}
 
-case class RingPairType(l: RingType, r: RingType) extends RingType
+case class RingPairType(l: RingType, r: RingType) extends RingType {
+  override def toString = s"($l × $r)"
+}
 
-case class MappingType(key: KeyType, ring: RingType) extends RingType
+case class MappingType(key: KeyType, ring: RingType) extends RingType {
+  override def toString = ring match {
+    case IntType => s"Bag($key)"
+    case _ => s"($key → $ring)"
+  }
+}
 
-case object UnresolvedRingType extends RingType
+object BagType {
+  def apply(keyType: KeyType): RingType = MappingType(keyType, IntType)
+}
 
-//unresolved key expressions only appear in the LHS of an InfMapping. They are naturally resolved upon
-//introduction in a For expression. In explicit usage of infinite mappings, they are resolved when the
-
-
-
-
-
-
-
-
-
-
-
-
-//
-//case class CollectionType[K]() extends MappingType(Dom[K](), IntType)
-
-
-//sealed trait RingType[R <: RingType[R]] {
-//  def pair[R1 <: RingType[R1]](other: R1): RingPair[RingType[R], R1] = RingPair(this, other)
-//  def dot[R1 <: RingType[R1]](other: R1) = (this,other) match {
-//    case (IntType(),IntType()) => IntType()
-//    case (CollectionType(k,r),IntType()) => CollectionType(k, r.dot(IntType()))
-//    case (CollectionType(k1,r1),CollectionType(k2,r2)) => CollectionType(k1.pair(k2), r1.dot(r2))
-//  }
-//}
-//
-//case class IntType() extends RingType[IntType]
-//
-//case class RingPair[R1 <: RingType[R1], R2 <: RingType[R2]](r1: R1, r2: R2)
-//  extends RingType[RingPair[R1, R2]] {
-//  def _1: R1 = r1
-//  def _2: R2 = r2
-//}
-//
-//case class CollectionType[K <: KeyType[K], R <: RingType[R]](k: K, r: R) extends RingType[CollectionType[R, K]] {
-////  def *(c: CollectionType): CollectionType = (this,c) match {
-////    case (CollectionType(k1,r1), CollectionType(k2, r2)) if (k1 == k2) => CollectionType(k1, r1.dot(r2))
-////  }
-//  def sum: R = r
-//}
+case object UnresolvedRingType extends RingType {
+  override def toString = "Unresolved"
+}

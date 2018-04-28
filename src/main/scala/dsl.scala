@@ -2,53 +2,40 @@ package slender
 
 object dsl {
 
- // case class UnresolvedInfMapping(varName: String, value: RingExpr)
-
   implicit class StringImplicits(s: String) {
     def <--(r: RingExpr): (VarKeyExpr, RingExpr) = r.ringType match {
       case UnresolvedRingType => (UnresolvedVarKeyExpr(s),r)
       case MappingType(kt,_) => (ResolvedVarKeyExpr(s, kt),r)
+      case _ => throw new IllegalStateException("Cannot iterate over non-mapping type RingExpr.")
     }
+  }
 
-//    def ==>(r: RingExpr): UnresolvedInfMapping = UnresolvedInfMapping(s, r)
+  implicit class StringContextImplicits(sc: StringContext) {
+    def v(args: Any*): UnresolvedVarKeyExpr = {
+      assert(args.isEmpty)
+      assert(sc.parts.size == 1)
+      UnresolvedVarKeyExpr(sc.parts.head)
+    }
   }
 
   implicit def stringToUnresolvedVarKeyExpr(s: String): UnresolvedVarKeyExpr = UnresolvedVarKeyExpr(s)
 
+  implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
+
   implicit class RingExprImplicits(r: RingExpr) {
-
     def +(r1: RingExpr) = Plus(r, r1)
-
     def *(r1: RingExpr) = Multiply(r, r1)
-
     def dot(r1: RingExpr) = Dot(r, r1)
-
     def unary_- = Negate(r)
-
     def unary_! = Not(r)
 
+    def _1: RingExpr = Project1(r)
+    def _2: RingExpr = Project2(r)
+  }
 
-//    def +(m: UnresolvedInfMapping): RingExpr = r match {
-//
-//      case m1: MappingRingExpr => m.value.ringType match {
-//        case rT if (rT == m1.valueType) => {
-//          val resolvedVar = ResolvedVarKeyExpr(m.varName, m1.keyType)
-//          r + InfMapping(resolvedVar, m.value)
-//        }
-//        case _ => throw new IllegalArgumentException("Cannot add infinite mapping of different value type.")
-//      }
-//
-//      case _ => throw new IllegalArgumentException("Cannot add infinite mapping to non-mapping ring expression.")
-//    }
-//
-//    def *(m: UnresolvedInfMapping): RingExpr = r match {
-//      case m1: MappingRingExpr => {
-//        val resolved = ResolvedVarKeyExpr(m.varName, m1.keyType)
-//        r * InfMapping(resolved, m.value)
-//      }
-//      case _ => throw new IllegalArgumentException("Cannot multiply non-mapping with infinite mapping.")
-//    }
-
+  implicit class KeyExprImplicits(k: KeyExpr) {
+    def _1: KeyExpr = Project1K(k)
+    def _2: KeyExpr = Project2K(k)
   }
 
   implicit class MappingRingExprImplicits(r: MappingRingExpr) {
@@ -57,20 +44,14 @@ object dsl {
 
   implicit class VarKeyExprImplicits(x: VarKeyExpr) {
     def ==>(r: RingExpr): InfMapping = InfMapping(x, r)
-//
-//    def <--(r: RingExpr): (VarKeyExpr, RingExpr) = r match
-//          (ResolvedVarKeyExpr(s, r.keyType), r)
   }
 
   def sng(e: KeyExpr): Sng = Sng(e, IntExpr(1))
-
   def sng(e: KeyExpr, r: RingExpr) = Sng(e, r)
-
   def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
+  implicit def fromK(k: BoxedRingExpr): RingExpr = k.r
+  implicit def fromK(s: String): RingExpr = UnboxedVarRingExpr(UnresolvedVarKeyExpr(s))
 
-  def fromK(k: BoxedRingExpr): RingExpr = k.r
-
-  def fromK(s: String): RingExpr = UnboxedVarRingExpr(UnresolvedVarKeyExpr(s))
 
   case class ForComprehensionBuilder(x: VarKeyExpr, r1: RingExpr) {
 
@@ -79,7 +60,9 @@ object dsl {
     def Yield(pair: (KeyExpr, RingExpr)): RingExpr = Collect(sng(pair._1, pair._2))
 
     def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
+
   }
+
 
   case class PredicatedForComprehensionBuilder(x: VarKeyExpr, exprPred: (RingExpr, Predicate)) {
 
@@ -94,7 +77,9 @@ object dsl {
     }
 
     def Yield(k: KeyExpr): RingExpr = builder.Yield((k, p))
+
   }
+
 
   object For {
     def apply(paired: (VarKeyExpr, RingExpr)): ForComprehensionBuilder =

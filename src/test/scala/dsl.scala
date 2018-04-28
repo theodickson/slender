@@ -8,9 +8,9 @@ class DslTests extends FunSuite {
 
   val stringCounts1 = Collection(DomStringType, IntType, "stringCounts1")
   val stringCounts2 = Collection(DomStringType, IntType, "stringCounts2")
-  val bagOfBags = Bag(BoxedRing(MappingType(DomStringType, IntType)), "bagOfBags")
+  val bagOfBags = Bag(BoxedRingType(MappingType(DomStringType, IntType)), "bagOfBags")
   val intCounts = Collection(DomIntType, IntType, "intCount")
-
+  val bagOfPairs = Bag(KeyPair(DomStringType,DomStringType), "bagOfPairs")
   val const = IntExpr(1)
 
   test("Operators work") {
@@ -30,12 +30,27 @@ class DslTests extends FunSuite {
 //    )
   }
 
-  test("Simple yield works") {
-      val q = For ("x" <-- bagOfBags) Collect (
-        For ("y" <-- fromK("x")) Yield "y"
+//  test("Simple yield works") {
+//      val q = For ("x" <-- bagOfBags) Yield (
+//        "x"
+//      )
+//      println(q)
+//      println(q.ringType)
+//  }
+//
+//  test("flatten works") {
+//    val q = For ("x" <-- bagOfBags) Collect "x"
+//    println(q)
+//    println(q.ringType)
+//  }
+
+  test ("nest works") {
+    val q =
+      For ("ks" <-- bagOfPairs) Yield (
+        v"ks"._1 -> sng(v"ks"._2)
       )
-      println(q)
-    assert(true)
+    println(q)
+    println(q.ringType)
   }
 
 
