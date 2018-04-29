@@ -1,38 +1,50 @@
 package slender
 
-
 sealed trait KeyType {
+  type Type
   def pair(k: KeyType): KeyType = KeyPair(this, k)
+  def -->(r: RingType): RingType = (this,r) match {
+    case (UnresolvedKeyType,_) => UnresolvedRingType
+    case (_,UnresolvedRingType) => UnresolvedRingType
+    case _ => MappingType(this, r)
+  }
+  def _1: KeyType = this match {
+    case KeyPair(l,_) => l
+    case UnresolvedKeyType => UnresolvedKeyType
+    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
+  }
+  def _2: KeyType = this match {
+    case KeyPair(_,r) => r
+    case UnresolvedKeyType => UnresolvedKeyType
+    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
+  }
 }
-case object UnitType extends KeyType
 
-case object DomStringType extends KeyType
+case object UnitType extends KeyType {
+  type Type = Unit
+}
 
-case object DomIntType extends KeyType
+case object DomIntType extends KeyType {
+  type Type = Int
+  override def toString = "Int"
+}
+
+case object DomStringType extends KeyType {
+  type Type = String
+  override def toString = "String"
+}
 
 case class KeyPair(k1: KeyType, k2: KeyType) extends KeyType {
-  def _1: KeyType = k1
-  def _2: KeyType = k2
+  type Type = (k1.Type, k2.Type)
+  override def toString = s"$k1×$k2"
 }
+
 case class Label(ref: String) extends KeyType
 
-case class BoxedRing(r: RingType) extends KeyType
+case class BoxedRingType(r: RingType) extends KeyType {
+  override def toString = s"[$r]"
+}
 
-//sealed trait KeyType[T <: KeyType[T]] {
-//  def pair[T1 <: KeyType[T1]](k: KeyType[T1]): KeyPair[KeyType[T], KeyType[T1]] = KeyPair(this, k)
-//}
-//case class UnitType() extends KeyType[UnitType]
-//case class Dom[T]() extends KeyType[Dom[T]]
-//case class KeyPair[T1 <: KeyType[T1], T2 <: KeyType[T2]](k1: T1, k2: T2)
-//  extends KeyType[KeyPair[T1, T2]] {
-//  def _1: T1 = k1
-//  def _2: T2 = k2
-//}
+case object UnresolvedKeyType extends KeyType
 
-
-//object KeyType {
-//  def apply[T](implicit tag: ClassTag[T]): KeyType = tag.runtimeClass match {
-//    case _ : Class[Unit] => UnitType
-//    case _ : Class[(_,_)]=>
-//  }
-//}
+case class InvalidKeyProjectionException(msg: String) extends Exception(msg)
