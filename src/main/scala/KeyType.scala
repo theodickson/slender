@@ -68,5 +68,3 @@ case class BoxedRingType(r: ResolvedRingType) extends ResolvedKeyType {
 
 
 case class InvalidKeyProjectionException(msg: String) extends Exception(msg)
-case class InvalidKeyPairException(msg: String) extends Exception(msg)
-case class InvalidBoxedRingException(msg: String) extends Exception(msg)
