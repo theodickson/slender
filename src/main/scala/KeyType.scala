@@ -11,12 +11,12 @@ sealed trait KeyType {
   def _1: KeyType = this match {
     case KeyPair(l,_) => l
     case UnresolvedKeyType => UnresolvedKeyType
-    case _ => throw new IllegalArgumentException("Cannot project non-pair type key.")
+    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
   }
   def _2: KeyType = this match {
     case KeyPair(_,r) => r
     case UnresolvedKeyType => UnresolvedKeyType
-    case _ => throw new IllegalArgumentException("Cannot project non-pair type key.")
+    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
   }
 }
 
@@ -36,7 +36,7 @@ case object DomStringType extends KeyType {
 
 case class KeyPair(k1: KeyType, k2: KeyType) extends KeyType {
   type Type = (k1.Type, k2.Type)
-  override def toString = s"($k1 × $k2)"
+  override def toString = s"$k1×$k2"
 }
 
 case class Label(ref: String) extends KeyType
@@ -46,3 +46,5 @@ case class BoxedRingType(r: RingType) extends KeyType {
 }
 
 case object UnresolvedKeyType extends KeyType
+
+case class InvalidKeyProjectionException(msg: String) extends Exception(msg)
