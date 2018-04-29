@@ -83,7 +83,7 @@ class DslTests extends FunSuite {
     assert(query.isResolved)
     assert(query.ringType ==
       BagType(
-        (DomStringType, box(BagType(DomIntType)))
+        (DomStringType, BoxedRingType(BagType(DomIntType)))
       )
     )
   }

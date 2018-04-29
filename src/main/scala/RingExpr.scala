@@ -3,8 +3,7 @@ package slender
 sealed trait RingExpr {
   def ringType: RingType
   def isResolved: Boolean = ringType != UnresolvedRingType
-  def resolveWith(vars: Map[String,KeyType]): RingExpr //make private
-  //def resolve(vars: (String,KeyType)*): RingExpr = resolve(vars.toMap)
+  def resolveWith(vars: Map[String,KeyType]): RingExpr
   def resolve: RingExpr = resolveWith(Map.empty[String,KeyType])
 }
 

@@ -6,7 +6,8 @@ object dsl {
 
     def <--(r: RingExpr): (VarKeyExpr, RingExpr) = (UnresolvedVarKeyExpr(s),r)
     def -->(r: RingExpr): YieldPair = YieldPair(UnresolvedVarKeyExpr(s),r)
-    //since implicit methods on result of implicit conversions dont tend to resolve, duplicate keyexpr implicits here:
+    //since implicit methods on result of implicit conversions dont tend to resolve,
+    //duplicate keyexpr implicits here:
     def _1: KeyExpr = Project1K(s)
     def _2: KeyExpr = Project2K(s)
 
@@ -28,11 +29,13 @@ object dsl {
 
   implicit def keyExprPairImplicits(p: (KeyExpr,KeyExpr)): KeyPairExpr = KeyPairExpr(p._1,p._2)
 
-  implicit def ringTypePairImplicits(p: (RingType,RingType)): RingType = p._1.pair(p._2)
+  implicit def ringTypePairImplicits(p: (ResolvedRingType,ResolvedRingType)): ResolvedRingType =
+    RingPairType(p._1, p._2)
 
-  implicit def keyTypePairImplicits(p: (KeyType,KeyType)): KeyType = p._1.pair(p._2)
+  implicit def keyTypePairImplicits(p: (ResolvedKeyType,ResolvedKeyType)): ResolvedKeyType =
+    KeyPair(p._1, p._2)
 
-  implicit def box(r: RingType): KeyType = r.box
+  implicit def box(r: ResolvedRingType): KeyType = r.box
 
   implicit class RingExprImplicits(r: RingExpr) {
     def +(r1: RingExpr) = Add(r, r1)
@@ -113,13 +116,3 @@ object dsl {
 }
 
 case class YieldPair(k: KeyExpr, r: RingExpr)
-
-//    implicit class StringContextImplicits(val sc: StringContext) {
-//      def v(args: Any*): VarKeyExpr = {
-//        assert(args.isEmpty)
-//        sc.parts.toList match {
-//          case s::Nil => UnresolvedVarKeyExpr(s)
-//          case _ => throw new IllegalArgumentException
-//        }
-//      }
-//    }

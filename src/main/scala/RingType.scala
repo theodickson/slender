@@ -5,24 +5,20 @@ sealed trait RingType {
   def pair(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType, _) => UnresolvedRingType
     case (_, UnresolvedRingType) => UnresolvedRingType
-    case _ => RingPairType(this, r)
+    case (r1:ResolvedRingType,r2:ResolvedRingType) => RingPairType(r1,r2)
   }
 
   def dot(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType,_) => UnresolvedRingType
     case (_,UnresolvedRingType) => UnresolvedRingType
-    case (IntType,IntType) => IntType
-    case (MappingType(k,r),IntType) => MappingType(k, r.dot(IntType))
-    case (IntType, MappingType(k,r)) => MappingType(k, IntType.dot(r))
-    case (MappingType(k1,r1),MappingType(k2,r2)) => MappingType(k1.pair(k2), r1.dot(r2))
-    case (r1,r2) => throw InvalidRingDotException(s"Invalid types for dot operation: $r1 , $r2")
+    case (r1:ResolvedRingType, r2: ResolvedRingType) => r1.resolvedDot(r2)
   }
 
   def *(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType,_) => UnresolvedRingType
     case (_,UnresolvedRingType) => UnresolvedRingType
     case (IntType,IntType) => IntType
-    case (MappingType(k1,r1),MappingType(k2,r2)) if (k1 == k2) => MappingType(k1, r1.dot(r2))
+    case (MappingType(k1,r1),MappingType(k2,r2)) if (k1 == k2) => MappingType(k1, r1.resolvedDot(r2))
     case (r1,r2) => throw InvalidRingMultiplyException(s"Invalid types for * operation: $r1, $r2")
   }
 
@@ -53,24 +49,37 @@ sealed trait RingType {
 
   def box: KeyType = this match {
     case UnresolvedRingType => UnresolvedKeyType
-    case _ => BoxedRingType(this)
+    case r: ResolvedRingType => BoxedRingType(r)
+  }
+
+
+}
+
+case object UnresolvedRingType extends RingType {
+  override def toString = "Unresolved"
+}
+
+sealed trait ResolvedRingType extends RingType {
+
+  def resolvedDot(other: ResolvedRingType): ResolvedRingType = (this,other) match {
+    case (IntType, IntType) => IntType
+    case (MappingType(k, r), IntType) => MappingType(k, r.resolvedDot(IntType))
+    case (IntType, MappingType(k, r)) => MappingType(k, IntType.resolvedDot(r))
+    case (MappingType(k1, r1), MappingType(k2, r2)) => MappingType(KeyPair(k1,k2), r1.resolvedDot(r2))
+    case (r1, r2) => throw InvalidRingDotException(s"Invalid types for dot operation: $r1 , $r2")
   }
 
 }
 
-case object IntType extends RingType {
+case object IntType extends ResolvedRingType {
   override def toString = "Int"
 }
 
-case class RingPairType(l: RingType, r: RingType) extends RingType {
-  if (l == UnresolvedRingType || r == UnresolvedRingType)
-    throw InvalidRingPairException("Cannot create RingPair type with unresolved ring typed arguments.")
+case class RingPairType(l: ResolvedRingType, r: ResolvedRingType) extends ResolvedRingType {
   override def toString = s"$l×$r"
 }
 
-case class MappingType(key: KeyType, ring: RingType) extends RingType {
-  if (key == UnresolvedKeyType || ring == UnresolvedRingType)
-    throw InvalidMappingTypeException("Cannot create MappingType with unresolved key or ring arguments.")
+case class MappingType(key: ResolvedKeyType, ring: ResolvedRingType) extends ResolvedRingType {
   override def toString = ring match {
     case IntType => s"Bag($key)"
     case _ => s"$key→$ring"
@@ -78,11 +87,7 @@ case class MappingType(key: KeyType, ring: RingType) extends RingType {
 }
 
 object BagType {
-  def apply(keyType: KeyType): RingType = keyType --> IntType
-}
-
-case object UnresolvedRingType extends RingType {
-  override def toString = "Unresolved"
+  def apply(keyType: ResolvedKeyType): ResolvedRingType = MappingType(keyType, IntType)
 }
 
 case class InvalidRingDotException(msg: String) extends Exception(msg)
@@ -90,5 +95,3 @@ case class InvalidRingMultiplyException(msg: String) extends Exception(msg)
 case class InvalidRingAddException(msg: String) extends Exception(msg)
 case class InvalidRingSumException(msg: String) extends Exception(msg)
 case class InvalidRingProjectionException(msg: String) extends Exception(msg)
-case class InvalidRingPairException(msg: String) extends Exception(msg)
-case class InvalidMappingTypeException(msg: String) extends Exception(msg)

@@ -7,13 +7,13 @@ sealed trait KeyType {
   def pair(k: KeyType): KeyType = (this,k) match {
     case (UnresolvedKeyType,_) => UnresolvedKeyType
     case (_,UnresolvedKeyType) => UnresolvedKeyType
-    case _ => KeyPair(this,k)
+    case (l: ResolvedKeyType, r: ResolvedKeyType) => KeyPair(l,r)
   }
 
   def -->(r: RingType): RingType = (this,r) match {
     case (UnresolvedKeyType,_) => UnresolvedRingType
     case (_,UnresolvedRingType) => UnresolvedRingType
-    case _ => MappingType(this, r)
+    case (k: ResolvedKeyType, r1: ResolvedRingType) => MappingType(k,r1)
   }
 
   def _1: KeyType = this match {
@@ -37,37 +37,35 @@ sealed trait KeyType {
 
 }
 
-case object UnitType extends KeyType {
+case object UnresolvedKeyType extends KeyType
+
+sealed trait ResolvedKeyType extends KeyType
+
+case object UnitType extends ResolvedKeyType {
   type Type = Unit
 }
 
-case object DomIntType extends KeyType {
+case object DomIntType extends ResolvedKeyType {
   type Type = Int
   override def toString = "Int"
 }
 
-case object DomStringType extends KeyType {
+case object DomStringType extends ResolvedKeyType {
   type Type = String
   override def toString = "String"
 }
 
-case class KeyPair(k1: KeyType, k2: KeyType) extends KeyType {
-  if (k1 == UnresolvedKeyType || k2 == UnresolvedKeyType)
-    throw InvalidKeyPairException("Cannot create KeyPair type with unresolved key typed arguments.")
+case class KeyPair(k1: ResolvedKeyType, k2: ResolvedKeyType) extends ResolvedKeyType {
   type Type = (k1.Type, k2.Type)
   override def toString = s"$k1×$k2"
 }
 
-case class Label(ref: String) extends KeyType
+case class Label(ref: String) extends ResolvedKeyType
 
-case class BoxedRingType(r: RingType) extends KeyType {
-  if (r == UnresolvedRingType) throw InvalidBoxedRingException(
-    "Cannot create BoxedRingType with unresolved ring argument"
-  )
+case class BoxedRingType(r: ResolvedRingType) extends ResolvedKeyType {
   override def toString = s"[$r]"
 }
 
-case object UnresolvedKeyType extends KeyType
 
 case class InvalidKeyProjectionException(msg: String) extends Exception(msg)
 case class InvalidKeyPairException(msg: String) extends Exception(msg)
