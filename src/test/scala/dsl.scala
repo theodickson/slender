@@ -94,8 +94,10 @@ class DslTests extends FunSuite {
         "y" --> sng("z")
       )
     )
-    println(query.ringType)
     assert(!query.isResolved)
+    val resolvedQuery = query.resolveWith(Map("z" -> DomStringType))
+    assert(resolvedQuery.isResolved)
+    println(resolvedQuery.ringType)
   }
 
 }

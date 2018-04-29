@@ -32,7 +32,7 @@ object dsl {
 
   implicit def keyTypePairImplicits(p: (KeyType,KeyType)): KeyType = p._1.pair(p._2)
 
-  implicit def box(r: RingType): KeyType = BoxedRingType(r)
+  implicit def box(r: RingType): KeyType = r.box
 
   implicit class RingExprImplicits(r: RingExpr) {
     def +(r1: RingExpr) = Add(r, r1)

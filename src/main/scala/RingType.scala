@@ -51,25 +51,34 @@ sealed trait RingType {
     case r => throw InvalidRingProjectionException(s"Invalid type for projection operation: $r")
   }
 
+  def box: KeyType = this match {
+    case UnresolvedRingType => UnresolvedKeyType
+    case _ => BoxedRingType(this)
+  }
+
 }
 
 case object IntType extends RingType {
   override def toString = "Int"
 }
 
-protected case class RingPairType(l: RingType, r: RingType) extends RingType {
+case class RingPairType(l: RingType, r: RingType) extends RingType {
+  if (l == UnresolvedRingType || r == UnresolvedRingType)
+    throw InvalidRingPairException("Cannot create RingPair type with unresolved ring typed arguments.")
   override def toString = s"$l×$r"
 }
 
 case class MappingType(key: KeyType, ring: RingType) extends RingType {
+  if (key == UnresolvedKeyType || ring == UnresolvedRingType)
+    throw InvalidMappingTypeException("Cannot create MappingType with unresolved key or ring arguments.")
   override def toString = ring match {
-    case IntType => s"BagType($key)"
+    case IntType => s"Bag($key)"
     case _ => s"$key→$ring"
   }
 }
 
 object BagType {
-  def apply(keyType: KeyType): RingType = MappingType(keyType, IntType)
+  def apply(keyType: KeyType): RingType = keyType --> IntType
 }
 
 case object UnresolvedRingType extends RingType {
@@ -81,3 +90,5 @@ case class InvalidRingMultiplyException(msg: String) extends Exception(msg)
 case class InvalidRingAddException(msg: String) extends Exception(msg)
 case class InvalidRingSumException(msg: String) extends Exception(msg)
 case class InvalidRingProjectionException(msg: String) extends Exception(msg)
+case class InvalidRingPairException(msg: String) extends Exception(msg)
+case class InvalidMappingTypeException(msg: String) extends Exception(msg)

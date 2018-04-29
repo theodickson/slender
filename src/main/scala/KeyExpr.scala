@@ -43,7 +43,7 @@ case class Project2K(k: KeyExpr) extends KeyExpr {
 }
 
 case class BoxedRingExpr(r: RingExpr) extends KeyExpr {
-  val keyType = BoxedRingType(r.ringType)
+  val keyType = r.ringType.box
   def resolveWith(vars: Map[String,KeyType]) = BoxedRingExpr(r.resolveWith(vars))
   override def toString = s"[$r]"
 }
