@@ -63,7 +63,7 @@ protected case class RingPairType(l: RingType, r: RingType) extends RingType {
 
 case class MappingType(key: KeyType, ring: RingType) extends RingType {
   override def toString = ring match {
-    case IntType => s"Bag($key)"
+    case IntType => s"BagType($key)"
     case _ => s"$key→$ring"
   }
 }

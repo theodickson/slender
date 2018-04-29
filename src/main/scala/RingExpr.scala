@@ -132,13 +132,7 @@ case class Sum(child: RingExpr) extends UnaryRingExpr {
 
 case class Predicate(k1: KeyExpr, k2: KeyExpr) extends RingExpr {
 
-  val ringType = (k1.keyType,k2.keyType) match {
-    case (UnresolvedKeyType,_) => UnresolvedRingType
-    case (_,UnresolvedKeyType) => UnresolvedRingType
-    case (kt1,kt2) => if (kt1 == kt2) IntType else
-      throw InvalidPredicateException(s"Cannot compare keys of differing type $kt1 and $kt2 for equality.")
-
-  }
+  val ringType = k1.keyType === k2.keyType
 
   def resolveWith(vars: Map[String, KeyType]) = Predicate(k1.resolveWith(vars),k2.resolveWith(vars))
   override def toString = s"$k1==$k2"
@@ -160,7 +154,9 @@ case class UnboxedVarRingExpr(k: VarKeyExpr) extends NullaryRingExpr {
   val ringType: RingType = k.keyType match {
     case UnresolvedKeyType => UnresolvedRingType
     case BoxedRingType(r) => r
-    case _ => throw new IllegalArgumentException("Cannot unbox non-boxed ring variable.")
+    case t => throw new IllegalArgumentException(
+      s"Cannot unbox non-boxed ring variable ${k.name} with type $t."
+    )
   }
 
   override def resolveWith(vars: Map[String, KeyType]) = vars.get(k.name) match {

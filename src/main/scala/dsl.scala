@@ -60,7 +60,6 @@ object dsl {
     def =!=(other: String): RingExpr = Not(Predicate(k, other))
 
     def -->(r: RingExpr): YieldPair = YieldPair(k,r)
-    //def ==>(r: RingExpr): InfMapping = InfMapping(k, r)
   }
 
   implicit class IffImplicit(pair: (VarKeyExpr,RingExpr)) {
@@ -73,9 +72,9 @@ object dsl {
 
   def sng(e: KeyExpr): Sng = Sng(e, IntExpr(1))
   def sng(e: KeyExpr, r: RingExpr) = Sng(e, r)
-  def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
-  def fromK(k: BoxedRingExpr): RingExpr = k.r
-  def fromK(s: String): RingExpr = UnboxedVarRingExpr(UnresolvedVarKeyExpr(s))
+  implicit def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
+  implicit def fromK(k: BoxedRingExpr): RingExpr = k.r
+  implicit def fromK(s: String): RingExpr = UnboxedVarRingExpr(UnresolvedVarKeyExpr(s))
 
 
   case class ForComprehensionBuilder(x: VarKeyExpr, r1: RingExpr) {

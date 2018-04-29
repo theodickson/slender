@@ -54,6 +54,8 @@ sealed trait VarKeyExpr extends KeyExpr {
 }
 
 case class ResolvedVarKeyExpr(name: String, keyType: KeyType) extends VarKeyExpr {
+  //TODO = is this always okay to allow resolving of already resolved variables?
+  //i.e. in key nesting query, does it matter if inner for uses same var name?
   def resolveWith(vars: Map[String,KeyType]) = vars.get(name) match {
     case None => this
     case Some(`keyType`) => this

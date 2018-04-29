@@ -88,5 +88,14 @@ class DslTests extends FunSuite {
     )
   }
 
+  test("Unresolved query") {
+    val query = For ("x" <-- bagOfBags) Yield (
+      For ("y" <-- "x") Yield (
+        "y" --> sng("z")
+      )
+    )
+    println(query.ringType)
+    assert(!query.isResolved)
+  }
 
 }

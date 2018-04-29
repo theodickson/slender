@@ -18,6 +18,12 @@ sealed trait KeyType {
     case UnresolvedKeyType => UnresolvedKeyType
     case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
   }
+  def ===(other: KeyType): RingType = (this,other) match {
+    case (UnresolvedKeyType,_) => UnresolvedRingType
+    case (_,UnresolvedKeyType) => UnresolvedRingType
+    case _ => if (this == other) IntType else
+      throw InvalidPredicateException(s"Cannot compare keys of differing type $this and $other for equality.")
+  }
 }
 
 case object UnitType extends KeyType {
