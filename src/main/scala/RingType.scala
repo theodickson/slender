@@ -52,7 +52,6 @@ sealed trait RingType {
     case r: ResolvedRingType => BoxedRingType(r)
   }
 
-
 }
 
 case object UnresolvedRingType extends RingType {
