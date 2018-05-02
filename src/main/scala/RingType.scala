@@ -52,7 +52,6 @@ sealed trait RingType {
     case r: ResolvedRingType => BoxedRingType(r)
   }
 
-
 }
 
 case object UnresolvedRingType extends RingType {
@@ -65,7 +64,7 @@ sealed trait ResolvedRingType extends RingType {
     case (IntType, IntType) => IntType
     case (MappingType(k, r), IntType) => MappingType(k, r.resolvedDot(IntType))
     case (IntType, MappingType(k, r)) => MappingType(k, IntType.resolvedDot(r))
-    case (MappingType(k1, r1), MappingType(k2, r2)) => MappingType(KeyPair(k1,k2), r1.resolvedDot(r2))
+    case (MappingType(k1, r1), MappingType(k2, r2)) => MappingType(KeyPairType(k1,k2), r1.resolvedDot(r2))
     case (r1, r2) => throw InvalidRingDotException(s"Invalid types for dot operation: $r1 , $r2")
   }
 
@@ -75,19 +74,19 @@ case object IntType extends ResolvedRingType {
   override def toString = "Int"
 }
 
-case class RingPairType(l: ResolvedRingType, r: ResolvedRingType) extends ResolvedRingType {
-  override def toString = s"$l×$r"
+case class RingPairType(r1: ResolvedRingType, r2: ResolvedRingType) extends ResolvedRingType {
+  override def toString = s"$r1×$r2"
 }
 
-case class MappingType(key: ResolvedKeyType, ring: ResolvedRingType) extends ResolvedRingType {
-  override def toString = ring match {
-    case IntType => s"Bag($key)"
-    case _ => s"$key→$ring"
+case class MappingType(k: ResolvedKeyType, r: ResolvedRingType) extends ResolvedRingType {
+  override def toString = r match {
+    case IntType => s"Bag($k)"
+    case _ => s"$k→$r"
   }
 }
 
 object BagType {
-  def apply(keyType: ResolvedKeyType): ResolvedRingType = MappingType(keyType, IntType)
+  def apply(k: ResolvedKeyType): ResolvedRingType = MappingType(k, IntType)
 }
 
 case class InvalidRingDotException(msg: String) extends Exception(msg)
