@@ -5,73 +5,78 @@ sealed trait RingExpr {
   def isResolved: Boolean = ringType != UnresolvedRingType
   def resolveWith(vars: Map[String,KeyType]): RingExpr
   def resolve: RingExpr = resolveWith(Map.empty[String,KeyType])
+
+//  def freeVariables: Set[TypedFreeVariable] = ???
+//
+//  def shred: ShreddedRingExpr = ???
 }
 
-trait NullaryRingExpr extends RingExpr {
+sealed trait NullaryRingExpr extends RingExpr {
   def resolveWith(vars: Map[String,KeyType]) = this
 }
 
-trait UnaryRingExpr extends RingExpr {
+sealed trait UnaryRingExpr extends RingExpr {
   def child: RingExpr
   def ringType: RingType = child.ringType
+//  def resolveWith(vars: Map[String,KeyType]): this.type = this(child.resolveWith(vars))
 }
 
-trait BinaryRingExpr extends RingExpr {
+sealed trait BinaryRingExpr extends RingExpr {
   def left: RingExpr
   def right: RingExpr
 }
 
-trait MappingRingExpr extends RingExpr {
+sealed trait MappingExpr extends RingExpr {
   def keyType: KeyType
   def valueType: RingType
-  def ringType: RingType = keyType --> valueType
+  def ringType: RingType = keyType --> valueType //TODO - could hide errors by not being called on init
 }
 
-trait FiniteMappingRingExpr extends MappingRingExpr
+sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr
 
 case class IntExpr(value: Int) extends NullaryRingExpr {
   val ringType = IntType
   override def toString = s"$value"
 }
 
-case class Collection(keyType: KeyType, valueType: RingType, ref: String) extends FiniteMappingRingExpr
-  with NullaryRingExpr {
+case class PhysicalCollection(keyType: KeyType, valueType: RingType, ref: String) extends PhysicalMapping {
   override def toString = s"$ref:$ringType"
 }
 
-case class Bag(keyType: KeyType, ref: String) extends FiniteMappingRingExpr with NullaryRingExpr {
+case class PhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
   val valueType = IntType
   override def toString = s"$ref:$ringType"
 }
 
-case class InfMapping(key: VarKeyExpr, value: RingExpr) extends MappingRingExpr {
+case class InfiniteMappingExpr(key: FreeVariable, value: RingExpr) extends MappingExpr {
+//  assert(key.isInstanceOf[FreeVariable]) //TODO
   val keyType = key.keyType
   val valueType = value.ringType
 
   def resolveWith(vars: Map[String, KeyType]) = {
     val newKey = key.resolveWith(vars)
     val newValue = value.resolveWith(vars)
-    InfMapping(newKey, newValue)
+    InfiniteMappingExpr(newKey, newValue)
   }
 
   override def toString = s"{$key => $value}"
 }
 
-case class Pair(left: RingExpr, right: RingExpr) extends BinaryRingExpr {
+case class RingPairExpr(left: RingExpr, right: RingExpr) extends BinaryRingExpr {
   val ringType: RingType = left.ringType.pair(right.ringType)
-  def resolveWith(vars: Map[String, KeyType]) = Pair(left.resolveWith(vars), right.resolveWith(vars))
+  def resolveWith(vars: Map[String, KeyType]) = RingPairExpr(left.resolveWith(vars), right.resolveWith(vars))
 
   override def toString = s"⟨$left,$right⟩"
 }
 
-case class Project1(child: RingExpr) extends RingExpr {
-  val ringType: RingType = child.ringType._1
-  def resolveWith(vars: Map[String, KeyType]) = Project1(child.resolveWith(vars))
+case class Project1RingExpr(child: RingExpr) extends UnaryRingExpr {
+  override val ringType: RingType = child.ringType._1
+  def resolveWith(vars: Map[String, KeyType]) = Project1RingExpr(child.resolveWith(vars))
 }
 
-case class Project2(child: RingExpr) extends RingExpr {
+case class Project2RingExpr(child: RingExpr) extends RingExpr {
   val ringType: RingType = child.ringType._2
-  def resolveWith(vars: Map[String, KeyType]) = Project2(child.resolveWith(vars))
+  def resolveWith(vars: Map[String, KeyType]) = Project2RingExpr(child.resolveWith(vars))
 }
 
 case class Add(left: RingExpr, right: RingExpr) extends BinaryRingExpr {
@@ -101,7 +106,7 @@ case class Multiply(left: RingExpr, right: RingExpr) extends BinaryRingExpr {
       case MappingType(keyType,_) => right match {
         //If the RHS is indeed an InfMapping, resolve the RHS with the addition of its free variable
         //bound to the key type of the LHS:
-        case InfMapping(varKeyExpr,_) => right.resolveWith(vars ++ Map(varKeyExpr.name -> keyType))
+        case InfiniteMappingExpr(varKeyExpr,_) => right.resolveWith(vars ++ Map(varKeyExpr.name -> keyType))
         //If it's not, resolve with no added vars:
         case _ => right.resolveWith(vars)
       }
@@ -142,32 +147,20 @@ case class Not(child: RingExpr) extends UnaryRingExpr {
   override def toString = s"¬($child)"
 }
 
-case class Sng(k: KeyExpr, r: RingExpr) extends MappingRingExpr {
+case class Sng(k: KeyExpr, r: RingExpr) extends MappingExpr {
   val keyType = k.keyType
   val valueType = r.ringType
   def resolveWith(vars: Map[String, KeyType]) = Sng(k.resolveWith(vars), r.resolveWith(vars))
   override def toString = s"($k⟼$r)"
 }
 
-case class UnboxedVarRingExpr(k: VarKeyExpr) extends NullaryRingExpr {
-  val ringType: RingType = k.keyType match {
-    case UnresolvedKeyType => UnresolvedRingType
-    case BoxedRingType(r) => r
-    case t => throw new IllegalArgumentException(
-      s"Cannot unbox non-boxed ring variable ${k.name} with type $t."
-    )
-  }
+sealed trait FromK extends RingExpr
 
-  override def resolveWith(vars: Map[String, KeyType]) = vars.get(k.name) match {
-    case None => this
-    case Some(keyType) => k.keyType match {
-      case UnresolvedKeyType => UnboxedVarRingExpr(ResolvedVarKeyExpr(k.name,keyType))
-      case otherKeyType => if (keyType == otherKeyType) this else
-        throw new IllegalArgumentException("Key variable resolution conflict.")
-    }
-  }
-
-  override def toString = k.toString
+case class FromBoxedRing(k: KeyExpr) extends FromK {
+  val ringType: RingType = k.keyType.unbox
+  override def resolveWith(vars: Map[String, KeyType]) = FromBoxedRing(k.resolveWith(vars))
 }
+
+//case class FromLabel(l: Label, ctx: ShreddingContext) extends FromK
 
 case class InvalidPredicateException(str: String) extends Exception(str)

@@ -5,11 +5,11 @@ import dsl._
 import org.scalatest.FunSuite
 
 object collections {
-  val stringCounts1 = Collection(DomStringType, IntType, "stringCounts1")
-  val stringCounts2 = Collection(DomStringType, IntType, "stringCounts2")
-  val bagOfBags = Bag(BoxedRingType(MappingType(DomStringType, IntType)), "bagOfBags")
-  val intCounts = Collection(DomIntType, IntType, "intCounts")
-  val bagOfPairs = Bag(KeyPair(DomStringType,DomIntType), "bagOfPairs")
+  val stringCounts1 = PhysicalCollection(StringKeyType, IntType, "stringCounts1")
+  val stringCounts2 = PhysicalCollection(StringKeyType, IntType, "stringCounts2")
+  val bagOfBags = PhysicalBag(BoxedRingType(MappingType(StringKeyType, IntType)), "bagOfBags")
+  val intCounts = PhysicalCollection(IntKeyType, IntType, "intCounts")
+  val bagOfPairs = PhysicalBag(KeyPairType(StringKeyType,IntKeyType), "bagOfPairs")
   val const = IntExpr(1)
 }
 
@@ -39,7 +39,7 @@ class DslTests extends FunSuite {
   test("Simple yield") {
     val query = For ("x" <-- stringCounts1) Yield "x"
     assert(query.isResolved)
-    assert(query.ringType == MappingType(DomStringType,IntType))
+    assert(query.ringType == MappingType(StringKeyType,IntType))
     assert(query ==
       Sum(stringCounts1 * {"x" ==> sng("x")}).resolve
     )
@@ -48,7 +48,7 @@ class DslTests extends FunSuite {
   test("Predicated yield") {
     val query = For ("x" <-- intCounts iff "x" === 1) Yield "x"
     assert(query.isResolved)
-    assert(query.ringType == MappingType(DomIntType,IntType))
+    assert(query.ringType == MappingType(IntKeyType,IntType))
     assert(query ==
       Sum(intCounts * {"x" ==> sng("x","x"===1)}).resolve
     )
@@ -57,7 +57,7 @@ class DslTests extends FunSuite {
   test("Flatten") {
     val query = For ("x" <-- bagOfBags) Collect fromK("x")
     assert(query.isResolved)
-    assert(query.ringType == BagType(DomStringType))
+    assert(query.ringType == BagType(StringKeyType))
     assert(query ==
       Sum(bagOfBags * {"x" ==> fromK("x")}).resolve
     )
@@ -69,7 +69,7 @@ class DslTests extends FunSuite {
         "k"._1 --> sng("k"._2)
       )
     assert(query.isResolved)
-    assert(query.ringType == MappingType(DomStringType,BagType(DomIntType)))
+    assert(query.ringType == MappingType(StringKeyType,BagType(IntKeyType)))
   }
 
   test ("Key nesting") {
@@ -83,7 +83,7 @@ class DslTests extends FunSuite {
     assert(query.isResolved)
     assert(query.ringType ==
       BagType(
-        (DomStringType, BoxedRingType(BagType(DomIntType)))
+        (StringKeyType, BoxedRingType(BagType(IntKeyType)))
       )
     )
   }
@@ -95,7 +95,7 @@ class DslTests extends FunSuite {
       )
     )
     assert(!query.isResolved)
-    val resolvedQuery = query.resolveWith(Map("z" -> DomStringType))
+    val resolvedQuery = query.resolveWith(Map("z" -> StringKeyType))
     assert(resolvedQuery.isResolved)
     println(resolvedQuery.ringType)
   }

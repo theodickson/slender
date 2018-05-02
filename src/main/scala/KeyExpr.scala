@@ -15,12 +15,12 @@ case object UnitKeyExpr extends NullaryKeyExpr {
 }
 
 case class IntKeyExpr(i: Int) extends NullaryKeyExpr {
-  val keyType = DomIntType
+  val keyType = IntKeyType
   override def toString = s"$i"
 }
 
 case class StringKeyExpr(s: String) extends NullaryKeyExpr {
-  val keyType = DomStringType
+  val keyType = StringKeyType
   override def toString = s""""$s""""
 }
 
@@ -30,30 +30,24 @@ case class KeyPairExpr(l: KeyExpr, r: KeyExpr) extends KeyExpr {
   override def toString = s"⟨$l,$r⟩"
 }
 
-case class Project1K(k: KeyExpr) extends KeyExpr {
+case class Project1KeyExpr(k: KeyExpr) extends KeyExpr {
   val keyType = k.keyType._1
-  def resolveWith(vars: Map[String,KeyType]) = Project1K(k.resolveWith(vars))
+  def resolveWith(vars: Map[String,KeyType]) = Project1KeyExpr(k.resolveWith(vars))
   override def toString = s"($k)._1"
 }
 
-case class Project2K(k: KeyExpr) extends KeyExpr {
+case class Project2KeyExpr(k: KeyExpr) extends KeyExpr {
   val keyType = k.keyType._2
-  def resolveWith(vars: Map[String,KeyType]) = Project2K(k.resolveWith(vars))
+  def resolveWith(vars: Map[String,KeyType]) = Project2KeyExpr(k.resolveWith(vars))
   override def toString = s"($k)._2"
 }
 
-case class BoxedRingExpr(r: RingExpr) extends KeyExpr {
-  val keyType = r.ringType.box
-  def resolveWith(vars: Map[String,KeyType]) = BoxedRingExpr(r.resolveWith(vars))
-  override def toString = s"[$r]"
-}
-
-sealed trait VarKeyExpr extends KeyExpr {
+sealed trait FreeVariable extends KeyExpr {
   def name: String
-  override def resolveWith(vars: Map[String,KeyType]): VarKeyExpr
+  override def resolveWith(vars: Map[String,KeyType]): FreeVariable
 }
 
-case class ResolvedVarKeyExpr(name: String, keyType: KeyType) extends VarKeyExpr {
+case class TypedFreeVariable(name: String, keyType: KeyType) extends FreeVariable {
   //TODO = is this always okay to allow resolving of already resolved variables?
   //i.e. in key nesting query, does it matter if inner for uses same var name?
   def resolveWith(vars: Map[String,KeyType]) = vars.get(name) match {
@@ -66,13 +60,35 @@ case class ResolvedVarKeyExpr(name: String, keyType: KeyType) extends VarKeyExpr
   override def toString = s""""$name":$keyType"""
 }
 
-case class UnresolvedVarKeyExpr(name: String) extends VarKeyExpr {
+case class UntypedFreeVariable(name: String) extends FreeVariable {
   val keyType = UnresolvedKeyType
   def resolveWith(vars: Map[String,KeyType]) = vars.get(name) match {
     case None => this
-    case Some(kT) => ResolvedVarKeyExpr(name, kT)
+    case Some(kT) => TypedFreeVariable(name, kT)
   }
   override def toString = s""""$name":?"""
 }
 
+sealed trait ToK extends KeyExpr
+
+case class BoxedRingExpr(r: RingExpr) extends ToK {
+  val keyType = r.ringType.box
+  def resolveWith(vars: Map[String,KeyType]) = BoxedRingExpr(r.resolveWith(vars))
+  override def toString = s"[$r]"
+}
+
+//case class LabelExpr(r: RingExpr) extends ToK {
+//
+//  val keyType = LabelType
+//
+//  //Label based on free variables of r??
+//
+//  def resolveWith(vars: Map[String,KeyType]) = throw IllegalResolutionException(
+//    "Cannot attempt to resolve shredded expression. Should only shred fully resolved" +
+//      "expressions"
+//  )
+//
+//}
+
 case class VariableResolutionConflictException(msg: String) extends Exception(msg)
+case class IllegalResolutionException(msg: String) extends Exception(msg)
