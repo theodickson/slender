@@ -3,7 +3,6 @@ package slender
 sealed trait RingExpr {
   def ringType: RingType
   def freeVariables: Set[TypedFreeVariable]
-//  def shred: ShreddedRingExpr = ???
 }
 
 sealed trait NullaryRingExpr extends RingExpr {
@@ -114,9 +113,10 @@ case class FromBoxedRing(k: KeyExpr) extends FromK {
   val ringType: RingType = k.keyType.unbox
   def freeVariables = k.freeVariables
 }
-
-case class FromLabel(l: LabelExpr, ctx: ShreddingContext) extends FromK with NullaryRingExpr {
-  val ringType: RingType = ???
-}
+//
+//case class FromLabel(l: LabelExpr, ctx: ShreddingContext) extends FromK with UnaryRingExpr {
+////  val ringType: RingType = l.r.ringType
+//  def child = l.r
+//}
 
 case class InvalidPredicateException(str: String) extends Exception(str)
