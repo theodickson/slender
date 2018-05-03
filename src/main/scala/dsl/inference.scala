@@ -63,7 +63,6 @@ object inference {
     case KeyPairExpr(l, r) => KeyPairExpr(inferTypesK(l, vars), inferTypesK(r, vars))
     case Project1KeyExpr(c) => Project1KeyExpr(inferTypesK(c, vars))
     case Project2KeyExpr(c) => Project2KeyExpr(inferTypesK(c, vars))
-    //case _ : FreeVariable => throw new IllegalStateException("Use inferTypesFreeVar for free variables.")
     case BoxedRingExpr(r) => BoxedRingExpr(inferTypesR(r, vars))
     case UntypedFreeVariable(name) => vars.get(name) match {
       case None => k
@@ -78,5 +77,6 @@ object inference {
         s"Tried to resolve var $name with type $otherType, already had type $kT."
       )
     }
+    case LabelExpr(_) => k
   }
 }
