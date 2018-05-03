@@ -88,16 +88,16 @@ class DslTests extends FunSuite {
     )
   }
 
-  test("Unresolved query") {
+  test("Untyped query") {
     val query = For ("x" <-- bagOfBags) Yield (
       For ("y" <-- "x") Yield (
         "y" --> sng("z")
       )
     )
     assert(!query.isTyped)
-    val resolvedQuery = inferTypesR(query, Map("z" -> StringKeyType))
-    assert(resolvedQuery.isTyped)
-    println(resolvedQuery.ringType)
+    val typedQuery = inferTypesR(query, Map("z" -> StringKeyType))
+    assert(typedQuery.isTyped)
+    println(typedQuery.ringType)
   }
 
 }
