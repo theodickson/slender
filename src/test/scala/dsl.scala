@@ -97,7 +97,5 @@ class DslTests extends FunSuite {
     assert(!query.isTyped)
     val typedQuery = inferTypesR(query, Map("z" -> StringKeyType))
     assert(typedQuery.isTyped)
-    println(typedQuery.ringType)
   }
-
 }

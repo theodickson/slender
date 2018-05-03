@@ -1,7 +1,7 @@
-//package slender
-//
-//trait ShreddedRingExpr {
-//  def topExpr: RingExpr
-//  def subExprs: Map[LabelExpr,ShreddedRingExpr]
-//  def nestedExpr: RingExpr
-//}
+package slender
+
+trait ShreddedRingExpr {
+  def flatExpr: RingExpr
+  def context: Map[LabelExpr,ShreddedRingExpr]
+  def nestedExpr: RingExpr
+}
