@@ -2,20 +2,24 @@ package slender
 
 sealed trait RingExpr {
   def ringType: RingType
-//  def freeVariables: Set[TypedFreeVariable] = ???
+  def freeVariables: Set[TypedFreeVariable]
 //  def shred: ShreddedRingExpr = ???
 }
 
-sealed trait NullaryRingExpr extends RingExpr
+sealed trait NullaryRingExpr extends RingExpr {
+  def freeVariables = Set.empty
+}
 
 sealed trait UnaryRingExpr extends RingExpr {
   def child: RingExpr
   def ringType: RingType = child.ringType
+  def freeVariables = child.freeVariables
 }
 
 sealed trait BinaryRingExpr extends RingExpr {
   def left: RingExpr
   def right: RingExpr
+  def freeVariables = left.freeVariables ++ right.freeVariables
 }
 
 sealed trait MappingExpr extends RingExpr {
@@ -25,6 +29,12 @@ sealed trait MappingExpr extends RingExpr {
 }
 
 sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr
+
+sealed trait LogicalMappingExpr extends MappingExpr {
+  def key: KeyExpr
+  def value: RingExpr
+  def freeVariables = key.freeVariables ++ value.freeVariables
+}
 
 case class IntExpr(value: Int) extends NullaryRingExpr {
   val ringType = IntType
@@ -40,7 +50,7 @@ case class PhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
   override def toString = s"$ref:$ringType"
 }
 
-case class InfiniteMappingExpr(key: FreeVariable, value: RingExpr) extends MappingExpr {
+case class InfiniteMappingExpr(key: FreeVariable, value: RingExpr) extends LogicalMappingExpr {
   val keyType = key.keyType
   val valueType = value.ringType
   override def toString = s"{$key => $value}"
@@ -55,8 +65,8 @@ case class Project1RingExpr(child: RingExpr) extends UnaryRingExpr {
   override val ringType: RingType = child.ringType._1
 }
 
-case class Project2RingExpr(child: RingExpr) extends RingExpr {
-  val ringType: RingType = child.ringType._2
+case class Project2RingExpr(child: RingExpr) extends UnaryRingExpr {
+  override val ringType: RingType = child.ringType._2
 }
 
 case class Add(left: RingExpr, right: RingExpr) extends BinaryRingExpr {
@@ -85,24 +95,28 @@ case class Sum(child: RingExpr) extends UnaryRingExpr {
 case class Predicate(k1: KeyExpr, k2: KeyExpr) extends RingExpr {
   val ringType = k1.keyType === k2.keyType
   override def toString = s"$k1==$k2"
+  def freeVariables = k1.freeVariables ++ k2.freeVariables
 }
 
 case class Not(child: RingExpr) extends UnaryRingExpr {
   override def toString = s"¬($child)"
 }
 
-case class Sng(k: KeyExpr, r: RingExpr) extends MappingExpr {
-  val keyType = k.keyType
-  val valueType = r.ringType
-  override def toString = s"($k⟼$r)"
+case class Sng(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
+  val keyType = key.keyType
+  val valueType = value.ringType
+  override def toString = s"($key⟼$value)"
 }
 
 sealed trait FromK extends RingExpr
 
 case class FromBoxedRing(k: KeyExpr) extends FromK {
   val ringType: RingType = k.keyType.unbox
+  def freeVariables = k.freeVariables
 }
 
-//case class FromLabel(l: Label, ctx: ShreddingContext) extends FromK
+case class FromLabel(l: LabelExpr, ctx: ShreddingContext) extends FromK with NullaryRingExpr {
+  val ringType: RingType = ???
+}
 
 case class InvalidPredicateException(str: String) extends Exception(str)
