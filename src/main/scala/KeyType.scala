@@ -2,8 +2,6 @@ package slender
 
 sealed trait KeyType {
 
-  type Type
-
   def pair(k: KeyType): KeyType = (this,k) match {
     case (UnresolvedKeyType,_) => UnresolvedKeyType
     case (_,UnresolvedKeyType) => UnresolvedKeyType
@@ -47,22 +45,17 @@ case object UnresolvedKeyType extends KeyType
 
 sealed trait ResolvedKeyType extends KeyType
 
-case object UnitType extends ResolvedKeyType {
-  type Type = Unit
-}
+case object UnitType extends ResolvedKeyType
 
 case object IntKeyType extends ResolvedKeyType {
-  type Type = Int
   override def toString = "Int"
 }
 
 case object StringKeyType extends ResolvedKeyType {
-  type Type = String
   override def toString = "String"
 }
 
 case class KeyPairType(k1: ResolvedKeyType, k2: ResolvedKeyType) extends ResolvedKeyType {
-  type Type = (k1.Type, k2.Type)
   override def toString = s"$k1×$k2"
 }
 
