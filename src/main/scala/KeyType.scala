@@ -8,6 +8,11 @@ sealed trait KeyType {
     case (l: ResolvedKeyType, r: ResolvedKeyType) => KeyPairType(l,r)
   }
 
+  def triple(k1: KeyType, k2: KeyType): KeyType = (this,k1,k2) match {
+    case (UnresolvedKeyType,_,_) | (_,UnresolvedKeyType,_) | (_,_,UnresolvedKeyType) => UnresolvedKeyType
+    case (k1: ResolvedKeyType, k2: ResolvedKeyType, k3: ResolvedKeyType) => KeyTuple3Type(k1, k2, k3)
+  }
+
   def -->(r: RingType): RingType = (this,r) match {
     case (UnresolvedKeyType,_) => UnresolvedRingType
     case (_,UnresolvedRingType) => UnresolvedRingType
@@ -15,15 +20,21 @@ sealed trait KeyType {
   }
 
   def _1: KeyType = this match {
-    case KeyPairType(l,_) => l
+    case k : Tuple1KeyType => k.t1
     case UnresolvedKeyType => UnresolvedKeyType
-    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
+    case _ => throw InvalidKeyProjectionException(s"Cannot project-1 key of type $this.")
   }
 
   def _2: KeyType = this match {
-    case KeyPairType(_,r) => r
+    case k : Tuple2KeyType => k.t2
     case UnresolvedKeyType => UnresolvedKeyType
-    case _ => throw InvalidKeyProjectionException("Cannot project non-pair type key.")
+    case _ => throw InvalidKeyProjectionException(s"Cannot project-2 key of type $this.")
+  }
+
+  def _3: KeyType = this match {
+    case k : Tuple3KeyType => k.t3
+    case UnresolvedKeyType => UnresolvedKeyType
+    case _ => throw InvalidKeyProjectionException(s"Cannot project-3 key of type $this.")
   }
 
   def ===(other: KeyType): RingType = (this,other) match {
@@ -45,6 +56,18 @@ case object UnresolvedKeyType extends KeyType
 
 sealed trait ResolvedKeyType extends KeyType
 
+sealed trait Tuple1KeyType extends ResolvedKeyType {
+  def t1: ResolvedKeyType
+}
+
+sealed trait Tuple2KeyType extends Tuple1KeyType {
+  def t2: ResolvedKeyType
+}
+
+sealed trait Tuple3KeyType extends Tuple2KeyType {
+  def t3: ResolvedKeyType
+}
+
 case object UnitType extends ResolvedKeyType
 
 case object IntKeyType extends ResolvedKeyType {
@@ -55,8 +78,14 @@ case object StringKeyType extends ResolvedKeyType {
   override def toString = "String"
 }
 
-case class KeyPairType(k1: ResolvedKeyType, k2: ResolvedKeyType) extends ResolvedKeyType {
-  override def toString = s"$k1×$k2"
+case class KeyPairType(override val t1: ResolvedKeyType, override val t2: ResolvedKeyType) extends Tuple2KeyType {
+  override def toString = s"$t1×$t2"
+}
+
+case class KeyTuple3Type(override val t1: ResolvedKeyType,
+                         override val t2: ResolvedKeyType,
+                         override val t3: ResolvedKeyType) extends Tuple3KeyType {
+  override def toString = s"$t1×$t2×$t3"
 }
 
 case object LabelType extends ResolvedKeyType

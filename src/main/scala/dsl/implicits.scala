@@ -13,6 +13,7 @@ object implicits {
     //duplicate keyexpr implicits here:
     def _1: KeyExpr = Project1KeyExpr(s)
     def _2: KeyExpr = Project2KeyExpr(s)
+    def _3: KeyExpr = Project3KeyExpr(s)
 
     def ===(other: KeyExpr): RingExpr = Predicate(s, other)
     def ===(other: String): RingExpr = Predicate(s, other)
@@ -43,6 +44,7 @@ object implicits {
   implicit class KeyExprImplicits(k: KeyExpr) {
     def _1: KeyExpr = Project1KeyExpr(k)
     def _2: KeyExpr = Project2KeyExpr(k)
+    def _3: KeyExpr = Project3KeyExpr(k)
 
     def ===(other: KeyExpr): RingExpr = Predicate(k, other)
     def ===(other: String): RingExpr = Predicate(k, other)
@@ -80,7 +82,7 @@ object implicits {
 
   implicit def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
 
-  implicit def fromK(k: BoxedRingExpr): RingExpr = k.r
+  implicit def fromK(k: KeyExpr): RingExpr = FromBoxedRing(k)
 
   implicit def fromK(s: String): RingExpr = FromBoxedRing(UntypedFreeVariable(s))
 

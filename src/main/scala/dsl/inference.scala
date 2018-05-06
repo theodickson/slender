@@ -10,6 +10,8 @@ object inference {
     case _ : NullaryRingExpr => r
     case InfiniteMappingExpr(k, v) => InfiniteMappingExpr(inferTypesFreeVar(k, vars), inferTypesR(v, vars))
     case RingPairExpr(l, r) => RingPairExpr(inferTypesR(l, vars), inferTypesR(r, vars))
+    case RingTuple3Expr(r1, r2, r3) =>
+      RingTuple3Expr(inferTypesR(r1, vars), inferTypesR(r2, vars), inferTypesR(r3, vars))
     case Project1RingExpr(p) => Project1RingExpr(inferTypesR(p, vars))
     case Project2RingExpr(p) => Project2RingExpr(inferTypesR(p, vars))
     case Add(l, r) => Add(inferTypesR(l, vars), inferTypesR(r, vars))
@@ -61,8 +63,10 @@ object inference {
   def inferTypesK(k: KeyExpr, vars: Map[String,ResolvedKeyType]): KeyExpr = k match {
     case _ : NullaryKeyExpr => k
     case KeyPairExpr(l, r) => KeyPairExpr(inferTypesK(l, vars), inferTypesK(r, vars))
+    case KeyTuple3Expr(k1, k2, k3) => KeyTuple3Expr(inferTypesK(k1, vars), inferTypesK(k2, vars), inferTypesK(k3, vars))
     case Project1KeyExpr(c) => Project1KeyExpr(inferTypesK(c, vars))
     case Project2KeyExpr(c) => Project2KeyExpr(inferTypesK(c, vars))
+    case Project3KeyExpr(c) => Project3KeyExpr(inferTypesK(c, vars))
     case BoxedRingExpr(r) => BoxedRingExpr(inferTypesR(r, vars))
     case UntypedFreeVariable(name) => vars.get(name) match {
       case None => k

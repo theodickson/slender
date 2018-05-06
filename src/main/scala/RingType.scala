@@ -8,6 +8,11 @@ sealed trait RingType {
     case (r1:ResolvedRingType,r2:ResolvedRingType) => RingPairType(r1,r2)
   }
 
+  def triple(k1: RingType, k2: RingType): RingType = (this,k1,k2) match {
+    case (UnresolvedRingType,_,_) | (_,UnresolvedRingType,_) | (_,_,UnresolvedRingType) => UnresolvedRingType
+    case (k1: ResolvedRingType, k2: ResolvedRingType, k3: ResolvedRingType) => RingTuple3Type(k1, k2, k3)
+  }
+
   def dot(r: RingType): RingType = (this,r) match {
     case (UnresolvedRingType,_) => UnresolvedRingType
     case (_,UnresolvedRingType) => UnresolvedRingType
@@ -47,6 +52,12 @@ sealed trait RingType {
     case r => throw InvalidRingProjectionException(s"Invalid type for projection operation: $r")
   }
 
+//  def _3: RingType = this match {
+//    case UnresolvedRingType => UnresolvedRingType
+//    case RingPairType(_, _2) => _2
+//    case r => throw InvalidRingProjectionException(s"Invalid type for projection operation: $r")
+//  }
+
   def box: KeyType = this match {
     case UnresolvedRingType => UnresolvedKeyType
     case r: ResolvedRingType => BoxedRingType(r)
@@ -76,6 +87,10 @@ case object IntType extends ResolvedRingType {
 
 case class RingPairType(r1: ResolvedRingType, r2: ResolvedRingType) extends ResolvedRingType {
   override def toString = s"$r1×$r2"
+}
+
+case class RingTuple3Type(r1: ResolvedRingType, r2: ResolvedRingType, r3: ResolvedRingType) extends ResolvedRingType {
+  override def toString = s"$r1×$r2×$r3"
 }
 
 case class MappingType(k: ResolvedKeyType, r: ResolvedRingType) extends ResolvedRingType {
