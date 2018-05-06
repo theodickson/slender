@@ -43,18 +43,18 @@ case class ListExecutionContext(collections: (String,ListCollectionLike[_,_,_])*
   def get(ref: String) = collections.filter(_._1 == ref).head._2
 }
 
-object ListExecutor extends Executor[ListExecutionContext] {
-
-  def execute(expr: RingExpr, ctx: ListExecutionContext): Any = expr match {
-    case IntExpr(i) => i
-    case PhysicalCollection(kt,vt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,vt.Type)]]
-    case PhysicalBag(kt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,Int)]]
-    case Sum(c) => {
-      val inner = execute(c, ctx).asInstanceOf[List[innerRingType.Type]]
-      Ring.sum(inner)
-    }
-  }
-}
+//object ListExecutor extends Executor[ListExecutionContext] {
+//
+//  def execute(expr: RingExpr, ctx: ListExecutionContext): Any = expr match {
+//    case IntExpr(i) => i
+//    case PhysicalCollection(kt,vt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,vt.Type)]]
+//    case PhysicalBag(kt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,Int)]]
+//    case Sum(c) => {
+//      val inner = execute(c, ctx).asInstanceOf[List[innerRingType.Type]]
+//      Ring.sum(inner)
+//    }
+//  }
+//}
 
 
 
