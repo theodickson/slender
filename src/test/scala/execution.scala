@@ -24,21 +24,11 @@ class ExecutionTests extends FunSuite {
     val result = ListExecutor.execute(stringCountsExpr, ctx)
     println(result)
   }
-//
-//  test("Sum list.") {
-//    val result = ListExecutor.execute(sumExpr, ctx)
-//    println(result)
-//  }
-  test("Casting test.") {
 
-    trait TypeMap {
-      type A = Int.type
-      type B = String.type
-
-      def get(ringType: RingType): TypeTag[_]
-    }
-
-
+  test("Sum list.") {
+    val result = ListExecutor.execute(sumExpr, ctx)
+    println(result)
   }
+
 
 }

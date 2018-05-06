@@ -1,23 +1,24 @@
 package slender.execution
 
 import slender._
-import scala.reflect.api.TypeTags
 
-//trait Ring[V] {
-//  def zero
-//}
-//object ListExecutionTypes extends ExecutionTypeContext {
-//  def get(ringType: RingType) = ringType match {
-//    case IntType => Int
-//    case MappingType(kT,rT) => List[]
-//  }
-//  def get(keyType: KeyType): Nothing  = keyType match {
-//    case UnitType => Unit
-//    case IntKeyType => Int
-//    case StringKeyType => String
-//    case KeyPairType(k1,k2) => (get(k1), get(k2))
-//  }
-//}
+import scala.reflect.runtime.universe._
+
+object Ring {
+
+  def plus(r1: Any, r2: Any): Any = (r1,r2) match {
+    case (r11: Int, r21: Int) => r11 + r21
+  }
+
+  def zero[T : TypeTag]: Any = {
+    typeOf[T] match {
+      case t if t =:= typeOf[Int] => 0
+    }
+  }
+
+  def sum[T: TypeTag](list: List[T]): Any = list.fold(zero[T])(plus)
+
+}
 
 trait ListCollectionLike[T, K, V] {
   def list: List[T]
@@ -46,8 +47,26 @@ object ListExecutor extends Executor[ListExecutionContext] {
 
   def execute(expr: RingExpr, ctx: ListExecutionContext): Any = expr match {
     case IntExpr(i) => i
-    case PhysicalCollection(_,_,ref) => ctx.get(ref).list
-    case PhysicalBag(_,ref) => ctx.get(ref).list
-    //case Sum(c) => execute(c, ctx).asInstanceOf[]
+    case PhysicalCollection(kt,vt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,vt.Type)]]
+    case PhysicalBag(kt,ref) => ctx.get(ref).list.asInstanceOf[List[(kt.Type,Int)]]
+    case Sum(c) => {
+      val inner = execute(c, ctx).asInstanceOf[List[innerRingType.Type]]
+      Ring.sum(inner)
+    }
   }
 }
+
+
+
+//object ListExecutionTypes extends ExecutionTypeContext {
+//  def get(ringType: RingType) = ringType match {
+//    case IntType => Int
+//    case MappingType(kT,rT) => List[]
+//  }
+//  def get(keyType: KeyType): Nothing  = keyType match {
+//    case UnitType => Unit
+//    case IntKeyType => Int
+//    case StringKeyType => String
+//    case KeyPairType(k1,k2) => (get(k1), get(k2))
+//  }
+//}
