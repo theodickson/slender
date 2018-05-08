@@ -7,8 +7,8 @@ object implicits {
 
   implicit class StringImplicits(s: String) {
 
-    def <--(r: RingExpr): (FreeVariable, RingExpr) = (UntypedFreeVariable(s),r)
-    def -->(r: RingExpr): YieldPair = YieldPair(UntypedFreeVariable(s),r)
+    def <--(r: RingExpr): (VariableKeyExpr, RingExpr) = (UntypedVariableKeyExpr(s),r)
+    def -->(r: RingExpr): YieldPair = YieldPair(UntypedVariableKeyExpr(s),r)
     //since implicit methods on result of implicit conversions dont tend to resolve,
     //duplicate keyexpr implicits here:
     def _1: KeyExpr = Project1KeyExpr(s)
@@ -22,6 +22,7 @@ object implicits {
 
     def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(s, r)
   }
+
 
   implicit class RingExprImplicits(r: RingExpr) {
     def +(r1: RingExpr) = Add(r, r1)
@@ -54,15 +55,15 @@ object implicits {
     def -->(r: RingExpr): YieldPair = YieldPair(k,r)
   }
 
-  implicit class IffImplicit(pair: (FreeVariable,RingExpr)) {
-    def iff(r1: RingExpr): (FreeVariable,(RingExpr,RingExpr)) = (pair._1,(pair._2,r1))
+  implicit class IffImplicit(pair: (VariableKeyExpr,RingExpr)) {
+    def iff(r1: RingExpr): (VariableKeyExpr,(RingExpr,RingExpr)) = (pair._1,(pair._2,r1))
   }
 
-  implicit class VarKeyExprImplicits(x: FreeVariable) {
+  implicit class VarKeyExprImplicits(x: VariableKeyExpr) {
     def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(x, r)
   }
 
-  implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedFreeVariable = UntypedFreeVariable(s)
+  implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedVariableKeyExpr = UntypedVariableKeyExpr(s)
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
@@ -84,20 +85,20 @@ object implicits {
 
   implicit def fromK(k: KeyExpr): RingExpr = FromBoxedRing(k)
 
-  implicit def fromK(s: String): RingExpr = FromBoxedRing(UntypedFreeVariable(s))
+  implicit def fromK(s: String): RingExpr = FromBoxedRing(UntypedVariableKeyExpr(s))
 
   def sng(e: KeyExpr): Sng = Sng(e, IntExpr(1))
 
   def sng(e: KeyExpr, r: RingExpr) = Sng(e, r)
 
 
-  case class ForComprehensionBuilder(x: FreeVariable, r1: RingExpr) {
+  case class ForComprehensionBuilder(x: VariableKeyExpr, r1: RingExpr) {
     def Collect(r2: RingExpr): RingExpr = Sum(r1 * {x ==> r2}).inferTypes
     def Yield(pair: YieldPair): RingExpr = Collect(sng(pair.k, pair.r))
     def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
   }
 
-  case class PredicatedForComprehensionBuilder(x: FreeVariable, exprPred: (RingExpr, RingExpr)) {
+  case class PredicatedForComprehensionBuilder(x: VariableKeyExpr, exprPred: (RingExpr, RingExpr)) {
     val r1 = exprPred._1
     val p = exprPred._2
     val builder = ForComprehensionBuilder(x, r1)
@@ -107,9 +108,9 @@ object implicits {
   }
 
   object For {
-    def apply(paired: (FreeVariable, RingExpr)): ForComprehensionBuilder =
+    def apply(paired: (VariableKeyExpr, RingExpr)): ForComprehensionBuilder =
       ForComprehensionBuilder(paired._1, paired._2)
-    def apply(paired: (FreeVariable, (RingExpr,RingExpr))): PredicatedForComprehensionBuilder =
+    def apply(paired: (VariableKeyExpr, (RingExpr,RingExpr))): PredicatedForComprehensionBuilder =
       PredicatedForComprehensionBuilder(paired._1, paired._2)
   }
 

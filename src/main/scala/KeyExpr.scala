@@ -27,20 +27,17 @@ sealed trait TernaryKeyExpr extends KeyExpr with TernaryExpr
 
 sealed trait Tuple1KeyExpr extends KeyExpr with UnaryKeyExpr {
   def c1: KeyExpr
-//  def shredR: Tuple1KeyExpr = ??? //TODO
 }
 
 sealed trait Tuple2KeyExpr extends KeyExpr with BinaryKeyExpr {
   def c1: KeyExpr
   def c2: KeyExpr
-//  def shredR: Tuple2KeyExpr = ??? //TODO
 }
 
 sealed trait Tuple3KeyExpr extends KeyExpr with TernaryKeyExpr {
   def c1: KeyExpr
   def c2: KeyExpr
   def c3: KeyExpr
-//   shredR: Tuple3KeyExpr = ??? //TODO
 }
 
 case object UnitKeyExpr extends NullaryKeyExpr {
@@ -83,8 +80,8 @@ case class KeyTuple3Expr(c1: KeyExpr, c2: KeyExpr, c3: KeyExpr) extends Tuple3Ke
 case class Project1KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
   val exprType = c1.exprType._1
   override def toString = c1 match {
-    case TypedFreeVariable(name, kt) => s""""$name"._1"""
-    case UntypedFreeVariable(name) => s""""$name._1:?"""
+    case TypedVariableKeyExpr(name, kt) => s""""$name"._1"""
+    case UntypedVariableKeyExpr(name) => s""""$name._1:?"""
     case _ => s"$c1._1"
   }
 
@@ -98,8 +95,8 @@ case class Project1KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
 case class Project2KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
   val exprType = c1.exprType._2
   override def toString = c1 match {
-    case TypedFreeVariable(name, kt) => s""""$name"._2"""
-    case UntypedFreeVariable(name) => s""""$name._2:?"""
+    case TypedVariableKeyExpr(name, kt) => s""""$name"._2"""
+    case UntypedVariableKeyExpr(name) => s""""$name._2:?"""
     case _ => s"$c1._2"
   }
 
@@ -113,8 +110,8 @@ case class Project2KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
 case class Project3KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
   val exprType = c1.exprType._3
   override def toString = c1 match {
-    case TypedFreeVariable(name, kt) => s""""$name"._3"""
-    case UntypedFreeVariable(name) => s""""$name._3:?"""
+    case TypedVariableKeyExpr(name, kt) => s""""$name"._3"""
+    case UntypedVariableKeyExpr(name) => s""""$name._3:?"""
     case _ => s"$c1._3"
   }
 
@@ -125,24 +122,24 @@ case class Project3KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
   def shredR = Project3KeyExpr(c1.shred)
 }
 
-sealed trait FreeVariable extends NullaryKeyExpr {
+sealed trait VariableKeyExpr extends NullaryKeyExpr {
   def name: String
 }
 
-case class TypedFreeVariable(name: String, exprType: KeyType) extends FreeVariable {
+case class TypedVariableKeyExpr(name: String, exprType: KeyType) extends VariableKeyExpr {
   override def toString = s""""$name""""
   override def freeVariables = Set(this)
 
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = vars.get(name) match {
     case None | Some(`exprType`) => this
-    case Some(otherType) => if (overwrite) TypedFreeVariable(name, otherType) else
+    case Some(otherType) => if (overwrite) TypedVariableKeyExpr(name, otherType) else
       throw VariableResolutionConflictException(
         s"Tried to resolve var $name with type $otherType, already had type $exprType, overwriting false."
       )
   }
 }
 
-case class UntypedFreeVariable(name: String) extends FreeVariable {
+case class UntypedVariableKeyExpr(name: String) extends VariableKeyExpr {
   val exprType = UnresolvedKeyType
   override def toString = s""""$name":?"""
   override def freeVariables = throw IllegalFreeVariableRequestException(
@@ -152,7 +149,7 @@ case class UntypedFreeVariable(name: String) extends FreeVariable {
 
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = vars.get(name) match {
     case None => this
-    case Some(eT) => TypedFreeVariable(name, eT)
+    case Some(eT) => TypedVariableKeyExpr(name, eT)
   }
 }
 
@@ -169,14 +166,19 @@ case class BoxedRingExpr(c1: RingExpr) extends ToK {
 }
 
 case class LabelExpr(c1: RingExpr) extends ToK {
+
   val exprType = c1.exprType match {
     case rt: ResolvedRingType => LabelType(rt)
-    case _ => throw new IllegalStateException("Cannot create labeltype from unresovled ring type.")
+    case _ => throw new IllegalStateException("Cannot create labeltype from unresolved ring type.")
   }
+
   private def id = hashCode.abs.toString.take(3).toInt
-  override def toString = s"Label($id}"
-  def explain = s"$id - $c1"
-  override def labelExplanations = explain +: c1.labelExplanations
+
+  override def toString = s"Label($id,${freeVariables.mkString(",")})"
+
+  def explainFreeVariables = freeVariables.map(v => s"${v.name}:${v.exprType}").mkString(", ")
+
+  override def labelExplanations = c1.labelExplanations :+ s"$id - $explainFreeVariables - $c1"
 
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     LabelExpr(c1.replaceTypes(vars, overwrite))

@@ -2,18 +2,15 @@ package slender
 
 trait Expr {
   def children: Seq[Expr]
-  def freeVariables: Set[TypedFreeVariable] =
-    children.foldRight(Set.empty[TypedFreeVariable])((v,acc) => acc ++ v.freeVariables)
+  def freeVariables: Set[VariableKeyExpr] =
+    children.foldRight(Set.empty[VariableKeyExpr])((v, acc) => acc ++ v.freeVariables)
   def labelExplanations: Seq[String] =
-    children.foldRight(Seq.empty[String])((v,acc) => acc ++ v.labelExplanations)
-//  def replaceTypes(vars: Map[String,ResolvedKeyType], overwrite: Boolean): this.type
-//  def inferTypes(vars: Map[String,ResolvedKeyType]): this.type = replaceTypes(vars, false)
-//  def inferTypes: this.type = inferTypes(Map.empty)
+    children.foldLeft(Seq.empty[String])((acc,v) => acc ++ v.labelExplanations)
+  def explain: String = s"$this" + "\n\n" + labelExplanations.foldRight("")((v,acc) => acc + "\n" + v)
 }
 
 trait NullaryExpr extends Expr {
   def children = List.empty[Expr]
-//  def replaceTypes(vars: Map[String,ResolvedKeyType], overwrite: Boolean): this.type = this
 }
 
 trait UnaryExpr extends Expr {
@@ -21,13 +18,13 @@ trait UnaryExpr extends Expr {
   def children = List(c1)
 }
 
-trait BinaryExpr {
+trait BinaryExpr extends Expr {
   def c1: Expr
   def c2: Expr
   def children = List(c1, c2)
 }
 
-trait TernaryExpr {
+trait TernaryExpr extends Expr {
   def c1: Expr
   def c2: Expr
   def c3: Expr

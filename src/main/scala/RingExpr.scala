@@ -66,7 +66,7 @@ case class ShreddedPhysicalBag(keyType: KeyType, ref: String) extends PhysicalMa
 }
 
 case class InfiniteMappingExpr(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
-  assert(key.isInstanceOf[FreeVariable]) //TODO
+  assert(key.isInstanceOf[VariableKeyExpr]) //TODO
   val keyType = key.exprType
   val valueType = value.exprType
   override def toString = s"{$key => $value}"
@@ -127,11 +127,16 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
   val exprType: RingType = c1.exprType * c2.exprType
   override def toString = s"($c1 * $c2)"
 
+  override def freeVariables = c2 match {
+    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables - k
+    case _ => c1.freeVariables ++ c2.freeVariables
+  }
+
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = {
     val newC1 = c1.replaceTypes(vars, overwrite)
     val newC2 = newC1.exprType match {
       case MappingType(keyType,_) => c2 match {
-        case InfiniteMappingExpr(v: FreeVariable,_) => c2.replaceTypes(vars + (v.name -> keyType), overwrite)
+        case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars + (v.name -> keyType), overwrite)
         case _ => c2.replaceTypes(vars, overwrite)
       }
       case _ => c2.replaceTypes(vars, overwrite)
@@ -143,7 +148,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
     val newC1 = c1.shred
     val newC2 = newC1.exprType match {
       case MappingType(keyType,_) => c2 match {
-        case InfiniteMappingExpr(v: FreeVariable,_) => {
+        case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
           //println(c2)
           //println(v.name, keyType)
           val replaced = c2.replaceTypes(Map(v.name -> keyType), true)
@@ -205,7 +210,10 @@ case class Predicate(c1: KeyExpr, c2: KeyExpr) extends BinaryRingExpr {
 case class Sng(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
   val keyType = key.exprType
   val valueType = value.exprType
-  override def toString = s"⟨$key ↦ $value⟩"
+  override def toString = value match {
+    case IntExpr(1) => s"sng($key)"
+    case _ => s"sng($key, $value)"
+  }
 
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     Sng(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
