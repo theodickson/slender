@@ -1,7 +1,7 @@
 package slender.dsl
 
 import slender._
-import slender.dsl.inference._
+//import slender.dsl.inference._
 
 object implicits {
 
@@ -37,7 +37,7 @@ object implicits {
     def && = * _
     def || = this.+ _
 
-    def isTyped: Boolean = r.ringType != UnresolvedRingType
+    def isTyped: Boolean = r.exprType != UnresolvedRingType
 
   }
 
@@ -92,7 +92,7 @@ object implicits {
 
 
   case class ForComprehensionBuilder(x: FreeVariable, r1: RingExpr) {
-    def Collect(r2: RingExpr): RingExpr = inferTypes(Sum(r1 * {x ==> r2}))
+    def Collect(r2: RingExpr): RingExpr = Sum(r1 * {x ==> r2}).inferTypes
     def Yield(pair: YieldPair): RingExpr = Collect(sng(pair.k, pair.r))
     def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
   }

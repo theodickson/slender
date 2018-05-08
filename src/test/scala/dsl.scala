@@ -1,7 +1,6 @@
 package slender
 
 import slender.dsl.implicits._
-import slender.dsl.inference._
 import org.scalatest.FunSuite
 
 object collections {
@@ -30,36 +29,36 @@ class DslTests extends FunSuite {
   test("Simple for-comprehension") {
     val query = For ("x" <-- stringCounts1) Collect 1
     assert(query.isTyped)
-    assert(query.ringType == IntType)
+    assert(query.exprType == IntType)
     assert(query ==
-      inferTypes(Sum(stringCounts1 * {"x" ==> 1}))
+      Sum(stringCounts1 * {"x" ==> 1}).inferTypes
     )
   }
 
   test("Simple yield") {
     val query = For ("x" <-- stringCounts1) Yield "x"
     assert(query.isTyped)
-    assert(query.ringType == MappingType(StringKeyType,IntType))
+    assert(query.exprType == MappingType(StringKeyType,IntType))
     assert(query ==
-      inferTypes(Sum(stringCounts1 * {"x" ==> sng("x")}))
+      Sum(stringCounts1 * {"x" ==> sng("x")}).inferTypes
     )
   }
 
   test("Predicated yield") {
     val query = For ("x" <-- intCounts iff "x" === 1) Yield "x"
     assert(query.isTyped)
-    assert(query.ringType == MappingType(IntKeyType,IntType))
+    assert(query.exprType == MappingType(IntKeyType,IntType))
     assert(query ==
-      inferTypes(Sum(intCounts * {"x" ==> sng("x","x"===1)}))
+      Sum(intCounts * {"x" ==> sng("x","x"===1)}).inferTypes
     )
   }
 
   test("Flatten") {
     val query = For ("x" <-- bagOfBags) Collect fromK("x")
     assert(query.isTyped)
-    assert(query.ringType == BagType(StringKeyType))
+    assert(query.exprType == BagType(StringKeyType))
     assert(query ==
-      inferTypes(Sum(bagOfBags * {"x" ==> fromK("x")}))
+      Sum(bagOfBags * {"x" ==> fromK("x")}).inferTypes
     )
   }
 
@@ -69,7 +68,7 @@ class DslTests extends FunSuite {
         "k"._1 --> sng("k"._2)
       )
     assert(query.isTyped)
-    assert(query.ringType == MappingType(StringKeyType,BagType(IntKeyType)))
+    assert(query.exprType == MappingType(StringKeyType,BagType(IntKeyType)))
   }
 
   test ("Key nesting") {
@@ -81,7 +80,7 @@ class DslTests extends FunSuite {
       )
 
     assert(query.isTyped)
-    assert(query.ringType ==
+    assert(query.exprType ==
       BagType(
         (StringKeyType, BoxedRingType(BagType(IntKeyType)))
       )
@@ -95,7 +94,7 @@ class DslTests extends FunSuite {
       )
     )
     assert(!query.isTyped)
-    val typedQuery = inferTypesR(query, Map("z" -> StringKeyType))
+    val typedQuery = query.inferTypes(Map("z" -> StringKeyType))
     assert(typedQuery.isTyped)
   }
 }

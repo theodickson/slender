@@ -1,0 +1,3 @@
+package slender
+
+trait ExprType
