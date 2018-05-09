@@ -124,12 +124,13 @@ case class Project3KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
 
 sealed trait VariableKeyExpr extends NullaryKeyExpr {
   def name: String
+  override def variables = Set(this)
+  override def freeVariables = Set(this)
 }
 
 case class TypedVariableKeyExpr(name: String, exprType: KeyType) extends VariableKeyExpr {
   override def toString = s""""$name""""
-  override def freeVariables = Set(this)
-
+  override def explain: String = s""""$name": $exprType"""
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = vars.get(name) match {
     case None | Some(`exprType`) => this
     case Some(otherType) => if (overwrite) TypedVariableKeyExpr(name, otherType) else
@@ -141,12 +142,8 @@ case class TypedVariableKeyExpr(name: String, exprType: KeyType) extends Variabl
 
 case class UntypedVariableKeyExpr(name: String) extends VariableKeyExpr {
   val exprType = UnresolvedKeyType
-  override def toString = s""""$name":?"""
-  override def freeVariables = throw IllegalFreeVariableRequestException(
-    "Cannot request free variables of expression with untyped free variables. Must resolve" +
-      "any untyped free variables first."
-  )
-
+  override def explain = toString
+  override def toString = s""""$name": ?"""
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = vars.get(name) match {
     case None => this
     case Some(eT) => TypedVariableKeyExpr(name, eT)
@@ -174,17 +171,26 @@ case class LabelExpr(c1: RingExpr) extends ToK {
 
   private def id = hashCode.abs.toString.take(3).toInt
 
-  override def toString = s"Label($id,${freeVariables.mkString(",")})"
+  override def toString = s"Label($id)"
 
-  def explainFreeVariables = freeVariables.map(v => s"${v.name}:${v.exprType}").mkString(", ")
+  def explainFreeVariables = freeVariables.map(_.explain).mkString("\n\t")
 
-  override def labelExplanations = c1.labelExplanations :+ s"$id - $explainFreeVariables - $c1"
+  def definition: String = {
+    val s = new StringBuilder(s"$this: ${c1.exprType}")
+    s ++= s"\n\n\t$c1"
+    s ++= s"\n\n\tWhere:\n\t$explainFreeVariables\n"
+//    s ++= s"\n\tWrapped expr:\n\t$c1"
+    s.mkString
+  }
+  override def labelDefinitions = c1.labelDefinitions :+ definition
 
   override def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     LabelExpr(c1.replaceTypes(vars, overwrite))
 
   override def shredR =
     throw InvalidShreddingException("Cannot shred a LabelExpr, it's already shredded.")
+
+  override def isShredded = true
 }
 
 case class VariableResolutionConflictException(msg: String) extends Exception(msg)

@@ -1,12 +1,47 @@
 package slender
 
+import scala.collection.mutable.StringBuilder
+
 trait Expr {
+
   def children: Seq[Expr]
+
+  def exprType: ExprType
+
+  def variables: Set[VariableKeyExpr] =
+    children.foldRight(Set.empty[VariableKeyExpr])((v, acc) => acc ++ v.variables)
+
   def freeVariables: Set[VariableKeyExpr] =
     children.foldRight(Set.empty[VariableKeyExpr])((v, acc) => acc ++ v.freeVariables)
-  def labelExplanations: Seq[String] =
-    children.foldLeft(Seq.empty[String])((acc,v) => acc ++ v.labelExplanations)
-  def explain: String = s"$this" + "\n\n" + labelExplanations.foldRight("")((v,acc) => acc + "\n" + v)
+
+  def labelDefinitions: Seq[String] =
+    children.foldLeft(Seq.empty[String])((acc,v) => acc ++ v.labelDefinitions)
+
+  def isShredded: Boolean = children.exists(_.isShredded)
+
+  def isResolved: Boolean = exprType.isResolved
+
+  def isComplete: Boolean = freeVariables.isEmpty
+
+  def explainVariables: String = "\t" + variables.map(_.explain).mkString("\n\t")
+
+  def explainLabels: String = labelDefinitions.foldRight("")((v, acc) => acc + "\n" + v)
+
+  def explain: String = {
+    val border = "-"*80
+    var s = new StringBuilder(s"$border\n")
+    s ++= s"+++ $this +++"
+    s ++= s"\n\nType: $exprType"
+    s ++= s"\n\nVariable types:\n$explainVariables\n"
+    if (isShredded) s ++= s"$explainLabels\n"
+    s ++= border
+    s.mkString
+  }
+
+  def leftBracket = ""
+  def rightBracket = ""
+  def openString = toString
+  def closedString = s"$leftBracket$openString$rightBracket"
 }
 
 trait NullaryExpr extends Expr {

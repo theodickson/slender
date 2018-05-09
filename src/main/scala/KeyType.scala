@@ -53,6 +53,8 @@ sealed trait KeyType extends ExprType {
 }
 
 case object UnresolvedKeyType extends KeyType {
+  override def toString = "Unresolved"
+  override def isResolved = false
   def shred = ???
 }
 
@@ -63,6 +65,8 @@ sealed trait PrimitiveKeyType extends ResolvedKeyType {
 }
 sealed trait Tuple1KeyType extends ResolvedKeyType {
   def t1: ResolvedKeyType
+  override def leftBracket = "("
+  override def rightBracket = ")"
 }
 
 sealed trait Tuple2KeyType extends Tuple1KeyType {
@@ -84,16 +88,17 @@ case object StringKeyType extends PrimitiveKeyType {
 }
 
 case class KeyPairType(t1: ResolvedKeyType, t2: ResolvedKeyType) extends Tuple2KeyType {
-  override def toString = s"$t1×$t2"
+  override def toString = s"${t1.closedString}×${t2.closedString}"
   def shred = KeyPairType(t1.shred, t2.shred)
 }
 
 case class KeyTuple3Type(t1: ResolvedKeyType, t2: ResolvedKeyType, t3: ResolvedKeyType) extends Tuple3KeyType {
-  override def toString = s"$t1×$t2×$t3"
+  override def toString = s"${t1.closedString}×${t2.closedString}×${t3.closedString}"
   def shred = KeyTuple3Type(t1.shred, t2.shred, t3.shred)
 }
 
 case class LabelType(r: ResolvedRingType) extends ResolvedKeyType {
+  override def toString = s"Label($r)"
   def shred = ???
 }
 

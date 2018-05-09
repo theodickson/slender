@@ -22,33 +22,23 @@ class ShreddingTests extends FunSuite {
 
   val intPairs = PhysicalBag(KeyPairType(IntKeyType,IntKeyType), "intPairs")
 
-//  test("") {
-//
-//    val p = Predicate(IntKeyExpr(1), IntKeyExpr(1)) //todo
-//
-//    def invalid(x: String) = For ("y" <-- fromK(x._2).dot(fromK(x._3)) iff p) Yield "y"._1._3
-//
-//    val query = For ("x" <-- server) Yield ("x"._1, toK(invalid("x")))
-//
-//    println(query); println
-//    println(query.exprType); println
-//
-//    val shredded = query.shred
-//    println(shredded); println
-//    println(shredded.exprType); println
-//    shredded.labelExplanations.foreach(println)
-//  }
+  test("") {
 
-//  test("Key nesting") {
-//    def group(k: KeyExpr) = For ("x" <-- intPairs iff (k === "x"._1)) Yield "x"._2
-//    val query = For ("k" <-- intPairs) Yield ("k"._1,toK(group("k"._1)))
-//    val shredded = query.shred
-//    println(query)
-//    println(query.exprType)
-//    println(shredded)
-//    println(shredded.exprType)
-//    println(shredded.explain)
-//  }
+    val p = Predicate(IntKeyExpr(1), IntKeyExpr(1)) //todo
+
+    def invalid(x: String) = For("y" <-- fromK(x._2).dot(fromK(x._3)) iff p) Yield "y"._1._3
+
+    val query = For("x" <-- server) Yield("x"._1, toK(invalid("x")))
+    val shredded = query.shred
+    println(query.shredAndExplain)
+  }
+
+  test("Key nesting") {
+    def group(k: KeyExpr) = For ("x" <-- intPairs iff (k === "x"._1)) Yield "x"._2
+    val query = For ("k" <-- intPairs) Yield ("k"._1,toK(group("k"._1)))
+    val shredded = query.shred
+    println(query.shredAndExplain)
+  }
 
   test("Double nesting") {
     val intTriples = PhysicalBag(KeyTuple3Type(IntKeyType,IntKeyType,IntKeyType), "intTriples")
@@ -64,10 +54,6 @@ class ShreddingTests extends FunSuite {
         )
         )
     val shredded = query.shred
-    println(query)
-    println(query.exprType)
-    println(shredded)
-    println(shredded.exprType)
-    println(shredded.explain)
+    println(query.shredAndExplain)
   }
 }

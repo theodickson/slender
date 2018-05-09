@@ -65,6 +65,7 @@ sealed trait RingType extends ExprType {
 
 case object UnresolvedRingType extends RingType {
   override def toString = "Unresolved"
+  override def isResolved = false
   def shred = ???
 }
 
@@ -87,6 +88,8 @@ case object IntType extends ResolvedRingType {
 
 sealed trait Tuple1RingType extends ResolvedRingType {
   def t1: ResolvedRingType
+  override def leftBracket = "("
+  override def rightBracket = ")"
 }
 
 sealed trait Tuple2RingType extends Tuple1RingType {
@@ -99,12 +102,12 @@ sealed trait Tuple3RingType extends Tuple2RingType {
 
 
 case class RingPairType(t1: ResolvedRingType, t2: ResolvedRingType) extends Tuple2RingType {
-  override def toString = s"$t1×$t2"
+  override def toString = s"${t1.closedString}×${t2.closedString}"
   def shred = RingPairType(t1.shred, t2.shred)
 }
 
 case class RingTuple3Type(t1: ResolvedRingType, t2: ResolvedRingType, t3: ResolvedRingType) extends Tuple3RingType {
-  override def toString = s"$t1×$t2×$t3"
+  override def toString = s"${t1.closedString}×${t2.closedString}×${t3.closedString}"
   def shred = RingTuple3Type(t1.shred, t2.shred, t3.shred)
 }
 

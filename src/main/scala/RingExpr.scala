@@ -6,6 +6,9 @@ sealed trait RingExpr extends Expr {
   def inferTypes(vars: Map[String,ResolvedKeyType]): RingExpr = replaceTypes(vars, false)
   def inferTypes: RingExpr = inferTypes(Map.empty)
   def shred: RingExpr
+  def shredAndExplain: String = {
+    explain + "\n" + shred.explain + "\n\n"
+  }
 }
 
 sealed trait NullaryRingExpr extends RingExpr with NullaryExpr {
@@ -30,11 +33,6 @@ sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr {
   override def toString = s"$ref"
 }
 
-case class ShreddedPhysicalMapping(mapping: PhysicalMapping) extends NullaryRingExpr with MappingExpr {
-  val keyType = mapping.keyType.shred
-  val valueType = mapping.valueType.shred
-}
-
 sealed trait LogicalMappingExpr extends MappingExpr with BinaryExpr {
   def key: KeyExpr
   def value: RingExpr
@@ -57,11 +55,13 @@ case class PhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
 }
 
 case class ShreddedPhysicalCollection(keyType: KeyType, valueType: RingType, ref: String) extends PhysicalMapping {
+  override def toString = s"${ref}_F"
   override def shred: RingExpr = ???
 }
 
 case class ShreddedPhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
   val valueType = IntType
+  override def toString = s"${ref}_F"
   override def shred: RingExpr = ???
 }
 
@@ -115,7 +115,8 @@ case class Project2RingExpr(c1: RingExpr) extends UnaryRingExpr {
 
 case class Add(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
   val exprType: RingType = c1.exprType + c2.exprType
-  override def toString = s"($c1 + $c2)"
+  override def leftBracket = "("; override def rightBracket = ")"
+  override def toString = s"${c1.closedString} + ${c2.closedString}"
 
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     Add(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
@@ -125,7 +126,8 @@ case class Add(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
 
 case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
   val exprType: RingType = c1.exprType * c2.exprType
-  override def toString = s"($c1 * $c2)"
+  override def leftBracket = "("; override def rightBracket = ")"
+  override def toString = s"${c1.closedString} * ${c2.closedString}"
 
   override def freeVariables = c2 match {
     case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables - k
@@ -149,10 +151,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
     val newC2 = newC1.exprType match {
       case MappingType(keyType,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-          //println(c2)
-          //println(v.name, keyType)
           val replaced = c2.replaceTypes(Map(v.name -> keyType), true)
-          //println(replaced)
           replaced.shred
         }
         case _ => c2.shred
@@ -165,7 +164,8 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
 
 case class Dot(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
   val exprType: RingType = c1.exprType dot c2.exprType
-  override def toString = s"($c1 ⋅ $c2)"
+  override def leftBracket = "("; override def rightBracket = ")"
+  override def toString = s"${c1.closedString} ⊙ ${c2.closedString}"
 
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     Dot(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
@@ -182,14 +182,14 @@ case class Sum(c1: RingExpr) extends UnaryRingExpr {
 
 case class Not(c1: RingExpr) extends UnaryRingExpr {
   val exprType = c1.exprType
-  override def toString = s"¬($c1)"
+  override def toString = s"¬${c1.closedString}"
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Not(c1.replaceTypes(vars, overwrite))
   def shred = Not(c1.shred)
 }
 
 case class Negate(c1: RingExpr) extends UnaryRingExpr {
   val exprType = c1.exprType
-  override def toString = s"-$c1"
+  override def toString = s"-${c1.closedString}"
 
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     Negate(c1.replaceTypes(vars, overwrite))
@@ -199,7 +199,8 @@ case class Negate(c1: RingExpr) extends UnaryRingExpr {
 
 case class Predicate(c1: KeyExpr, c2: KeyExpr) extends BinaryRingExpr {
   val exprType = c1.exprType === c2.exprType
-  override def toString = s"($c1 = $c2)"
+  override def leftBracket = "("; override def rightBracket = ")"
+  override def toString = s"$c1 = $c2"
 
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
     Predicate(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))

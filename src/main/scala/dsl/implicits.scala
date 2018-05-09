@@ -1,7 +1,6 @@
 package slender.dsl
 
 import slender._
-//import slender.dsl.inference._
 
 object implicits {
 
