@@ -13,9 +13,9 @@ object implicits {
   val StringTpe = typeOf[java.lang.String]
 
   //use a macro instead to get rid of the need to use a ref here
-  implicit def toPhysicalCollection[T : TypeTag](p: (T, String)): PhysicalCollection = {
-    val mappingType = getMappingType(p._1)
-    PhysicalCollection(mappingType.k, mappingType.r, p._2)
+  implicit def toExpr[T : TypeTag](t: T, ref: String): PhysicalCollection = {
+    val mappingType = getMappingType(t)
+    PhysicalCollection(mappingType.k, mappingType.r, ref)
   }
 
   def getMappingType[T : TypeTag](t: T): MappingType = toMappingType(typeOf[T])
