@@ -1,7 +1,10 @@
 package slender.execution
 
 import slender._
-import scala.reflect.runtime.universe._
+
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context
+import scala.reflect.runtime.universe.{TypeTag,typeOf,Type}
 import scala.reflect.runtime.universe.definitions._
 
 
@@ -12,10 +15,17 @@ object implicits {
   val Tuple3Tpe = typeOf[(_,_,_)].typeConstructor
   val StringTpe = typeOf[java.lang.String]
 
-  //use a macro instead to get rid of the need to use a ref here
-  implicit def toExpr[T : TypeTag](t: T, ref: String): PhysicalCollection = {
-    val mappingType = getMappingType(t)
-    PhysicalCollection(mappingType.k, mappingType.r, ref)
+  implicit def toExpr[T](t: T)(implicit ev: TypeTag[T]): PhysicalCollection = macro toExprImpl[T]
+
+  def toExprImpl[T](c: Context)(t: c.Expr[T])(ev: c.Expr[TypeTag[T]]): c.Expr[PhysicalCollection] = {
+     import c.universe._
+     val refRep = show(t.tree).split('.').last
+     c.Expr[PhysicalCollection](
+       q"""
+        val mappingType = getMappingType($t)($ev)
+        PhysicalCollection(mappingType.k, mappingType.r, $refRep)
+        """
+    )
   }
 
   def getMappingType[T : TypeTag](t: T): MappingType = toMappingType(typeOf[T])

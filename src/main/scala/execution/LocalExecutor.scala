@@ -1,7 +1,8 @@
 package slender.execution
 
-import slender._
+import slender.{Expr => SlenderExpr, _}
 
+import scala.collection.MapLike
 import scala.tools.reflect.ToolBox
 import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe._
@@ -19,7 +20,7 @@ trait ToolboxExecutionContext extends ExecutionContext[Tree] {
 }
 
 trait CodeGen[T] {
-  def apply(expr: RingExpr)(implicit ctx: ExecutionContext[T]): T
+  def apply(expr: SlenderExpr)(implicit ctx: ExecutionContext[T]): T
   def typeTree(exprType: ExprType): T
   def zero(ringType: RingType): T
   def add(ringType: RingType): T
@@ -28,13 +29,14 @@ trait CodeGen[T] {
 //  def negate(ringType: RingType): T
 }
 
+case class GetOrElse[K,V](func: Predef.Function[K,V]) {
+  def apply(k: K) = func(k)
+  def getOrElse(k: K, default: V): V = func(k)
+}
+
 object LocalCodeGen extends CodeGen[Tree] {
 
-//  def printCode(expr: RingExpr)(implicit ctx: ExecutionContext[Tree]): Unit = {
-//    val tree = apply(expr)
-//    ctx.tb
-//  }
-  def apply(expr: RingExpr)(implicit ctx: ExecutionContext[Tree]): Tree = expr match {
+  def apply(expr: SlenderExpr)(implicit ctx: ExecutionContext[Tree]): Tree = expr match {
 
     case IntExpr(i) => q"""$i"""
 
@@ -44,31 +46,39 @@ object LocalCodeGen extends CodeGen[Tree] {
 
     case Sum(c) => {
       val inner = apply(c) //must be a Map[(_,_)] since it has to be a finite mapping
-      val zero = sumZero(c.exprType)
-      val add = LocalCodeGen.add(c.exprType.asInstanceOf[MappingType].r)
-      q"""$inner.values.foldRight($zero)($add)"""
+      val func = sum(c.exprType)
+      q"""$func($inner)"""
     }
 
     case Add(c1, c2) => {
       val inner1 = apply(c1)
       val inner2 = apply(c2)
-      val add = LocalCodeGen.add(c1.exprType)
-      q"""$add($inner1, $inner2)"""
+      val func = add(c1.exprType)
+      q"""$func($inner1, $inner2)"""
     }
 
     case Multiply(c1,c2) => {
       val inner1 = apply(c1)
       val inner2 = apply(c2)
-      val multiply = LocalCodeGen.multiply(c1.exprType, c2.exprType)
-      q"""$multiply($inner1, $inner2) """
+      val func = multiply(c1.exprType, c2.exprType)
+      q"""$func($inner1, $inner2) """
     }
 
     case Dot(c1,c2) => {
       val inner1 = apply(c1)
       val inner2 = apply(c2)
-      val dot = LocalCodeGen.dot(c1.exprType, c2.exprType)
-      q"""$dot($inner1, $inner2)"""
+      val func = dot(c1.exprType, c2.exprType)
+      q"""$func($inner1, $inner2)"""
     }
+
+    case InfiniteMappingExpr(key,value) => {
+      val arg = valDef(key.exprType,key.asInstanceOf[VariableKeyExpr].name)
+      val body = apply(value)
+      val function = Function(List(arg), body)
+      q"""slender.execution.GetOrElse($function)"""
+    }
+
+    case TypedVariableKeyExpr(name,_) => Ident(TermName(name))
 
   }
 
@@ -80,6 +90,16 @@ object LocalCodeGen extends CodeGen[Tree] {
     case MappingType(k, v) => tq"""scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"""
   }
 
+  def sum(ringType: RingType): Tree = anonFunc(ringType) {
+    ringType match {
+      case MappingType(_, vT) => {
+        val acc = zero(vT)
+        val combine = add(vT)
+        q"""x1.values.foldRight($acc)($combine)"""
+      }
+    }
+  }
+
   def sumZero(ringType: RingType): Tree = ringType match {
     case MappingType(_, vT) => zero(vT)
   }
@@ -88,7 +108,7 @@ object LocalCodeGen extends CodeGen[Tree] {
     case IntType => q"""0"""
     case RingPairType(t1, t2) => q"""(${zero(t1)},${zero(t2)})"""
     case RingTuple3Type(t1, t2, t3) => q"""(${zero(t1)},${zero(t2)},${zero(t3)})"""
-    case MappingType(k, v) => q"""List.empty[${typeTree(k)},${typeTree(v)}]"""
+    case MappingType(k, v) => q"""Map.empty[${typeTree(k)},${typeTree(v)}]"""
   }
 
   def add(ringType: RingType): Tree = anonFunc(ringType, ringType) {
@@ -118,10 +138,12 @@ object LocalCodeGen extends CodeGen[Tree] {
 
       case (MappingType(k1,v1),MappingType(k2,v2)) if (k1 == k2) => //TODO - do missing keys work the same as product wrt zero?
         q"""
-           x1 map { case (k1,v1) => k1 -> ${dot(v1, v2)}(v1,x2.getOrElse(k1,${zero(v1)})) }
+           x1 map { case (k1,v1) => k1 -> ${dot(v1, v2)}(v1,x2.getOrElse(k1,${zero(v2)})) }
          """
     }
   }
+
+  //TODO - do mutliplications of infinite mappings result type depend on the value type of the infinite mapping???
 
   def dot(t1: RingType, t2: RingType): Tree = anonFunc(t1, t2) {
     (t1,t2) match {
@@ -164,7 +186,6 @@ trait Executor[T] {
   def ctx: ExecutionContext[T]
   def codeGen: CodeGen[T]
   def execute(expr: RingExpr) = ctx.eval(codeGen(expr)(ctx))
-//  def printCode(expr: RingExpr) = ctx.
 }
 
 case class LocalExecutor(ctx: ExecutionContext[Tree], codeGen: CodeGen[Tree] = LocalCodeGen) extends Executor[Tree]
