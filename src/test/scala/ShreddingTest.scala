@@ -1,15 +1,7 @@
 package slender
 
 import slender.dsl.implicits._
-//import slender.dsl.inference._
 import org.scalatest.FunSuite
-
-//  val stringCounts1 = PhysicalCollection(StringKeyType, IntType, "stringCounts1")
-//  val stringCounts2 = PhysicalCollection(StringKeyType, IntType, "stringCounts2")
-//  val bagOfBags = PhysicalBag(BoxedRingType(MappingType(StringKeyType, IntType)), "bagOfBags")
-//  val intCounts = PhysicalCollection(IntKeyType, IntType, "intCounts")
-//  val bagOfPairs = PhysicalBag(KeyPairType(StringKeyType,IntKeyType), "bagOfPairs")
-//  val const = IntExpr(1)
 
 
 class ShreddingTests extends FunSuite {

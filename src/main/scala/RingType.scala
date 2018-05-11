@@ -37,13 +37,15 @@ sealed trait RingType extends ExprType {
   }
 
   def _1: RingType = this match {
-    case r : Tuple1RingType => r.t1
+    case r : Tuple2RingType => r.t1
+    case r : Tuple3RingType => r.t1
     case UnresolvedRingType => UnresolvedRingType
     case _ => throw InvalidRingProjectionException(s"Cannot project-1 ring of type $this.")
   }
 
   def _2: RingType = this match {
     case r : Tuple2RingType => r.t2
+    case r : Tuple3RingType => r.t2
     case UnresolvedRingType => UnresolvedRingType
     case _ => throw InvalidRingProjectionException(s"Cannot project-2 ring of type $this.")
   }
@@ -81,25 +83,24 @@ sealed trait ResolvedRingType extends RingType {
 
 }
 
-case object IntType extends ResolvedRingType {
-  override def toString = "Int"
+sealed trait PrimitiveRingType extends ResolvedRingType {
   def shred = this
 }
 
-sealed trait Tuple1RingType extends ResolvedRingType {
-  def t1: ResolvedRingType
-  override def leftBracket = "("
-  override def rightBracket = ")"
+case object IntType extends PrimitiveRingType {
+  override def toString = "Int"
 }
 
-sealed trait Tuple2RingType extends Tuple1RingType {
+sealed trait Tuple2RingType extends ResolvedRingType with Tuple2ExprType {
+  def t1: ResolvedRingType
   def t2: ResolvedRingType
 }
 
-sealed trait Tuple3RingType extends Tuple2RingType {
+sealed trait Tuple3RingType extends ResolvedRingType with Tuple3ExprType {
+  def t1: ResolvedRingType
+  def t2: ResolvedRingType
   def t3: ResolvedRingType
 }
-
 
 case class RingPairType(t1: ResolvedRingType, t2: ResolvedRingType) extends Tuple2RingType {
   override def toString = s"${t1.closedString}×${t2.closedString}"

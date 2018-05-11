@@ -65,7 +65,7 @@ object implicits {
   implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedVariableKeyExpr = UntypedVariableKeyExpr(s)
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
-
+//
   implicit def intToIntKeyExpr(i: Int): IntKeyExpr = IntKeyExpr(i)
 
   implicit def ringExprPairImplicits(p: (RingExpr,RingExpr)): RingPairExpr = RingPairExpr(p._1,p._2)

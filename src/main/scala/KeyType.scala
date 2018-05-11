@@ -1,5 +1,7 @@
 package slender
 
+import scala.reflect.runtime.universe._
+
 sealed trait KeyType extends ExprType {
 
   def pair(k: KeyType): KeyType = (this,k) match {
@@ -18,13 +20,15 @@ sealed trait KeyType extends ExprType {
   }
 
   def _1: KeyType = this match {
-    case k : Tuple1KeyType => k.t1
+    case k : Tuple2KeyType => k.t1
+    case k : Tuple3KeyType => k.t1
     case UnresolvedKeyType => UnresolvedKeyType
     case _ => throw InvalidKeyProjectionException(s"Cannot project-1 key of type $this.")
   }
 
   def _2: KeyType = this match {
     case k : Tuple2KeyType => k.t2
+    case k : Tuple3KeyType => k.t2
     case UnresolvedKeyType => UnresolvedKeyType
     case _ => throw InvalidKeyProjectionException(s"Cannot project-2 key of type $this.")
   }
@@ -61,30 +65,34 @@ case object UnresolvedKeyType extends KeyType {
 sealed trait ResolvedKeyType extends KeyType
 
 sealed trait PrimitiveKeyType extends ResolvedKeyType {
+  def tpe: Type
   def shred = this
-}
-sealed trait Tuple1KeyType extends ResolvedKeyType {
-  def t1: ResolvedKeyType
-  override def leftBracket = "("
-  override def rightBracket = ")"
+  override def toString = tpe.toString
 }
 
-sealed trait Tuple2KeyType extends Tuple1KeyType {
+sealed trait Tuple2KeyType extends ResolvedKeyType with Tuple2ExprType {
+  def t1: ResolvedKeyType
   def t2: ResolvedKeyType
 }
 
-sealed trait Tuple3KeyType extends Tuple2KeyType {
+sealed trait Tuple3KeyType extends ResolvedKeyType with Tuple3ExprType {
+  def t1: ResolvedKeyType
+  def t2: ResolvedKeyType
   def t3: ResolvedKeyType
 }
 
-case object UnitType extends PrimitiveKeyType
+case class DomKeyType(tpe: Type) extends PrimitiveKeyType
+
+case object UnitType extends PrimitiveKeyType {
+  def tpe = typeOf[Unit]
+}
 
 case object IntKeyType extends PrimitiveKeyType {
-  override def toString = "Int"
+  def tpe = typeOf[Int]
 }
 
 case object StringKeyType extends PrimitiveKeyType {
-  override def toString = "String"
+  def tpe = typeOf[String]
 }
 
 case class KeyPairType(t1: ResolvedKeyType, t2: ResolvedKeyType) extends Tuple2KeyType {
