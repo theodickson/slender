@@ -87,24 +87,6 @@ case class RingProductExpr(cs: RingExpr*) extends RingExpr {
   override def toString = s"⟨${children.mkString(",")}⟩"
 }
 
-//case class RingPairExpr(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
-//  val exprType: RingType = c1.exprType.pair(c2.exprType)
-//  override def toString = s"⟨$c1,$c2⟩"
-//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
-//    RingPairExpr(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
-//  def shred = RingPairExpr(c1.shred, c2.shred)
-//}
-//
-//case class RingTuple3Expr(c1: RingExpr, c2: RingExpr, c3: RingExpr) extends TernaryRingExpr {
-//  val exprType = c2.exprType.triple(c2.exprType, c3.exprType)
-//  override def toString = s"⟨$c2,$c2,$c3⟩"
-//
-//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
-//    RingTuple3Expr(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite), c3.replaceTypes(vars, overwrite))
-//
-//  def shred = RingTuple3Expr(c1.shred, c2.shred, c3.shred)
-//}
-
 
 case class ProjectRingExpr(n: Int)(val c1: RingExpr) extends UnaryRingExpr {
   override val exprType: RingType = c1.exprType.project(n)
@@ -117,23 +99,6 @@ case class ProjectRingExpr(n: Int)(val c1: RingExpr) extends UnaryRingExpr {
   def shred = ProjectRingExpr(n)(c1.shred)
 }
 
-//case class Project1RingExpr(c1: RingExpr) extends UnaryRingExpr {
-//  override val exprType: RingType = c1.exprType._1
-//
-//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
-//    Project1RingExpr(c1.replaceTypes(vars, overwrite))
-//
-//  def shred = Project1RingExpr(c1.shred)
-//}
-//
-//case class Project2RingExpr(c1: RingExpr) extends UnaryRingExpr {
-//  override val exprType: RingType = c1.exprType._2
-//
-//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
-//    Project2RingExpr(c1.replaceTypes(vars, overwrite))
-//
-//  def shred = Project2RingExpr(c1.shred)
-//}
 
 case class Add(c1: RingExpr, c2: RingExpr) extends BinaryRingExpr {
   val exprType: RingType = c1.exprType + c2.exprType
@@ -199,7 +164,6 @@ case class Sum(c1: RingExpr) extends UnaryRingExpr {
   override val exprType: RingType = c1.exprType.sum
   def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Sum(c1.replaceTypes(vars, overwrite))
   def shred = Sum(c1.shred)
-  //override def toString = s"Sum(\n\t${c1}\n)"
 }
 
 case class Not(c1: RingExpr) extends UnaryRingExpr {

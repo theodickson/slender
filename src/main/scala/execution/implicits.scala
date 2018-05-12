@@ -15,6 +15,7 @@ object implicits {
   val Tuple3Tpe = typeOf[(_,_,_)].typeConstructor
   val StringTpe = typeOf[java.lang.String]
 
+  //todo - this doesnt work from the REPL
   implicit def toExpr[T](t: T)(implicit ev: TypeTag[T]): PhysicalCollection = macro toExprImpl[T]
 
   def toExprImpl[T](c: Context)(t: c.Expr[T])(ev: c.Expr[TypeTag[T]]): c.Expr[PhysicalCollection] = {
