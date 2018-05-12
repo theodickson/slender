@@ -25,20 +25,20 @@ sealed trait BinaryKeyExpr extends KeyExpr with BinaryExpr
 
 sealed trait TernaryKeyExpr extends KeyExpr with TernaryExpr
 
-sealed trait Tuple1KeyExpr extends KeyExpr with UnaryKeyExpr {
-  def c1: KeyExpr
-}
-
-sealed trait Tuple2KeyExpr extends KeyExpr with BinaryKeyExpr {
-  def c1: KeyExpr
-  def c2: KeyExpr
-}
-
-sealed trait Tuple3KeyExpr extends KeyExpr with TernaryKeyExpr {
-  def c1: KeyExpr
-  def c2: KeyExpr
-  def c3: KeyExpr
-}
+//sealed trait Tuple1KeyExpr extends KeyExpr with UnaryKeyExpr {
+//  def c1: KeyExpr
+//}
+//
+//sealed trait Tuple2KeyExpr extends KeyExpr with BinaryKeyExpr {
+//  def c1: KeyExpr
+//  def c2: KeyExpr
+//}
+//
+//sealed trait Tuple3KeyExpr extends KeyExpr with TernaryKeyExpr {
+//  def c1: KeyExpr
+//  def c2: KeyExpr
+//  def c3: KeyExpr
+//}
 
 case object UnitKeyExpr extends NullaryKeyExpr {
   val exprType = UnitType
@@ -55,72 +55,95 @@ case class StringKeyExpr(s: String) extends NullaryKeyExpr {
   override def toString = s""""$s""""
 }
 
-case class KeyPairExpr(c1: KeyExpr, c2: KeyExpr) extends Tuple2KeyExpr {
-  val exprType = c1.exprType.pair(c2.exprType)
-  override def toString = s"⟨$c1,$c2⟩"
-
-  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = KeyPairExpr(
-    c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite)
-  )
-
-  def shredR = KeyPairExpr(c1.shred, c2.shred)
+case class KeyProductExpr(cs: KeyExpr*) extends KeyExpr {
+  val children = cs.toSeq
+  val exprType = KeyType.seq(children.map(_.exprType))
+  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
+    KeyProductExpr(children.map(_.replaceTypes(vars, overwrite)) : _ *)
+  def shredR = KeyProductExpr(children.map(_.shred) : _ *)
+  override def toString = s"⟨${children.mkString(",")}⟩"
 }
 
-case class KeyTuple3Expr(c1: KeyExpr, c2: KeyExpr, c3: KeyExpr) extends Tuple3KeyExpr {
-  val exprType = c2.exprType.triple(c2.exprType, c3.exprType)
-  override def toString = s"⟨$c2,$c2,$c3⟩"
+//case class KeyPairExpr(c1: KeyExpr, c2: KeyExpr) extends Tuple2KeyExpr {
+//  val exprType = c1.exprType.pair(c2.exprType)
+//  override def toString = s"⟨$c1,$c2⟩"
+//
+//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = KeyPairExpr(
+//    c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite)
+//  )
+//
+//  def shredR = KeyPairExpr(c1.shred, c2.shred)
+//}
+//
+//case class KeyTuple3Expr(c1: KeyExpr, c2: KeyExpr, c3: KeyExpr) extends Tuple3KeyExpr {
+//  val exprType = c2.exprType.triple(c2.exprType, c3.exprType)
+//  override def toString = s"⟨$c2,$c2,$c3⟩"
+//
+//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = KeyTuple3Expr(
+//    c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite), c3.replaceTypes(vars, overwrite)
+//  )
+//
+//  def shredR = KeyTuple3Expr(c1.shred, c2.shred, c3.shred)
+//}
 
-  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = KeyTuple3Expr(
-    c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite), c3.replaceTypes(vars, overwrite)
-  )
-
-  def shredR = KeyTuple3Expr(c1.shred, c2.shred, c3.shred)
-}
-
-case class Project1KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
-  val exprType = c1.exprType._1
+case class ProjectKeyExpr(n: Int)(val c1: KeyExpr) extends UnaryKeyExpr {
+  val exprType = c1.exprType.project(n)
   override def toString = c1 match {
-    case TypedVariableKeyExpr(name, kt) => s""""$name"._1"""
-    case UntypedVariableKeyExpr(name) => s""""$name._1:?"""
-    case _ => s"$c1._1"
+    case TypedVariableKeyExpr(name, kt) => s""""$name"._$n"""
+    case UntypedVariableKeyExpr(name) => s""""$name._$n:?"""
+    case _ => s"$c1._$n"
   }
 
-  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project1KeyExpr(
-    c1.replaceTypes(vars, overwrite)
-  )
+  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) =
+    ProjectKeyExpr(n)(c1.replaceTypes(vars, overwrite))
 
-  def shredR = Project1KeyExpr(c1.shred)
+  def shredR = ProjectKeyExpr(n)(c1.shred)
 }
 
-case class Project2KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
-  val exprType = c1.exprType._2
-  override def toString = c1 match {
-    case TypedVariableKeyExpr(name, kt) => s""""$name"._2"""
-    case UntypedVariableKeyExpr(name) => s""""$name._2:?"""
-    case _ => s"$c1._2"
-  }
-
-  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project2KeyExpr(
-    c1.replaceTypes(vars, overwrite)
-  )
-
-  def shredR = Project2KeyExpr(c1.shred)
-}
-
-case class Project3KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
-  val exprType = c1.exprType._3
-  override def toString = c1 match {
-    case TypedVariableKeyExpr(name, kt) => s""""$name"._3"""
-    case UntypedVariableKeyExpr(name) => s""""$name._3:?"""
-    case _ => s"$c1._3"
-  }
-
-  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project3KeyExpr(
-    c1.replaceTypes(vars, overwrite)
-  )
-
-  def shredR = Project3KeyExpr(c1.shred)
-}
+//case class Project1KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
+//  val exprType = c1.exprType._1
+//  override def toString = c1 match {
+//    case TypedVariableKeyExpr(name, kt) => s""""$name"._1"""
+//    case UntypedVariableKeyExpr(name) => s""""$name._1:?"""
+//    case _ => s"$c1._1"
+//  }
+//
+//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project1KeyExpr(
+//    c1.replaceTypes(vars, overwrite)
+//  )
+//
+//  def shredR = Project1KeyExpr(c1.shred)
+//}
+//
+//case class Project2KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
+//  val exprType = c1.exprType._2
+//  override def toString = c1 match {
+//    case TypedVariableKeyExpr(name, kt) => s""""$name"._2"""
+//    case UntypedVariableKeyExpr(name) => s""""$name._2:?"""
+//    case _ => s"$c1._2"
+//  }
+//
+//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project2KeyExpr(
+//    c1.replaceTypes(vars, overwrite)
+//  )
+//
+//  def shredR = Project2KeyExpr(c1.shred)
+//}
+//
+//case class Project3KeyExpr(c1: KeyExpr) extends UnaryKeyExpr {
+//  val exprType = c1.exprType._3
+//  override def toString = c1 match {
+//    case TypedVariableKeyExpr(name, kt) => s""""$name"._3"""
+//    case UntypedVariableKeyExpr(name) => s""""$name._3:?"""
+//    case _ => s"$c1._3"
+//  }
+//
+//  def replaceTypes(vars: Map[String, ResolvedKeyType], overwrite: Boolean) = Project3KeyExpr(
+//    c1.replaceTypes(vars, overwrite)
+//  )
+//
+//  def shredR = Project3KeyExpr(c1.shred)
+//}
 
 sealed trait VariableKeyExpr extends NullaryKeyExpr {
   def name: String

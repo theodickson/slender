@@ -10,9 +10,9 @@ object implicits {
     def -->(r: RingExpr): YieldPair = YieldPair(UntypedVariableKeyExpr(s),r)
     //since implicit methods on result of implicit conversions dont tend to resolve,
     //duplicate keyexpr implicits here:
-    def _1: KeyExpr = Project1KeyExpr(s)
-    def _2: KeyExpr = Project2KeyExpr(s)
-    def _3: KeyExpr = Project3KeyExpr(s)
+    def _1: KeyExpr = ProjectKeyExpr(1)(s)
+    def _2: KeyExpr = ProjectKeyExpr(2)(s)
+    def _3: KeyExpr = ProjectKeyExpr(3)(s)
 
     def ===(other: KeyExpr): RingExpr = Predicate(s, other)
     def ===(other: String): RingExpr = Predicate(s, other)
@@ -31,8 +31,8 @@ object implicits {
     def unary_- = Negate(r)
     def unary_! = Not(r)
 
-    def _1: RingExpr = Project1RingExpr(r)
-    def _2: RingExpr = Project2RingExpr(r)
+    def _1: RingExpr = ProjectRingExpr(1)(r)
+    def _2: RingExpr = ProjectRingExpr(2)(r)
 
     def && = * _
     def || = this.+ _
@@ -42,9 +42,9 @@ object implicits {
   }
 
   implicit class KeyExprImplicits(k: KeyExpr) {
-    def _1: KeyExpr = Project1KeyExpr(k)
-    def _2: KeyExpr = Project2KeyExpr(k)
-    def _3: KeyExpr = Project3KeyExpr(k)
+    def _1: KeyExpr = ProjectKeyExpr(1)(k)
+    def _2: KeyExpr = ProjectKeyExpr(2)(k)
+    def _3: KeyExpr = ProjectKeyExpr(3)(k)
 
     def ===(other: KeyExpr): RingExpr = Predicate(k, other)
     def ===(other: String): RingExpr = Predicate(k, other)
@@ -68,15 +68,15 @@ object implicits {
 //
   implicit def intToIntKeyExpr(i: Int): IntKeyExpr = IntKeyExpr(i)
 
-  implicit def ringExprPairImplicits(p: (RingExpr,RingExpr)): RingPairExpr = RingPairExpr(p._1,p._2)
+  implicit def ringExprPairImplicits(p: (RingExpr,RingExpr)): RingProductExpr = RingProductExpr(p._1,p._2)
 
-  implicit def keyExprPairImplicits(p: (KeyExpr,KeyExpr)): KeyPairExpr = KeyPairExpr(p._1,p._2)
+  implicit def keyExprPairImplicits(p: (KeyExpr,KeyExpr)): KeyProductExpr = KeyProductExpr(p._1,p._2)
 
   implicit def ringTypePairImplicits(p: (ResolvedRingType,ResolvedRingType)): ResolvedRingType =
-    RingPairType(p._1, p._2)
+    ProductRingType(p._1, p._2)
 
   implicit def keyTypePairImplicits(p: (ResolvedKeyType,ResolvedKeyType)): ResolvedKeyType =
-    KeyPairType(p._1, p._2)
+    ProductKeyType(p._1, p._2)
 
   implicit def box(r: ResolvedRingType): KeyType = r.box
 

@@ -19,7 +19,7 @@ object implicits {
 
   def toExprImpl[T](c: Context)(t: c.Expr[T])(ev: c.Expr[TypeTag[T]]): c.Expr[PhysicalCollection] = {
      import c.universe._
-     val refRep = show(t.tree).split('.').last
+     val refRep = show(t.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
      c.Expr[PhysicalCollection](
        q"""
         val mappingType = getMappingType($t)($ev)
@@ -28,25 +28,25 @@ object implicits {
     )
   }
 
-  def getMappingType[T : TypeTag](t: T): MappingType = toMappingType(typeOf[T])
+  def getMappingType[T : TypeTag](t: T): FiniteMappingType = toMappingType(typeOf[T])
 
-  def toMappingType(t: Type): MappingType = toRingType(t) match {
-    case m@MappingType(_,_) => m
+  def toMappingType(t: Type): FiniteMappingType = toRingType(t) match {
+    case m@FiniteMappingType(_,_) => m
     case _ => throw new IllegalStateException()
   }
 
   def toKeyType(t: Type): ResolvedKeyType = (t.typeConstructor,t.typeArgs) match {
-    case (Tuple2Tpe,List(tpe1,tpe2)) => KeyPairType(toKeyType(tpe1), toKeyType(tpe2))
-    case (Tuple3Tpe,List(tpe1,tpe2,tpe3)) => KeyTuple3Type(toKeyType(tpe1), toKeyType(tpe2), toKeyType(tpe3))
+    case (Tuple2Tpe,tpes) => ProductKeyType(tpes.map(toKeyType) : _ *)
+    case (Tuple3Tpe,tpes) => ProductKeyType(tpes.map(toKeyType) : _ *)
     case (primitive,List()) => DomKeyType(primitive)
     case _ => throw new IllegalStateException(s"Invalid type $t for conversion to KeyType.")
   }
 
   def toRingType(t: Type): ResolvedRingType = (t.typeConstructor,t.typeArgs) match {
     case (IntTpe,_) => IntType
-    case (MapTpe,List(kTpe,vTpe)) => MappingType(toKeyType(kTpe),toRingType(vTpe))
-    case (Tuple2Tpe,List(tpe1,tpe2)) => RingPairType(toRingType(tpe1), toRingType(tpe2))
-    case (Tuple3Tpe,List(tpe1,tpe2,tpe3)) => RingTuple3Type(toRingType(tpe1), toRingType(tpe2), toRingType(tpe3))
+    case (MapTpe,List(kTpe,vTpe)) => FiniteMappingType(toKeyType(kTpe),toRingType(vTpe))
+    case (Tuple2Tpe,tpes) => ProductRingType(tpes.map(toRingType) : _ *)
+    case (Tuple3Tpe,tpes) => ProductRingType(tpes.map(toRingType) : _ *)
     case _ => throw new IllegalStateException(s"Invalid type $t for conversion to RingType.")
   }
 

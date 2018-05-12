@@ -14,7 +14,5 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-compiler" % scalaVersion.value,
   "org.scala-lang" % "scala-reflect" % scalaVersion.value
 )
-libraryDependencies += "org.typelevel" %% "spire" % "0.14.1"
-libraryDependencies += "com.twitter" %% "algebird-core" % "0.13.4"
-libraryDependencies += "org.scorexfoundation" %% "scrypto_2.11" % "2.1.1"
-libraryDependencies += "io.github.jmcardon" %% "tsec-password" % tsecV
+//libraryDependencies += "org.typelevel" %% "spire" % "0.14.1"
+//libraryDependencies += "com.twitter" %% "algebird-core" % "0.13.4"

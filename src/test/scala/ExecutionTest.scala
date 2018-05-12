@@ -46,15 +46,15 @@ class ExecutionTests extends FunSuite {
 
   import ctx._
 
-  val executor = LocalExecutor(MyExecutionContext)
+  val interpreter = LocalInterpreter(MyExecutionContext)
 
   test("Evaluate Int.") {
-    val result = executor.execute(IntExpr(1))
+    val result = interpreter.apply(IntExpr(1))
     assert(result == 1)
   }
 
   test("Retrieve list collection unchanged.") {
-    val result = executor.execute(stringCounts)
+    val result = interpreter.apply(stringCounts)
     assert(result ==
       Map(
         ("a",1),
@@ -65,29 +65,29 @@ class ExecutionTests extends FunSuite {
   }
 
   test("Sum simple bag.") {
-    val result = executor.execute(Sum(stringCounts))
+    val result = interpreter.apply(Sum(stringCounts))
     assert(result == 6)
   }
 
   test("Sum mapping to pairs.") {
-    val result = executor.execute(Sum(stringIntPairs))
+    val result = interpreter.apply(Sum(stringIntPairs))
     assert(result == (6,6))
   }
 
   test("Sum mapping to nested pairs.") {
-    val result = executor.execute(Sum(stringIntNestedPairs))
+    val result = interpreter.apply(Sum(stringIntNestedPairs))
     assert(result == ((6,6),(6,6)))
   }
 
   test("Add two mappings, then sum") {
     val expr = Sum(Add(stringIntPairs,stringIntPairs))
-    val result = executor.execute(expr)
+    val result = interpreter.apply(expr)
     assert(result == (12,12)) //(2,2) + (4,4) + (6,6)
   }
 
   test("Simple dot test") {
     val expr = Dot(stringCounts, IntExpr(2))
-    val result = executor.execute(expr)
+    val result = interpreter.apply(expr)
     println(result)
     assert(result == Map(
       ("a",2),
@@ -98,9 +98,9 @@ class ExecutionTests extends FunSuite {
 
   test("Multiplication test") {
     val expr = Multiply(stringCounts, nestedStringBag)
-    val result = executor.execute(expr)
+    val result = interpreter.apply(expr)
     assert(result == Map(
-      ("a", Map()),
+      ("a", Map()), //todo
       ("b", Map("b" -> 4)),
       ("c", Map("c" -> 6))
     ))
@@ -108,7 +108,7 @@ class ExecutionTests extends FunSuite {
 
   test("Dot test") {
     val expr = Dot(stringCounts,nestedStringBag)
-    val result = executor.execute(expr)
+    val result = interpreter.apply(expr)
     println(result)
   }
 

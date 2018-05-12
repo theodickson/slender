@@ -6,9 +6,9 @@ import org.scalatest.FunSuite
 object collections {
   val stringCounts1 = PhysicalCollection(StringKeyType, IntType, "stringCounts1")
   val stringCounts2 = PhysicalCollection(StringKeyType, IntType, "stringCounts2")
-  val bagOfBags = PhysicalBag(BoxedRingType(MappingType(StringKeyType, IntType)), "bagOfBags")
+  val bagOfBags = PhysicalBag(BoxedRingType(FiniteMappingType(StringKeyType, IntType)), "bagOfBags")
   val intCounts = PhysicalCollection(IntKeyType, IntType, "intCounts")
-  val bagOfPairs = PhysicalBag(KeyPairType(StringKeyType,IntKeyType), "bagOfPairs")
+  val bagOfPairs = PhysicalBag(ProductKeyType(StringKeyType,IntKeyType), "bagOfPairs")
   val const = IntExpr(1)
 }
 
@@ -38,7 +38,7 @@ class DslTests extends FunSuite {
   test("Simple yield") {
     val query = For ("x" <-- stringCounts1) Yield "x"
     assert(query.isTyped)
-    assert(query.exprType == MappingType(StringKeyType,IntType))
+    assert(query.exprType == FiniteMappingType(StringKeyType,IntType))
     assert(query ==
       Sum(stringCounts1 * {"x" ==> sng("x")}).inferTypes
     )
@@ -47,7 +47,7 @@ class DslTests extends FunSuite {
   test("Predicated yield") {
     val query = For ("x" <-- intCounts iff "x" === 1) Yield "x"
     assert(query.isTyped)
-    assert(query.exprType == MappingType(IntKeyType,IntType))
+    assert(query.exprType == FiniteMappingType(IntKeyType,IntType))
     assert(query ==
       Sum(intCounts * {"x" ==> sng("x","x"===1)}).inferTypes
     )
@@ -68,7 +68,7 @@ class DslTests extends FunSuite {
         "k"._1 --> sng("k"._2)
       )
     assert(query.isTyped)
-    assert(query.exprType == MappingType(StringKeyType,BagType(IntKeyType)))
+    assert(query.exprType == FiniteMappingType(StringKeyType,BagType(IntKeyType)))
   }
 
   test ("Key nesting") {
