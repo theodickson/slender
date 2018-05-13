@@ -36,14 +36,14 @@ object implicits {
     case _ => throw new IllegalStateException()
   }
 
-  def toKeyType(t: Type): ResolvedKeyType = (t.typeConstructor,t.typeArgs) match {
+  def toKeyType(t: Type): KeyType = (t.typeConstructor,t.typeArgs) match {
     case (Tuple2Tpe,tpes) => ProductKeyType(tpes.map(toKeyType) : _ *)
     case (Tuple3Tpe,tpes) => ProductKeyType(tpes.map(toKeyType) : _ *)
-    case (primitive,List()) => DomKeyType(primitive)
+    case (primitive,List()) => PrimitiveKeyType(primitive)
     case _ => throw new IllegalStateException(s"Invalid type $t for conversion to KeyType.")
   }
 
-  def toRingType(t: Type): ResolvedRingType = (t.typeConstructor,t.typeArgs) match {
+  def toRingType(t: Type): RingType = (t.typeConstructor,t.typeArgs) match {
     case (IntTpe,_) => IntType
     case (MapTpe,List(kTpe,vTpe)) => FiniteMappingType(toKeyType(kTpe),toRingType(vTpe))
     case (Tuple2Tpe,tpes) => ProductRingType(tpes.map(toRingType) : _ *)

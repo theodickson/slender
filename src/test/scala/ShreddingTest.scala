@@ -1,6 +1,7 @@
 package slender
 
 import slender.dsl.implicits._
+import definitions._
 import org.scalatest.FunSuite
 
 

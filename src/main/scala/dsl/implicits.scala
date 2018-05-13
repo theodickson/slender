@@ -10,9 +10,9 @@ object implicits {
     def -->(r: RingExpr): YieldPair = YieldPair(UntypedVariableKeyExpr(s),r)
     //since implicit methods on result of implicit conversions dont tend to resolve,
     //duplicate keyexpr implicits here:
-    def _1: KeyExpr = ProjectKeyExpr(1)(s)
-    def _2: KeyExpr = ProjectKeyExpr(2)(s)
-    def _3: KeyExpr = ProjectKeyExpr(3)(s)
+    def _1: KeyExpr = ProjectKeyExpr(s, 1)
+    def _2: KeyExpr = ProjectKeyExpr(s, 2)
+    def _3: KeyExpr = ProjectKeyExpr(s, 3)
 
     def ===(other: KeyExpr): RingExpr = Predicate(s, other)
     def ===(other: String): RingExpr = Predicate(s, other)
@@ -31,8 +31,8 @@ object implicits {
     def unary_- = Negate(r)
     def unary_! = Not(r)
 
-    def _1: RingExpr = ProjectRingExpr(1)(r)
-    def _2: RingExpr = ProjectRingExpr(2)(r)
+    def _1: RingExpr = ProjectRingExpr(r, 1)
+    def _2: RingExpr = ProjectRingExpr(r, 2)
 
     def && = * _
     def || = this.+ _
@@ -42,9 +42,9 @@ object implicits {
   }
 
   implicit class KeyExprImplicits(k: KeyExpr) {
-    def _1: KeyExpr = ProjectKeyExpr(1)(k)
-    def _2: KeyExpr = ProjectKeyExpr(2)(k)
-    def _3: KeyExpr = ProjectKeyExpr(3)(k)
+    def _1: KeyExpr = ProjectKeyExpr(k, 1)
+    def _2: KeyExpr = ProjectKeyExpr(k, 2)
+    def _3: KeyExpr = ProjectKeyExpr(k, 3)
 
     def ===(other: KeyExpr): RingExpr = Predicate(k, other)
     def ===(other: String): RingExpr = Predicate(k, other)
@@ -72,13 +72,13 @@ object implicits {
 
   implicit def keyExprPairImplicits(p: (KeyExpr,KeyExpr)): KeyProductExpr = KeyProductExpr(p._1,p._2)
 
-  implicit def ringTypePairImplicits(p: (ResolvedRingType,ResolvedRingType)): ResolvedRingType =
+  implicit def ringTypePairImplicits(p: (RingType,RingType)): RingType =
     ProductRingType(p._1, p._2)
 
-  implicit def keyTypePairImplicits(p: (ResolvedKeyType,ResolvedKeyType)): ResolvedKeyType =
+  implicit def keyTypePairImplicits(p: (KeyType,KeyType)): KeyType =
     ProductKeyType(p._1, p._2)
 
-  implicit def box(r: ResolvedRingType): KeyType = r.box
+  implicit def box(r: RingType): KeyType = r.box
 
   implicit def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
 

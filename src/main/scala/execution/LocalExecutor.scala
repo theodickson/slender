@@ -2,9 +2,9 @@ package slender.execution
 
 import slender._
 
-import scala.tools.reflect.ToolBox
 import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe.{Expr => UniverseExpr,_}
+import scala.tools.reflect.ToolBox
 
 
 trait ExecutionContext[T] {
@@ -13,8 +13,8 @@ trait ExecutionContext[T] {
 
 
 trait CodeGen[T] {
-  def apply(expr: Expr)(implicit ctx: ExecutionContext[T]): T
-  def typeTree(exprType: ExprType): T
+  def apply(expr: Expr[_])(implicit ctx: ExecutionContext[T]): T
+  def typeTree(exprType: ExprType[_]): T
   def zero(t: RingType): T
   def add(t1: RingType, t2: RingType): T
   def multiply(t1: RingType, t2: RingType): T
@@ -47,14 +47,10 @@ trait ToolboxExecutionContext extends ExecutionContext[Tree] {
   def apply(ref: String) = Select(myTree, TermName(ref))
 }
 
-//case class GetOrElse[K,V](func: Predef.Function[K,V]) {
-//  def apply(k: K) = func(k)
-//  def getOrElse(k: K, default: V): V = func(k)
-//}
 
 object LocalCodeGen extends CodeGen[Tree] {
 
-  def apply(expr: Expr)(implicit ctx: ExecutionContext[Tree]): Tree = expr match {
+  def apply(expr: Expr[_])(implicit ctx: ExecutionContext[Tree]): Tree = expr match {
 
     case IntExpr(i) => q"""$i"""
 
@@ -89,16 +85,20 @@ object LocalCodeGen extends CodeGen[Tree] {
 
     case TypedVariableKeyExpr(name,_) => Ident(TermName(name))
 
+    case ProjectRingExpr(c, i) => Select(apply(c), TermName(s"_$i"))
+
+    case ProjectKeyExpr(c, i) => Select(apply(c), TermName(s"_$i"))
+
   }
 
-  def unaryApply(func: Tree)(c1: Expr)(implicit ctx: ExecutionContext[Tree]): Tree = q"$func(${apply(c1)})"
+  def unaryApply(func: Tree)(c1: Expr[_])(implicit ctx: ExecutionContext[Tree]): Tree = q"$func(${apply(c1)})"
 
-  def binaryApply(func: Tree)(c1: Expr, c2: Expr)(implicit ctx: ExecutionContext[Tree]): Tree =
+  def binaryApply(func: Tree)(c1: Expr[_], c2: Expr[_])(implicit ctx: ExecutionContext[Tree]): Tree =
     q"$func(${apply(c1)},${apply(c2)})"
 
-  def typeTree(exprType: ExprType): Tree = exprType match {
+  def typeTree(exprType: ExprType[_]): Tree = exprType match {
     case IntType => tq"""Int"""
-    case DomKeyType(t) => Ident(t.typeSymbol)
+    case PrimitiveKeyType(t) => Ident(t.typeSymbol)
     case FiniteMappingType(k, v) => tq"""scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"""
 
     case t: ProductExprType[_] => {
@@ -175,6 +175,8 @@ object LocalCodeGen extends CodeGen[Tree] {
 
       case (IntType,IntType) => q"""x1 * x2"""
 
+      case (r1:ProductRingType,r2:ProductRingType) if (r1 == r2) => ???
+
       case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) if (k1 == k2 && v1 == v2) =>
         q"""
            x1 map { case (k1,v1) => k1 -> ${multiply(v1,v2)}(v1,x2.getOrElse(k1,${zero(v1)})) }
@@ -188,21 +190,57 @@ object LocalCodeGen extends CodeGen[Tree] {
     }
   }
 
-  //TODO - ambiguity in mutliplication of mapping types wrt value type? (depending on if natural def is used or extended)
-
   def dot(t1: RingType, t2: RingType): Tree = anonFunc(t1, t2) {
     (t1,t2) match {
 
       case (IntType,IntType) => q"""x1 * x2"""
 
-      case (FiniteMappingType(_,valueType),IntType) => {
-        val innerDot = dot(valueType,IntType)
+      case (r:ProductRingType,IntType) => {
+        val elems = r.ts.zipWithIndex.map { case (t,i) =>
+          val func = dot(t,IntType)
+          Apply(
+            func,
+            List(
+              Select(Ident(TermName("x1")), TermName(s"_${i+1}")),
+              Ident(TermName("x2"))
+            )
+          )
+        }
+        tuple(elems)
+      }
+
+      case (IntType,r:ProductRingType) => {
+        val elems = r.ts.zipWithIndex.map { case (t,i) =>
+          val func = dot(IntType,t)
+          Apply(
+            func,
+            List(
+              Ident(TermName("x1")),
+              Select(Ident(TermName("x2")), TermName(s"_${i+1}"))
+            )
+          )
+        }
+        tuple(elems)
+      }
+
+      case (FiniteMappingType(_,vT),IntType) => {
+        val innerDot = dot(vT,IntType)
         q"""x1.mapValues(v => $innerDot(v, x2))"""
       }
 
-      case (IntType,FiniteMappingType(_,valueType)) => {
-        val innerDot = dot(IntType,valueType)
-        q"""x2.mapValues(v => $innerDot(v, x1))"""
+      case (IntType,FiniteMappingType(_,vT)) => {
+        val innerDot = dot(IntType,vT)
+        q"""x2.mapValues(v => $innerDot(x1, v))"""
+      }
+
+      case (FiniteMappingType(_,vT),r:ProductRingType) => {
+        val innerDot = dot(vT,r)
+        q"""x1.mapValues(v => $innerDot(v, x2))"""
+      }
+
+      case (r:ProductRingType,FiniteMappingType(_,vT)) => {
+        val innerDot = dot(r,vT)
+        q"""x2.mapValues(v => $innerDot(x1, v))"""
       }
 
       case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) => {
@@ -229,21 +267,21 @@ object LocalCodeGen extends CodeGen[Tree] {
     Apply(constructor, ts.toList)
   }
 
-  private def valDef(t: ExprType, n: String): ValDef =
+  private def valDef(t: ExprType[_], n: String): ValDef =
     ValDef(Modifiers(), TermName(n), typeTree(t), EmptyTree)
 
-  private def anonFunc(ts: ExprType*)(body: Tree): Function = {
-    val valDefs = ts.zipWithIndex.map { case (t: ExprType, i: Int) => valDef(t, s"x${i+1}") }.toList
+  private def anonFunc(ts: ExprType[_]*)(body: Tree): Function = {
+    val valDefs = ts.zipWithIndex.map { case (t: ExprType[_], i: Int) => valDef(t, s"x${i+1}") }.toList
     Function(valDefs, body)
   }
 }
-
 
 
 object ToolBoxExecutor extends Executor[Tree] {
   val tb = currentMirror.mkToolBox()
   def apply(t: Tree) = tb.eval(t)
 }
+
 
 case class LocalInterpreter(ctx: ExecutionContext[Tree]) extends Interpreter[Tree] {
   val codeGen = LocalCodeGen
