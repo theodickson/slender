@@ -17,7 +17,7 @@ class ShreddingTests extends FunSuite {
 
   test("") {
 
-    val p = Predicate(IntKeyExpr(1), IntKeyExpr(1)) //todo
+    val p = EqualsPredicate(IntKeyExpr(1), IntKeyExpr(1)) //todo
 
     def invalid(x: String) = For("y" <-- fromK(x._2).dot(fromK(x._3)) iff p) Yield "y"._1._3
 

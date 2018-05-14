@@ -44,6 +44,13 @@ trait ToolboxExecutionContext extends ExecutionContext[Tree] {
       Select(sel, TermName(name))
     }
   }
+//  def apply(ref: String) = {
+//    val path = ref.split('.')
+//    assert(path.length > 0)
+//    path.tail.foldLeft[Tree](Ident(TermName(path.head))) { (sel, name) =>
+//      Select(sel, TermName(name))
+//    }
+//  }
   def apply(ref: String) = Select(myTree, TermName(ref))
 }
 
@@ -52,19 +59,23 @@ object LocalCodeGen extends CodeGen[Tree] {
 
   def apply(expr: Expr[_])(implicit ctx: ExecutionContext[Tree]): Tree = expr match {
 
-    case IntExpr(i) => q"""$i"""
+    case p : PrimitiveExpr[_, _] => p.literal
 
-    case PhysicalCollection(kt, vt, ref) => q"""${ctx.apply(ref)}"""
+    case p : ProjectExpr[_] => Select(apply(p.c1), TermName(s"_${p.n}"))
+
+    case p : ProductExpr[_] => tuple(p.children.map(apply))
+
+    case PhysicalCollection(kt, vt, ref) => q"${ctx.apply(ref)}"
 
     case Sum(c) => unaryApply(sum(c.exprType))(c)
 
     case Add(c1, c2) => binaryApply(add(c1.exprType, c2.exprType))(c1, c2)
 
-    case Multiply(c1,inf:InfiniteMappingExpr) => {
+    case Multiply(c1:MappingExpr,inf:InfiniteMappingExpr) => {
       val lhs = apply(c1)
       val rhs = apply(inf)
       val dotFunc = dot(c1.exprType.asInstanceOf[MappingType].r, inf.valueType)
-      q"""$lhs.map { case (k,v1) => k -> $dotFunc(v1,$rhs(k)) }"""
+      q"$lhs.map { case (k,v1) => k -> $dotFunc(v1,$rhs(k)) }"
     }
 
     case Multiply(c1,c2) => binaryApply(multiply(c1.exprType,c2.exprType))(c1, c2)
@@ -85,9 +96,9 @@ object LocalCodeGen extends CodeGen[Tree] {
 
     case TypedVariableKeyExpr(name,_) => Ident(TermName(name))
 
-    case ProjectRingExpr(c, i) => Select(apply(c), TermName(s"_$i"))
+    case EqualsPredicate(c1,c2) => q"if (${apply(c1)} == ${apply(c2)}) 1 else 0"
 
-    case ProjectKeyExpr(c, i) => Select(apply(c), TermName(s"_$i"))
+    case BoxedRingExpr(c1) => apply(c1)
 
   }
 
@@ -97,15 +108,16 @@ object LocalCodeGen extends CodeGen[Tree] {
     q"$func(${apply(c1)},${apply(c2)})"
 
   def typeTree(exprType: ExprType[_]): Tree = exprType match {
-    case IntType => tq"""Int"""
-    case PrimitiveKeyType(t) => Ident(t.typeSymbol)
-    case FiniteMappingType(k, v) => tq"""scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"""
-
+    case t : PrimitiveType[_] => Ident(t.tpe.typeSymbol)
+    case FiniteMappingType(k, v) => tq"scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"
+    case InfiniteMappingType(k, v) => tq"${typeTree(k)} => ${typeTree(v)}"
     case t: ProductExprType[_] => {
       val ident = Select(Ident(TermName("scala")), TypeName(s"Tuple${t.ts.length}"))
       val args = t.ts.map(typeTree)
       AppliedTypeTree(ident, args.toList)
     }
+    case BoxedRingType(r) => typeTree(r)
+    case _ : UnresolvedExprType[_] => throw UnresolvedExprTypeException("Cannot make type tree for unresolved expr type.")
   }
 
   def sum(t: RingType): Tree = anonFunc(t) {
@@ -113,7 +125,7 @@ object LocalCodeGen extends CodeGen[Tree] {
       case FiniteMappingType(_, vT) => {
         val acc = zero(vT)
         val combine = add(vT, vT)
-        q"""x1.values.foldRight($acc)($combine)"""
+        q"x1.values.foldRight($acc)($combine)"
       }
       case _ => throw new IllegalStateException(s"Cannot sum ring of type $t")
     }
@@ -124,6 +136,7 @@ object LocalCodeGen extends CodeGen[Tree] {
       case IntType => q"-x1"
       case FiniteMappingType(k,v) => q"x1 mapValues ${negate(v)}"
       case p : ProductRingType => tuple(p.ts.map(negate))
+      case _ : UnresolvedExprType[_] => throw UnresolvedExprTypeException("Cannot negate unresolved type expression.")
       case _ : InfiniteMappingType => throw new IllegalStateException("Cannot negate infinite mapping type.")
     }
   }
@@ -133,24 +146,26 @@ object LocalCodeGen extends CodeGen[Tree] {
       case IntType => q"if (x1 == 0) 1 else 0"
       case FiniteMappingType(k,v) => q"x1 mapValues ${negate(v)}"
       case p : ProductRingType => tuple(p.ts.map(negate))
+      case _ : UnresolvedExprType[_] => throw UnresolvedExprTypeException("Cannot not unresolved type expression.")
       case _ : InfiniteMappingType => throw new IllegalStateException("Cannot not infinite mapping type.")
     }
   }
 
   def zero(t: RingType): Tree = t match {
-    case IntType => q"""0"""
+    case IntType => q"0"
     case FiniteMappingType(k, v) => q"""Map.empty[${typeTree(k)},${typeTree(v)}]"""
     case p : ProductRingType => tuple(p.ts.map(zero))
+    case _ : UnresolvedExprType[_] => throw new IllegalStateException("No zero for unresolved type.")
     case _ : InfiniteMappingType => throw new IllegalStateException("No zero infinite mapping type.")
   }
 
   def add(t1: RingType, t2: RingType): Tree = anonFunc(t1, t2) {
     (t1,t2) match {
 
-      case (IntType,IntType) => q"""x1 + x2"""
+      case (IntType,IntType) => q"x1 + x2"
 
       case (t@FiniteMappingType(_, rt),t2) if t == t2 =>
-        q"""x1 ++ x2.map { case (k,v) => k -> ${add(rt,rt)}(v,x1.getOrElse(k,${zero(rt)})) }"""
+        q"x1 ++ x2.map { case (k,v) => k -> ${add(rt,rt)}(v,x1.getOrElse(k,${zero(rt)})) }"
 
       case (p:ProductRingType,p2:ProductRingType) if (p == p2) => {
         val elems = p.ts.zipWithIndex.map { case (t,i) =>
@@ -173,7 +188,7 @@ object LocalCodeGen extends CodeGen[Tree] {
   def multiply(t1: RingType, t2: RingType): Tree = anonFunc(t1,t2) {
     (t1,t2) match {
 
-      case (IntType,IntType) => q"""x1 * x2"""
+      case (IntType,IntType) => q"x1 * x2"
 
       case (r1:ProductRingType,r2:ProductRingType) if (r1 == r2) => ???
 
@@ -193,7 +208,7 @@ object LocalCodeGen extends CodeGen[Tree] {
   def dot(t1: RingType, t2: RingType): Tree = anonFunc(t1, t2) {
     (t1,t2) match {
 
-      case (IntType,IntType) => q"""x1 * x2"""
+      case (IntType,IntType) => q"x1 * x2"
 
       case (r:ProductRingType,IntType) => {
         val elems = r.ts.zipWithIndex.map { case (t,i) =>
@@ -225,22 +240,22 @@ object LocalCodeGen extends CodeGen[Tree] {
 
       case (FiniteMappingType(_,vT),IntType) => {
         val innerDot = dot(vT,IntType)
-        q"""x1.mapValues(v => $innerDot(v, x2))"""
+        q"x1.mapValues(v => $innerDot(v, x2))"
       }
 
       case (IntType,FiniteMappingType(_,vT)) => {
         val innerDot = dot(IntType,vT)
-        q"""x2.mapValues(v => $innerDot(x1, v))"""
+        q"x2.mapValues(v => $innerDot(x1, v))"
       }
 
       case (FiniteMappingType(_,vT),r:ProductRingType) => {
         val innerDot = dot(vT,r)
-        q"""x1.mapValues(v => $innerDot(v, x2))"""
+        q"x1.mapValues(v => $innerDot(v, x2))"
       }
 
       case (r:ProductRingType,FiniteMappingType(_,vT)) => {
         val innerDot = dot(r,vT)
-        q"""x2.mapValues(v => $innerDot(x1, v))"""
+        q"x2.mapValues(v => $innerDot(x1, v))"
       }
 
       case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) => {
@@ -258,7 +273,7 @@ object LocalCodeGen extends CodeGen[Tree] {
   def sng(k: KeyType, v: RingType): Tree = anonFunc(k, v) {
     (k,v) match {
       case (_,InfiniteMappingType(_,_)) => throw new IllegalStateException("Cannot have infinite mapping as value of sng")
-      case _ => q"""scala.collection.immutable.Map(x1 -> x2)"""
+      case _ => q"scala.collection.immutable.Map(x1 -> x2)"
     }
   }
 
@@ -288,3 +303,5 @@ case class LocalInterpreter(ctx: ExecutionContext[Tree]) extends Interpreter[Tre
   val executor = ToolBoxExecutor
   def display(expr: RingExpr): String = showCode(codeGen(expr)(ctx))
 }
+
+case class UnresolvedExprTypeException(msg: String) extends Exception(msg)

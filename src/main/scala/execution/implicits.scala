@@ -18,11 +18,22 @@ object implicits {
   //todo - this doesnt work from the REPL
   implicit def toExpr[T](t: T)(implicit ev: TypeTag[T]): PhysicalCollection = macro toExprImpl[T]
 
+//  def toExprImpl[T](c: Context)(t: c.Expr[T])(ev: c.Expr[TypeTag[T]]): c.Expr[PhysicalCollection] = {
+//     import c.universe._
+//     val refRep = show(t.tree)
+//     c.Expr[PhysicalCollection](
+//       q"""
+//        val mappingType = getMappingType($t)($ev)
+//        PhysicalCollection(mappingType.k, mappingType.r, $refRep)
+//        """
+//    )
+//  }
+
   def toExprImpl[T](c: Context)(t: c.Expr[T])(ev: c.Expr[TypeTag[T]]): c.Expr[PhysicalCollection] = {
-     import c.universe._
-     val refRep = show(t.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
-     c.Expr[PhysicalCollection](
-       q"""
+    import c.universe._
+    val refRep = show(t.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
+    c.Expr[PhysicalCollection](
+      q"""
         val mappingType = getMappingType($t)($ev)
         PhysicalCollection(mappingType.k, mappingType.r, $refRep)
         """

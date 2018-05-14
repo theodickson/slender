@@ -36,6 +36,14 @@ object MyExecutionContext extends ToolboxExecutionContext {
       ("d", Map("d" -> 2))
     )
 
+  val bagOfPairs =
+    Map(
+      ("a",1) -> 4,
+      ("b",2) -> 3,
+      ("b",3) -> 2,
+      ("b",4) -> 1
+    )
+
 }
 
 class ExecutionTests extends FunSuite {
@@ -132,5 +140,17 @@ class ExecutionTests extends FunSuite {
 //    println(expr.explain)
 //    println(result)
   }
+
+//  test("Key-nesting test") {
+//    val group: KeyExpr => RingExpr = k =>
+//      For ("k1" <-- bagOfPairs iff k === "k1"._1 && "k1"._2 > 2) Yield "k1"._2
+//    val query = For ("k" <-- bagOfPairs) Yield (
+//      ("k"._1, toK(group("k"._1)))
+//      )
+//    val result = interpreter(query)
+//    println(result)
+
+//  }
+
 
 }

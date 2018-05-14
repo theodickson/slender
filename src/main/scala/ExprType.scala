@@ -1,13 +1,15 @@
 package slender
 
 import scala.reflect.runtime.universe._
+import definitions._
 
 sealed trait ExprType[T <: ExprType[T]] {
+
   def isResolved: Boolean = true
-  def leftBracket: String = ""
-  def rightBracket: String = ""
+
+  def brackets: (String,String) = ("","")
   def openString: String = toString
-  def closedString: String = s"$leftBracket$openString$rightBracket"
+  def closedString: String = s"${brackets._1}$openString${brackets._2}"
 
   def project(n: Int): T = this match {
     case r : ProductExprType[T] => try r.get(n) catch {
@@ -36,8 +38,7 @@ sealed trait UnresolvedExprType[T <: ExprType[T]] extends ExprType[T] with Unshr
 sealed trait ProductExprType[T <: ExprType[T]] extends ExprType[T] {
   def ts: Seq[T]
   def get(n: Int): T = ts(n-1)
-  override def leftBracket = "("
-  override def rightBracket = ")"
+  override def brackets = ("(",")")
   override def toString = ts.map(_.closedString).mkString("×")
 }
 
@@ -58,10 +59,16 @@ sealed trait KeyType extends ExprType[KeyType] {
     case (k: KeyType, r1: RingType) => InfiniteMappingType(k,r1)
   }
 
-  def ===(other: KeyType): RingType = (this,other) match {
-    case (UnresolvedKeyType,_) | (_,UnresolvedKeyType) => UnresolvedRingType
+  def compareEq(other: KeyType): RingType = (this,other) match {
+    case (UnresolvedKeyType, _) | (_, UnresolvedKeyType) => UnresolvedRingType
     case _ => if (this == other) IntType else
-      throw InvalidPredicateException(s"Cannot compare keys of differing type $this and $other for equality.")
+      throw InvalidPredicateException(s"Cannot compare keys of differing types $this and $other for equality.")
+  }
+
+  def compareOrd(other: KeyType): RingType = (this,other) match {
+    case (UnresolvedKeyType,_) | (_,UnresolvedKeyType) => UnresolvedRingType
+    case (IntKeyType,IntKeyType) => IntType
+    case _ => throw InvalidPredicateException(s"Cannot compare keys of types $this and $other for ordering.")
   }
 
   def unbox: RingType = this match {
@@ -87,10 +94,14 @@ object ProductKeyType {
 }
 
 
-case class PrimitiveKeyType(tpe: Type) extends KeyType {
+sealed trait PrimitiveType[T <: ExprType[T]] extends ExprType[T] {
+  def tpe: Type
+  override def toString = tpe.toString
+}
+
+case class PrimitiveKeyType(tpe: Type) extends KeyType with PrimitiveType[KeyType] {
   //todo - should primitive types which can be ring type (e.g Int,Double) be forced to be boxed rings?
   def shred = this
-  override def toString = tpe.toString
 }
 
 
@@ -189,13 +200,10 @@ sealed trait RingType extends ExprType[RingType] {
 case object UnresolvedRingType extends RingType with UnresolvedExprType[RingType]
 
 
-sealed trait PrimitiveRingType extends RingType {
-  def shred = this
-}
-
-
-case object IntType extends PrimitiveRingType {
+case object IntType extends RingType with PrimitiveType[RingType] {
   override def toString = "Int"
+  def tpe = typeOf[Int]
+  def shred = this
 }
 
 

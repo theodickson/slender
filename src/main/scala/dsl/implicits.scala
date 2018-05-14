@@ -1,6 +1,7 @@
 package slender.dsl
 
 import slender._
+import scala.reflect.runtime.universe._
 
 object implicits {
 
@@ -14,10 +15,12 @@ object implicits {
     def _2: KeyExpr = ProjectKeyExpr(s, 2)
     def _3: KeyExpr = ProjectKeyExpr(s, 3)
 
-    def ===(other: KeyExpr): RingExpr = Predicate(s, other)
-    def ===(other: String): RingExpr = Predicate(s, other)
-    def =!=(other: KeyExpr): RingExpr = Not(Predicate(s,other))
-    def =!=(other: String): RingExpr = Not(Predicate(s,other))
+    def ===(other: KeyExpr): RingExpr = EqualsPredicate(s, other)
+    def ===(other: String): RingExpr = EqualsPredicate(s, other)
+    def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(s,other))
+    def =!=(other: String): RingExpr = Not(EqualsPredicate(s,other))
+//    def >(other: KeyExpr): RingExpr = IntPredicate(s, other, _ > _, ">")
+//    def <(other: KeyExpr): RingExpr = IntPredicate(s, other, _ < _, "<")
 
     def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(s, r)
   }
@@ -41,15 +44,19 @@ object implicits {
 
   }
 
+  implicit def boolToInt(b: Boolean): Int = if (b) 1 else 0
+
   implicit class KeyExprImplicits(k: KeyExpr) {
     def _1: KeyExpr = ProjectKeyExpr(k, 1)
     def _2: KeyExpr = ProjectKeyExpr(k, 2)
     def _3: KeyExpr = ProjectKeyExpr(k, 3)
 
-    def ===(other: KeyExpr): RingExpr = Predicate(k, other)
-    def ===(other: String): RingExpr = Predicate(k, other)
-    def =!=(other: KeyExpr): RingExpr = Not(Predicate(k,other))
-    def =!=(other: String): RingExpr = Not(Predicate(k, other))
+    def ===(other: KeyExpr): RingExpr = EqualsPredicate(k, other)
+    def ===(other: String): RingExpr = EqualsPredicate(k, other)
+    def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(k,other))
+    def =!=(other: String): RingExpr = Not(EqualsPredicate(k, other))
+//    def >(other: KeyExpr): RingExpr = IntPredicate(k, other, _ > _, ">")
+//    def <(other: KeyExpr): RingExpr = IntPredicate(k, other, _ < _, "<")
 
     def -->(r: RingExpr): YieldPair = YieldPair(k,r)
   }
@@ -66,7 +73,7 @@ object implicits {
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 //
-  implicit def intToIntKeyExpr(i: Int): IntKeyExpr = IntKeyExpr(i)
+  implicit def intToIntKeyExpr(i: Int): PrimitiveKeyExpr[Int] = IntKeyExpr(i)
 
   implicit def ringExprPairImplicits(p: (RingExpr,RingExpr)): RingProductExpr = RingProductExpr(p._1,p._2)
 
