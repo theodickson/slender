@@ -61,6 +61,7 @@ sealed trait KeyType extends ExprType[KeyType] {
 
   def compareEq(other: KeyType): RingType = (this,other) match {
     case (UnresolvedKeyType, _) | (_, UnresolvedKeyType) => UnresolvedRingType
+    case (PrimitiveKeyType(_),PrimitiveKeyType(_)) => IntType
     case _ => if (this == other) IntType else
       throw InvalidPredicateException(s"Cannot compare keys of differing types $this and $other for equality.")
   }

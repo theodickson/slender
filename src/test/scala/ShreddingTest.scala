@@ -15,7 +15,7 @@ class ShreddingTests extends FunSuite {
 
   val intPairs = PhysicalBag(ProductKeyType(IntKeyType,IntKeyType), "intPairs")
 
-  test("") {
+  test("Packet query") {
 
     val p = EqualsPredicate(IntKeyExpr(1), IntKeyExpr(1)) //todo
 

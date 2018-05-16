@@ -19,8 +19,8 @@ object implicits {
     def ===(other: String): RingExpr = EqualsPredicate(s, other)
     def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(s,other))
     def =!=(other: String): RingExpr = Not(EqualsPredicate(s,other))
-//    def >(other: KeyExpr): RingExpr = IntPredicate(s, other, _ > _, ">")
-//    def <(other: KeyExpr): RingExpr = IntPredicate(s, other, _ < _, "<")
+    def >(other: KeyExpr): RingExpr = IntPredicate(s, other, _ > _, ">")
+    def <(other: KeyExpr): RingExpr = IntPredicate(s, other, _ < _, "<")
 
     def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(s, r)
   }
@@ -55,8 +55,8 @@ object implicits {
     def ===(other: String): RingExpr = EqualsPredicate(k, other)
     def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(k,other))
     def =!=(other: String): RingExpr = Not(EqualsPredicate(k, other))
-//    def >(other: KeyExpr): RingExpr = IntPredicate(k, other, _ > _, ">")
-//    def <(other: KeyExpr): RingExpr = IntPredicate(k, other, _ < _, "<")
+    def >(other: KeyExpr): RingExpr = IntPredicate(k, other, _ > _, ">")
+    def <(other: KeyExpr): RingExpr = IntPredicate(k, other, _ < _, "<")
 
     def -->(r: RingExpr): YieldPair = YieldPair(k,r)
   }
@@ -85,7 +85,7 @@ object implicits {
   implicit def keyTypePairImplicits(p: (KeyType,KeyType)): KeyType =
     ProductKeyType(p._1, p._2)
 
-  implicit def box(r: RingType): KeyType = r.box
+//  implicit def box(r: RingType): KeyType = r.box
 
   implicit def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
 
