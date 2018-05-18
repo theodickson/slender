@@ -5,12 +5,7 @@ import scala.reflect.runtime.universe._
 
 object implicits {
 
-  implicit class VarKeyExprImplicits(val k: VariableKeyExpr) {
-    def <--(r: RingExpr): (VariableKeyExpr, RingExpr) = (k,r)
-    def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(k, r)
-  }
-
-  implicit class KeyExprImplicits(val k: KeyExpr) {
+  implicit class KeyExprOps(val k: KeyExpr) {
     def _1: KeyExpr = ProjectKeyExpr(k, 1)
     def _2: KeyExpr = ProjectKeyExpr(k, 2)
     def _3: KeyExpr = ProjectKeyExpr(k, 3)
@@ -24,14 +19,19 @@ object implicits {
     def -->(r: RingExpr): YieldPair = YieldPair(k,r)
   }
 
-//  implicit def unwrapKeyExprImplicits(x: KeyExprImplicits): KeyExpr = x.k
-
-  trait MakeVarKeyExpr[X] extends (X => VarKeyExprImplicits)
-  trait MakeKeyExpr[X] extends (X => KeyExpr)
-
-  implicit object stringMakeVarKeyExpr extends MakeVarKeyExpr[String] {
-    def apply(x: String) = VarKeyExprImplicits(UntypedVariable(x))
+  implicit class VarKeyExprOps(val k: VariableKeyExpr) {
+    def <--(r: RingExpr): (VariableKeyExpr, RingExpr) = (k,r)
+    def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(k, r)
   }
+
+  trait MakeKeyExpr[X] extends (X => KeyExpr)
+  trait MakeKeyExprOps[X] extends (X => KeyExprOps)
+  trait MakeVarKeyExprOps[X] extends (X => VarKeyExprOps)
+
+  implicit def toKeyExpr[X](x: X)(implicit make: MakeKeyExpr[X]): KeyExpr = make(x)
+  implicit def toKeyExprOps[X](x: X)(implicit make: MakeKeyExprOps[X]): KeyExprOps = make(x)
+  implicit def toVarKeyExprOps[X](x: X)(implicit make: MakeVarKeyExprOps[X]): VarKeyExprOps = make(x)
+
 
   implicit object idMakeKeyExpr extends MakeKeyExpr[KeyExpr] {
     def apply(x: KeyExpr) = x
@@ -41,14 +41,20 @@ object implicits {
     def apply(x: String) = UntypedVariable(x)
   }
 
-  implicit def pairMakeVarKeyExpr[A,B](implicit recur1: MakeVarKeyExpr[A],
-                                                recur2: MakeVarKeyExpr[B]): MakeVarKeyExpr[(A,B)]
-    = new MakeVarKeyExpr[(A,B)] {
-    def apply(x: (A,B)) = VarKeyExprImplicits(
-      ProductVariableKeyExpr(
-        List[VariableKeyExpr](recur1(x._1).k, recur2(x._2).k)
-      )
-    )
+  implicit object idMakeKeyExprOps extends MakeKeyExprOps[KeyExpr] {
+    def apply(x: KeyExpr) = KeyExprOps(x)
+  }
+
+  implicit object stringMakeKeyExprOps extends MakeKeyExprOps[String] {
+    def apply(x: String) = KeyExprOps(UntypedVariable(x))
+  }
+
+  implicit object idMakeVarKeyExprOps extends MakeVarKeyExprOps[VariableKeyExpr] {
+    def apply(x: VariableKeyExpr) = VarKeyExprOps(x)
+  }
+
+  implicit object stringMakeVarKeyExprOps extends MakeVarKeyExprOps[String] {
+    def apply(x: String) = VarKeyExprOps(UntypedVariable(x))
   }
 
   implicit def pairMakeKeyExpr[A,B](implicit recur1: MakeKeyExpr[A],
@@ -56,9 +62,60 @@ object implicits {
   = new MakeKeyExpr[(A,B)] {
     def apply(x: (A,B)) =
       KeyProductExpr(
-        List[KeyExpr](recur1(x._1).k, recur2(x._2).k)
+        List[KeyExpr](recur1(x._1), recur2(x._2))
       )
   }
+
+  implicit def pairMakeKeyExprOps[A,B](implicit recur1: MakeKeyExprOps[A],
+                                       recur2: MakeKeyExprOps[B]): MakeKeyExprOps[(A,B)]
+  = new MakeKeyExprOps[(A,B)] {
+    def apply(x: (A,B)) = KeyExprOps(
+      KeyProductExpr(
+        List[KeyExpr](recur1(x._1).k, recur2(x._2).k)
+      )
+    )
+  }
+
+  implicit def pairMakeVarKeyExprOps[A,B](implicit recur1: MakeVarKeyExprOps[A],
+                                       recur2: MakeVarKeyExprOps[B]): MakeVarKeyExprOps[(A,B)]
+    = new MakeVarKeyExprOps[(A,B)] {
+    def apply(x: (A,B)) = VarKeyExprOps(
+      ProductVariableKeyExpr(
+        List[VariableKeyExpr](recur1(x._1).k, recur2(x._2).k)
+      )
+    )
+  }
+
+  implicit def tripleMakeKeyExpr[A,B,C](implicit recur1: MakeKeyExpr[A],
+                                    recur2: MakeKeyExpr[B], recur3: MakeKeyExpr[C]): MakeKeyExpr[(A,B,C)]
+  = new MakeKeyExpr[(A,B,C)] {
+    def apply(x: (A,B,C)) =
+      KeyProductExpr(
+        List[KeyExpr](recur1(x._1), recur2(x._2), recur3(x._3))
+      )
+  }
+
+  implicit def tripleMakeKeyExprOps[A,B,C](implicit recur1: MakeKeyExprOps[A],
+                                       recur2: MakeKeyExprOps[B], recur3: MakeKeyExprOps[C]): MakeKeyExprOps[(A,B,C)]
+  = new MakeKeyExprOps[(A,B,C)] {
+    def apply(x: (A,B,C)) = KeyExprOps(
+      KeyProductExpr(
+        List[KeyExpr](recur1(x._1).k, recur2(x._2).k, recur3(x._3).k)
+      )
+    )
+  }
+
+  implicit def tripleMakeVarKeyExprOps[A,B,C](implicit recur1: MakeVarKeyExprOps[A],
+                                          recur2: MakeVarKeyExprOps[B], recur3: MakeVarKeyExprOps[C]): MakeVarKeyExprOps[(A,B,C)]
+  = new MakeVarKeyExprOps[(A,B,C)] {
+    def apply(x: (A,B,C)) = VarKeyExprOps(
+      ProductVariableKeyExpr(
+        List[VariableKeyExpr](recur1(x._1).k, recur2(x._2).k, recur3(x._3).k)
+      )
+    )
+  }
+
+
 
 
 
@@ -85,14 +142,6 @@ object implicits {
   implicit class IffImplicit(pair: (VariableKeyExpr,RingExpr)) {
     def iff(r1: RingExpr): (VariableKeyExpr,(RingExpr,RingExpr)) = (pair._1,(pair._2,r1))
   }
-
-//
-//  implicit def stringPairToVarPair(p: (String,String)): ProductVariableKeyExpr =
-//    ProductVariableKeyExpr(
-//      List(UntypedVariable(p._1),UntypedVariable(p._2))
-//    )
-
-  implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedVariable = UntypedVariable(s)
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
@@ -142,5 +191,26 @@ object implicits {
   }
 
   case class YieldPair(k: KeyExpr, r: RingExpr)
+
+
+  /**IntelliJ is not managing to resolve the conversions via the type-class mediator pattern even though its compiling
+    * so here are a bunch of explicit conversions to stop IDE errors. Hopefully can sort this out at some point.
+    */
+
+
+  implicit def stringPairToVarKeyExpr(p: (String,String)): VariableKeyExpr =
+    ProductVariableKeyExpr(List(p._1, p._2))
+
+  implicit def stringPairToVarKeyExprOps(p: (String,String)): VarKeyExprOps =
+    VarKeyExprOps(ProductVariableKeyExpr(List(p._1, p._2)))
+
+  implicit def stringTripleToVarKeyExprOps(p: (String,String,String)): VarKeyExprOps =
+    VarKeyExprOps(ProductVariableKeyExpr(List(p._1, p._2, p._3)))
+
+  implicit def oddPair1(p: (String,KeyExpr)): KeyProductExpr =
+    KeyProductExpr(List(UntypedVariable(p._1),p._2))
+
+  implicit def oddPair2(p: (KeyExpr,String)): KeyProductExpr =
+    KeyProductExpr(List(p._1,UntypedVariable(p._2)))
 
 }

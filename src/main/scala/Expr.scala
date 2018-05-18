@@ -132,6 +132,8 @@ object KeyProductExpr {
 
 
 case class ProjectKeyExpr(c1: KeyExpr, n: Int) extends KeyExpr with ProjectExpr[KeyExpr] with UnaryExpr[KeyExpr] {
+//  if (c1.isInstanceOf[VariableKeyExpr])
+//    throw new IllegalStateException("Cannot project variable key exprs. Bind to product keys with multiple variables.")
   val exprType = c1.exprType.project(n)
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
     ProjectKeyExpr(c1.replaceTypes(vars, overwrite), n)

@@ -17,12 +17,12 @@ trait CodeGen {
     q"""
          ..${predef(expr)}
          ${generate(expr)}
-     """//val nested = flat.map { case (k,v) => (k._1,k._2.get) -> v }
+     """
   }
   def generate(expr: Expr[_])(implicit ctx: ExecutionContext): Tree
   def predef(expr: Expr[_])(implicit ctx: ExecutionContext): Seq[Tree]
   def validate(expr: Expr[_]): Unit = expr.variables.foreach { v =>
-    if (v.name.matches("($_x(\\d)*|$_k(\\d)*|$_v(\\d)*)|lbl"))
+    if (v.name.matches("_.*"))
       throw new IllegalStateException(s"Expr contains variable named ${v.name} which is reserved for use by codegen.")
   }
   def typeTree(exprType: ExprType[_]): Tree
@@ -59,7 +59,15 @@ trait ToolboxExecutionContext extends ExecutionContext {
 }
 
 
-object LocalCodeGen extends CodeGen {
+class LocalCodeGen extends CodeGen {
+
+  val usedVars = scala.collection.mutable.Set[String]()
+
+  def freshVar: String = {
+    val attempt = s"_${scala.util.Random.alphanumeric.filter(_.isLetter).filter(_.isLower).take(3).mkString("")}"
+      if (usedVars.contains(attempt)) freshVar
+      else { usedVars += attempt; attempt }
+  }
 
   def generate(expr: Expr[_])(implicit ctx: ExecutionContext): Tree = expr match {
 
@@ -93,16 +101,18 @@ object LocalCodeGen extends CodeGen {
     case Sng(k,v) => binaryApply(sng(k.exprType,v.exprType))(k,v)
 
     case InfiniteMappingExpr(key,value) => {
-      val arg = valDef(key.exprType,key.asInstanceOf[Variable].name)
-      val body = generate(value)
+      val varName = freshVar
+      val arg = valDef(key.exprType,varName)//key.asInstanceOf[Variable].name)
+      //extractor so can deal with nested free variables.
+      val extract = extractor(key.asInstanceOf[VariableKeyExpr], varName)
+      val body = q"..$extract; ${generate(value)}"
+      //println(body)
       Function(List(arg), body)
     }
 
     case TypedVariable(name,_) => Ident(TermName(name))
 
     case UntypedVariable(_) => ???
-
-    case ProductVariableKeyExpr(cs) => tuple(cs.map(generate))
 
     case EqualsPredicate(c1,c2) => q"if (${generate(c1)} == ${generate(c2)}) 1 else 0"
 
@@ -342,6 +352,17 @@ object LocalCodeGen extends CodeGen {
     val valDefs = ts.zipWithIndex.map { case (t: ExprType[_], i: Int) => valDef(t, s"_x${i+1}") }.toList
     Function(valDefs, body)
   }
+
+  private def extractor(v: VariableKeyExpr, varName: String): Tree = {
+    def go(v: VariableKeyExpr): String = v match {
+      case ProductVariableKeyExpr(cs) => s"(${cs.map(v => go(v.asInstanceOf[VariableKeyExpr])).mkString(",")})"
+      case va : Variable => va.name
+    }
+    //todo - remove dependency on toolbox
+    val ex = currentMirror.mkToolBox().parse(s"val ${go(v)} = $varName")
+    //println(ex)
+    ex
+  }
 }
 
 
@@ -352,7 +373,7 @@ object ToolBoxExecutor extends Executor {
 
 
 case class LocalInterpreter(ctx: ExecutionContext) extends Interpreter {
-  val codeGen = LocalCodeGen
+  val codeGen = new LocalCodeGen
   val executor = ToolBoxExecutor
   def showProgram(expr: RingExpr): String = showCode(codeGen(expr)(ctx))
 }
