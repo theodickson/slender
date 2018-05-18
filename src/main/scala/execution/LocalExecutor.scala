@@ -93,12 +93,16 @@ object LocalCodeGen extends CodeGen {
     case Sng(k,v) => binaryApply(sng(k.exprType,v.exprType))(k,v)
 
     case InfiniteMappingExpr(key,value) => {
-      val arg = valDef(key.exprType,key.asInstanceOf[VariableKeyExpr].name)
+      val arg = valDef(key.exprType,key.asInstanceOf[Variable].name)
       val body = generate(value)
       Function(List(arg), body)
     }
 
-    case TypedVariableKeyExpr(name,_) => Ident(TermName(name))
+    case TypedVariable(name,_) => Ident(TermName(name))
+
+    case UntypedVariable(_) => ???
+
+    case ProductVariableKeyExpr(cs) => tuple(cs.map(generate))
 
     case EqualsPredicate(c1,c2) => q"if (${generate(c1)} == ${generate(c2)}) 1 else 0"
 
@@ -130,7 +134,7 @@ object LocalCodeGen extends CodeGen {
     val labelClasses = expr.labels.map { l =>
       val name = TypeName(s"Label${l.id}")
       val args = l.freeVariables.map {
-        case TypedVariableKeyExpr(n,t) => Typed(Ident(TermName(n)),typeTree(t))
+        case TypedVariable(n,t) => Typed(Ident(TermName(n)),typeTree(t))
       } toList
       val argsTree = args.size match {
         case 0 => ???

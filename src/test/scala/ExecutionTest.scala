@@ -1,66 +1,73 @@
-package slender
-
-import slender.execution._
-import slender.execution.implicits._
-import slender.dsl.implicits._
-
-import scala.reflect.runtime.universe._
-import org.scalatest.FunSuite
-
-object MyExecutionContext extends ToolboxExecutionContext {
-
-  val stringCounts =
-    Map(
-      ("a",1),
-      ("b",2),
-      ("c",3)
-    )
-
-  val stringIntPairs =
-    Map(
-      ("a",(1,1)),
-      ("b",(2,2)),
-      ("c",(3,3))
-    )
-
-  val stringIntNestedPairs =
-    Map(
-      ("a",((1,1),(1,1))),
-      ("b",((2,2),(2,2))),
-      ("c",((3,3),(3,3)))
-    )
-
-  val nestedStringBag =
-    Map(
-      ("b", Map("b" -> 2)),
-      ("c", Map("c" -> 2)),
-      ("d", Map("d" -> 2))
-    )
-
-  val bagOfPairs =
-    Map(
-      ("a",1) -> 4,
-      ("b",2) -> 3,
-      ("b",3) -> 2,
-      ("b",4) -> 1
-    )
-
-  val bagOfTriples =
-    Map(
-      (1,1,1) -> 1,
-      (1,1,2) -> 2,
-      (1,2,2) -> 3
-    )
-
-}
-
-class ExecutionTests extends FunSuite {
-
-  val ctx = MyExecutionContext
-
-  import ctx._
-
-  val interpreter = LocalInterpreter(MyExecutionContext)
+//package slender
+//
+//import slender.execution._
+//import slender.execution.implicits._
+//import slender.dsl.implicits._
+//
+//import scala.reflect.runtime.universe._
+//import org.scalatest.FunSuite
+//
+//object MyExecutionContext extends ToolboxExecutionContext {
+//
+//  val stringCounts =
+//    Map(
+//      ("a",1),
+//      ("b",2),
+//      ("c",3)
+//    )
+//
+//  val stringIntPairs =
+//    Map(
+//      ("a",(1,1)),
+//      ("b",(2,2)),
+//      ("c",(3,3))
+//    )
+//
+//  val stringIntNestedPairs =
+//    Map(
+//      ("a",((1,1),(1,1))),
+//      ("b",((2,2),(2,2))),
+//      ("c",((3,3),(3,3)))
+//    )
+//
+//  val nestedStringBag =
+//    Map(
+//      ("b", Map("b" -> 2)),
+//      ("c", Map("c" -> 2)),
+//      ("d", Map("d" -> 2))
+//    )
+//
+//  val bagOfPairs =
+//    Map(
+//      ("a",1) -> 4,
+//      ("b",2) -> 3,
+//      ("b",3) -> 2,
+//      ("b",4) -> 1
+//    )
+//
+//  val bagOfTriples =
+//    Map(
+//      (1,1,1) -> 1,
+//      (1,1,2) -> 2,
+//      (1,2,2) -> 3
+//    )
+//
+//  val bagOfIntPairs =
+//    Map(
+//      (1,1) -> 1,
+//      (1,2) -> 2,
+//      (2,2) -> 3
+//    )
+//
+//}
+//
+//class ExecutionTests extends FunSuite {
+//
+//  val ctx = MyExecutionContext
+//
+//  import ctx._
+//
+//  val interpreter = LocalInterpreter(MyExecutionContext)
 //
 //  test("Evaluate Int.") {
 //    val result = interpreter.apply(IntExpr(1))
@@ -155,18 +162,6 @@ class ExecutionTests extends FunSuite {
 //    assert(result == Map("a" -> 1, "b" -> 0, "c" -> 0))
 //  }
 //
-//  test("Key-nesting test") {
-//    val group: KeyExpr => RingExpr = k =>
-//      For ("k1" <-- bagOfPairs iff "k1"._1 === k && "k1"._2 > 2) Yield "k1"._2
-//    val query = For ("k" <-- bagOfPairs) Yield (
-//      ("k"._1, toK(group("k"._1)))
-//      )
-//    println(query.explain)
-//    val result = interpreter(query)
-//    println(interpreter.showProgram(query))
-//    println(result)
-//  }
-//
 //  test("Group test") {
 //    val group: KeyExpr => RingExpr = k =>
 //      For ("k1" <-- bagOfPairs iff k === "k1"._1) Yield "k1"._2
@@ -176,32 +171,8 @@ class ExecutionTests extends FunSuite {
 //    println(interpreter.showProgram(query))
 //    println(result)
 //  }
-
-//  test("Predef test") {
-//    val group: KeyExpr => RingExpr = k =>
-//      For ("k1" <-- bagOfPairs iff "k1"._1 === k) Yield "k1"._2
-//    val query = For ("k" <-- bagOfPairs) Yield (
-//      ("k"._1, toK(group("k"._1)))
-//      )
-//    val shredded = query.shred
-//    val predef = interpreter.codeGen.predef(shredded)
-//    interpreter.executor(q"..$predef")
-//  }
 //
-//  test("Label init test") {
-//    val group: KeyExpr => RingExpr = k =>
-//      For ("k1" <-- bagOfPairs iff "k1"._1 === k) Yield "k1"._2
-//    val query = For ("k" <-- bagOfPairs) Yield (
-//      ("k"._1, toK(group("k"._1)))
-//      )
-//    val shredded = query.shred
-//    val predef = interpreter.codeGen.predef(shredded)
-//    interpreter.executor(
-//      q"""..$predef
-//         val label = Label100(("a",1))
-//       """
-//    )
-//  }
+//
 //  test("Shredded key-nesting test") {
 //    val group: KeyExpr => RingExpr = k =>
 //      For ("k1" <-- bagOfPairs iff "k1"._1 === k) Yield "k1"._2
@@ -214,44 +185,54 @@ class ExecutionTests extends FunSuite {
 //    val result = interpreter(shredded)
 //    println(result)
 //  }
-
-//  test("Renested key-nesting test") {
-//    val group: KeyExpr => RingExpr = k =>
-//      For ("k1" <-- bagOfPairs iff "k1"._1 === k) Yield "k1"._2
-//    val query = For ("k" <-- bagOfPairs) Yield (
-//      ("k"._1, toK(group("k"._1)))
-//      )
-//    val shredded = query.shred
-//    val unshredded = shredded.unshred
-//    println(unshredded.explain)
-//    println(interpreter.showProgram(unshredded))
-//    val result = interpreter(unshredded)
-//    println(result)
-//  }
-
-  test("Double key-nesting test") {
-    val query =
-      For ("x" <-- bagOfTriples) Yield
-        ("x"._1, toK(
-          For ("y" <-- bagOfTriples iff "y"._1 === "x"._1) Yield
-            ("y"._2, toK(
-              For ("z" <-- bagOfTriples iff "z"._2 === "y"._2) Yield "z"._3
-            )
-            )
-        )
-        )
-    val result = interpreter(query)
-    println(interpreter.showProgram(query))
-    println(interpreter.showProgram(query.shred))
-    println(interpreter.showProgram(query.shred.renest))
-//    val shreddedResult = interpreter(query.shred.renest)
-//    val shreddedProgram = interpreter.showProgram(query.shred.renest)
+//
+//  test("Double key-nesting test") {
+//    val query =
+//      For ("x" <-- bagOfTriples) Yield
+//        ("x"._1, toK(
+//          For ("y" <-- bagOfTriples iff "y"._1 === "x"._1) Yield
+//            ("y"._2, toK(
+//              For ("z" <-- bagOfTriples iff "z"._2 === "y"._2) Yield "z"._3
+//            )
+//            )
+//        )
+//        )
+//    val result = interpreter(query)
+//    println(query.explain)
 //    println(query.shred.explain)
-//    println(shreddedProgram)
-    println(interpreter(query))
-    println(interpreter(query.shred))
-    println(interpreter(query.shred.renest))
-  }
-
-
-}
+//    println(query.shred.renest.explain)
+////    println(interpreter.showProgram(query))
+////    println(interpreter.showProgram(query.shred))
+////    println(interpreter.showProgram(query.shred.renest))
+////    val shreddedResult = interpreter(query.shred.renest)
+////    val shreddedProgram = interpreter.showProgram(query.shred.renest)
+////    println(query.shred.explain)
+////    println(shreddedProgram)
+//    println(interpreter(query))
+//    println(interpreter(query.shred))
+//    println(interpreter(query.shred.renest))
+//  }
+//
+//  test("Key-nesting test") {
+//    val query =
+//      For ("x" <-- bagOfIntPairs) Yield
+//        ("x"._1, toK(
+//          For ("y" <-- bagOfIntPairs iff "y"._1 === "x"._1) Yield
+//            "y"._2)
+//        )
+//    val result = interpreter(query)
+//    println(query.explain)
+//    println(query.shred.explain)
+//    println(query.shred.renest.explain)
+//    //    println(interpreter.showProgram(query))
+//    //    println(interpreter.showProgram(query.shred))
+//    //    println(interpreter.showProgram(query.shred.renest))
+//    //    val shreddedResult = interpreter(query.shred.renest)
+//    //    val shreddedProgram = interpreter.showProgram(query.shred.renest)
+//    //    println(query.shred.explain)
+//    //    println(shreddedProgram)
+//    println(interpreter(query))
+//    println(interpreter(query.shred))
+//    println(interpreter(query.shred.renest))
+//  }
+//}

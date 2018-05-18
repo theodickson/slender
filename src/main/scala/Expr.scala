@@ -21,10 +21,10 @@ sealed trait Expr[T <: Expr[T]] {
   def inferTypes(vars: Map[String,KeyType]): T = replaceTypes(vars, false)
   def inferTypes: T = inferTypes(Map.empty)
 
-  def variables: Set[VariableKeyExpr] =
-    children.foldRight(Set.empty[VariableKeyExpr])((v, acc) => acc ++ v.variables)
-  def freeVariables: Set[VariableKeyExpr] =
-    children.foldRight(Set.empty[VariableKeyExpr])((v, acc) => acc ++ v.freeVariables)
+  def variables: Set[Variable] =
+    children.foldRight(Set.empty[Variable])((v, acc) => acc ++ v.variables)
+  def freeVariables: Set[Variable] =
+    children.foldRight(Set.empty[Variable])((v, acc) => acc ++ v.freeVariables)
   def labels: Seq[LabelExpr] =
     children.foldLeft(Seq.empty[LabelExpr])((acc,v) => acc ++ v.labels)
   def labelDefinitions: Seq[String] = labels.map(_.definition)
@@ -138,26 +138,30 @@ case class ProjectKeyExpr(c1: KeyExpr, n: Int) extends KeyExpr with ProjectExpr[
   def shred = ProjectKeyExpr(c1.shred, n)
   def renest = ProjectKeyExpr(c1.renest, n)
   override def toString = c1 match {
-    case TypedVariableKeyExpr(name, kt) => s""""$name"._$n"""
-    case UntypedVariableKeyExpr(name) => s""""$name._$n:?"""
+    case TypedVariable(name, kt) => s""""$name"._$n"""
+    case UntypedVariable(name) => s""""$name._$n:?"""
     case _ => s"$c1._$n"
   }
 }
 
 
-sealed trait VariableKeyExpr extends NullaryKeyExpr {
+sealed trait VariableKeyExpr extends KeyExpr {
+  def matchTypes(keyType: KeyType): Map[String,KeyType]
+}
+
+sealed trait Variable extends VariableKeyExpr with NullaryKeyExpr {
   def name: String
   override def variables = Set(this)
   override def freeVariables = Set(this)
+  def matchTypes(keyType: KeyType) = Map(name -> keyType)
 }
 
-
-case class TypedVariableKeyExpr(name: String, exprType: KeyType) extends VariableKeyExpr {
+case class TypedVariable(name: String, exprType: KeyType) extends Variable {
   override def toString = s""""$name""""
   override def explain: String = s""""$name": $exprType"""
   override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
     case None | Some(`exprType`) => this
-    case Some(otherType) => if (overwrite) TypedVariableKeyExpr(name, otherType) else
+    case Some(otherType) => if (overwrite) TypedVariable(name, otherType) else
       throw VariableResolutionConflictException(
         s"Tried to resolve var $name with type $otherType, already had type $exprType, overwriting false."
       )
@@ -165,16 +169,33 @@ case class TypedVariableKeyExpr(name: String, exprType: KeyType) extends Variabl
 }
 
 
-case class UntypedVariableKeyExpr(name: String) extends VariableKeyExpr {
+case class UntypedVariable(name: String) extends Variable {
   val exprType = UnresolvedKeyType
   override def explain = toString
   override def toString = s""""$name": ?"""
   override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
     case None => this
-    case Some(eT) => TypedVariableKeyExpr(name, eT)
+    case Some(eT) => TypedVariable(name, eT)
   }
 }
 
+
+case class ProductVariableKeyExpr(children0: List[KeyExpr]) extends ProductExpr[KeyExpr] with VariableKeyExpr {
+  def exprType: KeyType =
+    if (children.forall(_.isResolved)) ProductKeyType(children.map(_.exprType))
+    else UnresolvedKeyType
+  def children: List[VariableKeyExpr] = children0.map(_.asInstanceOf[VariableKeyExpr])
+  def shred = this
+  def renest = this
+  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): KeyExpr = ProductVariableKeyExpr(
+    children.map(_.replaceTypes(vars,overwrite))
+  )
+  def matchTypes(keyType: KeyType): Map[String,KeyType] = keyType match {
+    case ProductKeyType(ts) => children.zip(ts) map { case (expr,typ) => expr.matchTypes(typ) } reduce { _ ++ _ }
+    case _ => ???
+  }
+  override def toString = s"⟨${children.mkString(",")}⟩"
+}
 
 sealed trait ToK extends KeyExpr with UnaryExpr[RingExpr]
 
@@ -306,8 +327,8 @@ case class InfiniteMappingExpr(key: KeyExpr, value: RingExpr) extends LogicalMap
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): RingExpr =
     InfiniteMappingExpr(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
 
-  def shred = InfiniteMappingExpr(key, value.shred)
-  def renest = InfiniteMappingExpr(key, value.renest)
+  def shred = InfiniteMappingExpr(key.shred, value.shred)
+  def renest = InfiniteMappingExpr(key.renest, value.renest)
 }
 
 
@@ -359,7 +380,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
   def opString = "*"
 
   override def freeVariables = c2 match {
-    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables - k
+    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables -- k.freeVariables
     case _ => c1.freeVariables ++ c2.freeVariables
   }
 
@@ -367,7 +388,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
     val newC1 = c1.replaceTypes(vars, overwrite)
     val newC2 = newC1.exprType match {
       case FiniteMappingType(keyType,_) => c2 match {
-        case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars + (v.name -> keyType), overwrite)
+        case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars ++ v.matchTypes(keyType), overwrite)
         case _ => c2.replaceTypes(vars, overwrite)
       }
       case _ => c2.replaceTypes(vars, overwrite)
@@ -380,7 +401,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
     val newC2 = newC1.exprType match {
       case FiniteMappingType(keyType,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-          val replaced = c2.replaceTypes(Map(v.name -> keyType), true)
+          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
           replaced.shred
         }
         case _ => c2.shred
@@ -395,7 +416,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
     val newC2 = newC1.exprType match {
       case FiniteMappingType(keyType,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-          val replaced = c2.replaceTypes(Map(v.name -> keyType), true)
+          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
           replaced.renest
         }
         case _ => c2.renest

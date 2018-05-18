@@ -5,25 +5,61 @@ import scala.reflect.runtime.universe._
 
 object implicits {
 
-  implicit class StringImplicits(s: String) {
-
-    def <--(r: RingExpr): (VariableKeyExpr, RingExpr) = (UntypedVariableKeyExpr(s),r)
-    def -->(r: RingExpr): YieldPair = YieldPair(UntypedVariableKeyExpr(s),r)
-    //since implicit methods on result of implicit conversions dont tend to resolve,
-    //duplicate keyexpr implicits here:
-    def _1: KeyExpr = ProjectKeyExpr(s, 1)
-    def _2: KeyExpr = ProjectKeyExpr(s, 2)
-    def _3: KeyExpr = ProjectKeyExpr(s, 3)
-
-    def ===(other: KeyExpr): RingExpr = EqualsPredicate(s, other)
-    def ===(other: String): RingExpr = EqualsPredicate(s, other)
-    def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(s,other))
-    def =!=(other: String): RingExpr = Not(EqualsPredicate(s,other))
-    def >(other: KeyExpr): RingExpr = IntPredicate(s, other, _ > _, ">")
-    def <(other: KeyExpr): RingExpr = IntPredicate(s, other, _ < _, "<")
-
-    def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(s, r)
+  implicit class VarKeyExprImplicits(val k: VariableKeyExpr) {
+    def <--(r: RingExpr): (VariableKeyExpr, RingExpr) = (k,r)
+    def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(k, r)
   }
+
+  implicit class KeyExprImplicits(val k: KeyExpr) {
+    def _1: KeyExpr = ProjectKeyExpr(k, 1)
+    def _2: KeyExpr = ProjectKeyExpr(k, 2)
+    def _3: KeyExpr = ProjectKeyExpr(k, 3)
+
+    def ===(other: KeyExpr): RingExpr = EqualsPredicate(k, other)
+    def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(k,other))
+
+    def >(other: KeyExpr): RingExpr = IntPredicate(k, other, _ > _, ">")
+    def <(other: KeyExpr): RingExpr = IntPredicate(k, other, _ < _, "<")
+
+    def -->(r: RingExpr): YieldPair = YieldPair(k,r)
+  }
+
+//  implicit def unwrapKeyExprImplicits(x: KeyExprImplicits): KeyExpr = x.k
+
+  trait MakeVarKeyExpr[X] extends (X => VarKeyExprImplicits)
+  trait MakeKeyExpr[X] extends (X => KeyExpr)
+
+  implicit object stringMakeVarKeyExpr extends MakeVarKeyExpr[String] {
+    def apply(x: String) = VarKeyExprImplicits(UntypedVariable(x))
+  }
+
+  implicit object idMakeKeyExpr extends MakeKeyExpr[KeyExpr] {
+    def apply(x: KeyExpr) = x
+  }
+
+  implicit object stringMakeKeyExpr extends MakeKeyExpr[String] {
+    def apply(x: String) = UntypedVariable(x)
+  }
+
+  implicit def pairMakeVarKeyExpr[A,B](implicit recur1: MakeVarKeyExpr[A],
+                                                recur2: MakeVarKeyExpr[B]): MakeVarKeyExpr[(A,B)]
+    = new MakeVarKeyExpr[(A,B)] {
+    def apply(x: (A,B)) = VarKeyExprImplicits(
+      ProductVariableKeyExpr(
+        List[VariableKeyExpr](recur1(x._1).k, recur2(x._2).k)
+      )
+    )
+  }
+
+  implicit def pairMakeKeyExpr[A,B](implicit recur1: MakeKeyExpr[A],
+                                             recur2: MakeKeyExpr[B]): MakeKeyExpr[(A,B)]
+  = new MakeKeyExpr[(A,B)] {
+    def apply(x: (A,B)) =
+      KeyProductExpr(
+        List[KeyExpr](recur1(x._1).k, recur2(x._2).k)
+      )
+  }
+
 
 
   implicit class RingExprImplicits(r: RingExpr) {
@@ -46,33 +82,20 @@ object implicits {
 
   implicit def boolToInt(b: Boolean): Int = if (b) 1 else 0
 
-  implicit class KeyExprImplicits(k: KeyExpr) {
-    def _1: KeyExpr = ProjectKeyExpr(k, 1)
-    def _2: KeyExpr = ProjectKeyExpr(k, 2)
-    def _3: KeyExpr = ProjectKeyExpr(k, 3)
-
-    def ===(other: KeyExpr): RingExpr = EqualsPredicate(k, other)
-    def ===(other: String): RingExpr = EqualsPredicate(k, other)
-    def =!=(other: KeyExpr): RingExpr = Not(EqualsPredicate(k,other))
-    def =!=(other: String): RingExpr = Not(EqualsPredicate(k, other))
-    def >(other: KeyExpr): RingExpr = IntPredicate(k, other, _ > _, ">")
-    def <(other: KeyExpr): RingExpr = IntPredicate(k, other, _ < _, "<")
-
-    def -->(r: RingExpr): YieldPair = YieldPair(k,r)
-  }
-
   implicit class IffImplicit(pair: (VariableKeyExpr,RingExpr)) {
     def iff(r1: RingExpr): (VariableKeyExpr,(RingExpr,RingExpr)) = (pair._1,(pair._2,r1))
   }
 
-  implicit class VarKeyExprImplicits(x: VariableKeyExpr) {
-    def ==>(r: RingExpr): InfiniteMappingExpr = InfiniteMappingExpr(x, r)
-  }
+//
+//  implicit def stringPairToVarPair(p: (String,String)): ProductVariableKeyExpr =
+//    ProductVariableKeyExpr(
+//      List(UntypedVariable(p._1),UntypedVariable(p._2))
+//    )
 
-  implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedVariableKeyExpr = UntypedVariableKeyExpr(s)
+  implicit def stringToUnresolvedVarKeyExpr(s: String): UntypedVariable = UntypedVariable(s)
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
-//
+
   implicit def intToIntKeyExpr(i: Int): PrimitiveKeyExpr[Int] = IntKeyExpr(i)
 
   implicit def ringExprPairImplicits(p: (RingExpr,RingExpr)): RingProductExpr = RingProductExpr(p._1,p._2)
@@ -85,18 +108,16 @@ object implicits {
   implicit def keyTypePairImplicits(p: (KeyType,KeyType)): KeyType =
     ProductKeyType(p._1, p._2)
 
-//  implicit def box(r: RingType): KeyType = r.box
 
   implicit def toK(r: RingExpr): KeyExpr = BoxedRingExpr(r)
 
   implicit def fromK(k: KeyExpr): RingExpr = FromBoxedRing(k)
 
-  implicit def fromK(s: String): RingExpr = FromBoxedRing(UntypedVariableKeyExpr(s))
+  implicit def fromK(s: String): RingExpr = FromBoxedRing(UntypedVariable(s))
 
   def sng(e: KeyExpr): Sng = Sng(e, IntExpr(1))
 
   def sng(e: KeyExpr, r: RingExpr) = Sng(e, r)
-
 
   case class ForComprehensionBuilder(x: VariableKeyExpr, r1: RingExpr) {
     def Collect(r2: RingExpr): RingExpr = Sum(r1 * {x ==> r2}).inferTypes
