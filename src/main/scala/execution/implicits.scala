@@ -20,51 +20,55 @@ object implicits {
   val Tuple3Tpe = typeOf[(_,_,_)].typeConstructor
   val StringTpe = typeOf[java.lang.String]
 
-  //todo - this doesnt work from the REPL
-  implicit def mapToExpr[K,V](m: Map[K,V])(implicit ev: TypeTag[Map[K,V]]): PhysicalCollection =
-    macro mapToExprImpl[K,V]
+//  def mapToExpr2[K,V](m: Map[K,V])(implicit ev: TypeTag[Map[K,V]]): PhysicalCollection = {
+//    val mappingType = getMappingType(m)
+//    PhysicalCollection(mappingType,m)
+//  }
 
-  implicit def datasetToExpr[K,V](ds: Dataset[(K,V)])(implicit ev: TypeTag[Dataset[(K,V)]]): PhysicalCollection =
-    macro datasetToExprImpl[K,V]
-
-  implicit def rddToExpr[K,V](ds: RDD[(K,V)])(implicit ev: TypeTag[RDD[(K,V)]]): PhysicalCollection =
-  macro rddToExprImpl[K,V]
-
-  def mapToExprImpl[K,V](c: Context)(m: c.Expr[Map[K,V]])
-                        (ev: c.Expr[TypeTag[Map[K,V]]]): c.Expr[PhysicalCollection] = {
-    import c.universe._
-    val refRep = show(m.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
-    c.Expr[PhysicalCollection](
-      q"""
-        val mappingType = getMappingType($m)($ev)
-        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=false)
-        """
-    )
-  }
-
-  def datasetToExprImpl[K,V](c: Context)(ds: c.Expr[Dataset[(K,V)]])
-                        (ev: c.Expr[TypeTag[Dataset[(K,V)]]]): c.Expr[PhysicalCollection] = {
-    import c.universe._
-    val refRep = show(ds.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
-    c.Expr[PhysicalCollection](
-      q"""
-        val mappingType = getMappingType($ds)($ev)
-        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=true)
-        """
-    )
-  }
-
-  def rddToExprImpl[K,V](c: Context)(ds: c.Expr[RDD[(K,V)]])
-                        (ev: c.Expr[TypeTag[RDD[(K,V)]]]): c.Expr[PhysicalCollection] = {
-    import c.universe._
-    val refRep = show(ds.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
-    c.Expr[PhysicalCollection](
-      q"""
-        val mappingType = getMappingType($ds)($ev)
-        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=true)
-        """
-    )
-  }
+//  implicit def mapToExpr[K,V](m: Map[K,V])(implicit ev: TypeTag[Map[K,V]]): PhysicalCollection =
+//    macro mapToExprImpl[K,V]
+//
+//  implicit def datasetToExpr[K,V](ds: Dataset[(K,V)])(implicit ev: TypeTag[Dataset[(K,V)]]): PhysicalCollection =
+//    macro datasetToExprImpl[K,V]
+//
+//  implicit def rddToExpr[K,V](ds: RDD[(K,V)])(implicit ev: TypeTag[RDD[(K,V)]]): PhysicalCollection =
+//  macro rddToExprImpl[K,V]
+//
+//  def mapToExprImpl[K,V](c: Context)(m: c.Expr[Map[K,V]])
+//                        (ev: c.Expr[TypeTag[Map[K,V]]]): c.Expr[PhysicalCollection] = {
+//    import c.universe._
+//    val refRep = show(m.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
+//    c.Expr[PhysicalCollection](
+//      q"""
+//        val mappingType = getMappingType($m)($ev)
+//        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=false)
+//        """
+//    )
+//  }
+//
+//  def datasetToExprImpl[K,V](c: Context)(ds: c.Expr[Dataset[(K,V)]])
+//                        (ev: c.Expr[TypeTag[Dataset[(K,V)]]]): c.Expr[PhysicalCollection] = {
+//    import c.universe._
+//    val refRep = show(ds.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
+//    c.Expr[PhysicalCollection](
+//      q"""
+//        val mappingType = getMappingType($ds)($ev)
+//        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=true)
+//        """
+//    )
+//  }
+//
+//  def rddToExprImpl[K,V](c: Context)(ds: c.Expr[RDD[(K,V)]])
+//                        (ev: c.Expr[TypeTag[RDD[(K,V)]]]): c.Expr[PhysicalCollection] = {
+//    import c.universe._
+//    val refRep = show(ds.tree).split('.').last //todo - why am i getting rid of the tree then rebuilding later?
+//    c.Expr[PhysicalCollection](
+//      q"""
+//        val mappingType = getMappingType($ds)($ev)
+//        PhysicalCollection(mappingType.k, mappingType.r, $refRep, dist=true)
+//        """
+//    )
+//  }
 
   def getMappingType[T : TypeTag](t: T): FiniteMappingType = toRingType(typeOf[T]).asInstanceOf[FiniteMappingType]
 
@@ -81,11 +85,6 @@ object implicits {
     case (tpe,List(kTpe,vTpe)) if tpe <:< MapTpe => {
       FiniteMappingType(toKeyType(kTpe), toRingType(vTpe))
     }
-//    case (ListTpe,List(tpe)) if (tpe.typeConstructor == Tuple2Tpe) => {
-//      val kTpe = tpe.typeArgs(0)
-//      val vTpe = tpe.typeArgs(1)
-//      FiniteMappingType(toKeyType(kTpe),toRingType(vTpe),dist=true)
-//    }
     case (distTpe,List(tpe)) if tpe.typeConstructor == Tuple2Tpe && (distTpe == RddTpe || distTpe == DatasetTpe) => {
       val kTpe = tpe.typeArgs(0)
       val vTpe = tpe.typeArgs(1)
@@ -95,33 +94,5 @@ object implicits {
     case (Tuple3Tpe,tpes) => ProductRingType(tpes.map(toRingType) : _ *)
     case _ => throw new IllegalStateException(s"Invalid type $t for conversion to RingType.")
   }
-
-
-  def sparkTestMacro: Any = macro sparkTestMacroImpl
-
-  def sparkTestMacroImpl(c: Context): c.Expr[Any] = {
-    import c.universe._
-    c.Expr[Any](
-      q"""
-      val spark = org.apache.spark.sql.SparkSession.builder.appName("test").config("spark.master", "local").getOrCreate()
-      import spark.implicits._
-      val stringCounts = Map(
-        ("a",1),
-        ("b",2),
-        ("c",3)
-      ).toList.toDS
-      stringCounts.map(x => x._2)
-      """
-    )
-  }
-
-//  def evalExpr(expr: Expr[_], codeGen: CodeGen, ctx: ExecutionContext): Any = macro evalExprImpl
-//
-//  def evalExprImpl(c: Context)(codeGen: c.Expr[CodeGen], ctx: c.Expr[ExecutionContext]): c.Expr[Any] = {
-//    import c.universe._
-//    c.Expr[Any](
-//      q
-//    )
-//  }
 
 }
