@@ -116,8 +116,10 @@ object StringKeyExpr {
 
 
 case class KeyProductExpr(children: List[KeyExpr]) extends KeyExpr with ProductExpr[KeyExpr] {
-  val exprType = if (children.map(_.exprType).forall(_.isResolved))
-    ProductKeyType(children.map(_.exprType)) else UnresolvedKeyType
+
+  val exprType =
+    if (children.map(_.exprType).forall(_.isResolved)) ProductKeyType(children.map(_.exprType))
+    else UnresolvedKeyType
 
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
     KeyProductExpr(children.map(_.replaceTypes(vars, overwrite)))
@@ -132,8 +134,7 @@ object KeyProductExpr {
 
 
 case class ProjectKeyExpr(c1: KeyExpr, n: Int) extends KeyExpr with ProjectExpr[KeyExpr] with UnaryExpr[KeyExpr] {
-//  if (c1.isInstanceOf[VariableKeyExpr])
-//    throw new IllegalStateException("Cannot project variable key exprs. Bind to product keys with multiple variables.")
+
   val exprType = c1.exprType.project(n)
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
     ProjectKeyExpr(c1.replaceTypes(vars, overwrite), n)
@@ -170,7 +171,6 @@ case class TypedVariable(name: String, exprType: KeyType) extends Variable {
   }
 }
 
-
 case class UntypedVariable(name: String) extends Variable {
   val exprType = UnresolvedKeyType
   override def explain = toString
@@ -180,7 +180,6 @@ case class UntypedVariable(name: String) extends Variable {
     case Some(eT) => TypedVariable(name, eT)
   }
 }
-
 
 case class ProductVariableKeyExpr(children0: List[KeyExpr]) extends ProductExpr[KeyExpr] with VariableKeyExpr {
   def exprType: KeyType =
@@ -199,8 +198,8 @@ case class ProductVariableKeyExpr(children0: List[KeyExpr]) extends ProductExpr[
   override def toString = s"⟨${children.mkString(",")}⟩"
 }
 
-sealed trait ToK extends KeyExpr with UnaryExpr[RingExpr]
 
+sealed trait ToK extends KeyExpr with UnaryExpr[RingExpr]
 
 case class BoxedRingExpr(c1: RingExpr) extends ToK {
   val exprType = c1.exprType.box
@@ -212,19 +211,14 @@ case class BoxedRingExpr(c1: RingExpr) extends ToK {
 }
 
 
-case class LabelExpr(c1: RingExpr) extends ToK {
-//todo - there is something screwy about unshredding. as shredding does not introduce any abstract notion
-//of a context, it just totally preserves the structure, there is something not right about recursively unshredding.
-//if you dont' reconstruct the LabelExpr with the recursively unshredded argument, then you preserve its ID and wrapped type
-//and could theoretically recover the definition no problem, but without any deeper labels being unshredded.
+sealed trait Label {
+  def definition: String
+}
 
-//however if you do recursively unshred the argument, then you end up with differetn label IDs and definitions to the
-//originally shredded expression. is this a problem? and if so, should unshredding purely be an implementation detail?
-//i.e.
-  val exprType = c1.exprType match {
-    case UnresolvedRingType => throw new IllegalStateException("Cannot create labeltype from unresolved ring type.")
-    case rt: RingType => LabelType(rt)
-  }
+case class LabelExpr(c1: RingExpr) extends ToK with Label {
+  val exprType =
+    if (!c1.isResolved) throw new IllegalStateException("Cannot create labeltype from unresolved ring type.")
+    else LabelType(c1.exprType)
 
   override def toString = s"Label($id)"
 
@@ -271,15 +265,14 @@ sealed trait UnaryRingExpr extends RingExpr with UnaryExpr[RingExpr]
 sealed trait MappingExpr extends RingExpr {
   def keyType: KeyType
   def valueType: RingType
-  def exprType: RingType = keyType --> valueType
+//  def exprType: RingType = keyType --> valueType
 }
 
 
 sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr {
   def ref: String
-  override def toString = s"$ref"
+  override def toString = ref.toString
 }
-
 
 sealed trait LogicalMappingExpr extends MappingExpr with BinaryExpr[KeyExpr,RingExpr] {
   def key: KeyExpr
@@ -295,35 +288,54 @@ case class IntExpr(value: Int)(implicit val ev1: TypeTag[Int]) extends NullaryRi
 }
 
 
-case class PhysicalCollection(keyType: KeyType, valueType: RingType, ref: String) extends PhysicalMapping {
+case class PhysicalCollection(keyType: KeyType, valueType: RingType, ref: String, dist: Boolean = false) extends PhysicalMapping {
+  assert(keyType != UnresolvedKeyType && valueType != UnresolvedRingType)
+  val exprType = FiniteMappingType(keyType, valueType, dist)
   override def shred = this//ShreddedPhysicalCollection(keyType.shred, valueType.shred, ref)
 }
 
 
-case class PhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
-  val valueType = IntType
-  override def shred = this//ShreddedPhysicalBag(keyType.shred, ref)
+object PhysicalBag {
+  def apply(keyType: KeyType, ref: String, dist: Boolean = false): PhysicalCollection =
+    PhysicalCollection(keyType, IntType, ref, dist)
 }
 
+//
+//case class Lift(c1: RingExpr) extends MappingExpr with UnaryRingExpr {
+//  val keyType = c1.exprType match {
+//    case FiniteMappingType(kT,rT) => ProductKeyType(kT,BoxedRingType(rT))
+//    case t => throw new IllegalStateException(s"Cannot lift expr of non finite mapping type $t")
+//  }
+//  val valueType = IntType
+//  def shred: RingExpr = ???
+//  def renest: RingExpr = ???
+//  def replaceTypes(vars: Map[String,KeyType], overwrite: Boolean) = this
+//}
 
-case class ShreddedPhysicalCollection(keyType: KeyType, valueType: RingType, ref: String) extends PhysicalMapping {
-  override def toString = s"${ref}_F"
-  override def shred: Nothing = ???
-}
-
-
-case class ShreddedPhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
-  val valueType = IntType
-  override def toString = s"${ref}_F"
-  override def shred: Nothing = ???
-}
+//
+//case class ShreddedPhysicalCollection(keyType: KeyType, valueType: RingType, ref: String) extends PhysicalMapping {
+//  override def toString = s"${ref}_F"
+//  override def shred: Nothing = ???
+//}
+//
+//
+//case class ShreddedPhysicalBag(keyType: KeyType, ref: String) extends PhysicalMapping {
+//  val valueType = IntType
+//  override def toString = s"${ref}_F"
+//  override def shred: Nothing = ???
+//}
 
 
 case class InfiniteMappingExpr(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
-  assert(key.isInstanceOf[VariableKeyExpr]) //TODO
+
+  assert(key.isInstanceOf[VariableKeyExpr])
+
   val keyType = key.exprType
+
   val valueType = value.exprType
+
   override val exprType = keyType ==> valueType
+
   override def toString = s"{$key => $value}"
 
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): RingExpr =
@@ -335,8 +347,9 @@ case class InfiniteMappingExpr(key: KeyExpr, value: RingExpr) extends LogicalMap
 
 
 case class RingProductExpr(children: List[RingExpr]) extends RingExpr with ProductExpr[RingExpr] {
-  val exprType = if (children.map(_.exprType).forall(_.isResolved))
-    ProductRingType(children.map(_.exprType)) else UnresolvedRingType
+  val exprType =
+    if (children.map(_.exprType).forall(_.isResolved)) ProductRingType(children.map(_.exprType))
+    else UnresolvedRingType
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
     RingProductExpr(children.map(_.replaceTypes(vars, overwrite)))
   def shred = RingProductExpr(children.map(_.shred))
@@ -389,7 +402,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
   def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = {
     val newC1 = c1.replaceTypes(vars, overwrite)
     val newC2 = newC1.exprType match {
-      case FiniteMappingType(keyType,_) => c2 match {
+      case FiniteMappingType(keyType,_,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars ++ v.matchTypes(keyType), overwrite)
         case _ => c2.replaceTypes(vars, overwrite)
       }
@@ -401,7 +414,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
   def shred = {
     val newC1 = c1.shred
     val newC2 = newC1.exprType match {
-      case FiniteMappingType(keyType,_) => c2 match {
+      case FiniteMappingType(keyType,_,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
           val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
           replaced.shred
@@ -416,7 +429,7 @@ case class Multiply(c1: RingExpr, c2: RingExpr) extends BinaryRingOpExpr {
   def renest = { //todo refactor
     val newC1 = c1.renest
     val newC2 = newC1.exprType match {
-      case FiniteMappingType(keyType,_) => c2 match {
+      case FiniteMappingType(keyType,_,_) => c2 match {
         case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
           val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
           replaced.renest
@@ -496,7 +509,13 @@ case class IntPredicate(c1: KeyExpr, c2: KeyExpr, p: (Int,Int) => Boolean, opStr
 case class Sng(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
   val keyType = key.exprType
   val valueType = value.exprType
+//  assert(keyType != UnresolvedKeyType && valueType != UnresolvedRingType)
   assert(!valueType.isInstanceOf[InfiniteMappingType])
+  val exprType = (keyType,valueType) match {
+    case (UnresolvedKeyType,_) | (_,UnresolvedRingType) => UnresolvedRingType
+    case _ => FiniteMappingType(keyType,valueType,false)
+  }
+
   override def toString = value match {
     case IntExpr(1) => s"sng($key)"
     case _ => s"sng($key, $value)"
@@ -542,6 +561,7 @@ case class FromLabel(c1: KeyExpr) extends FromK {
   def shred = ???
   def renest = FromK(c1.renest)
 }
+
 
 
 case class InvalidPredicateException(str: String) extends Exception(str)

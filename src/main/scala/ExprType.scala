@@ -126,11 +126,11 @@ sealed trait RingType extends ExprType[RingType] {
     case (UnresolvedRingType,_) | (_,UnresolvedRingType) => UnresolvedRingType
     case (IntType, IntType) => IntType
 
-    case (FiniteMappingType(k, r), IntType) => FiniteMappingType(k, r.dot(IntType))
-    case (IntType, FiniteMappingType(k, r)) => FiniteMappingType(k, IntType.dot(r))
+    case (FiniteMappingType(k,r,d), IntType) => FiniteMappingType(k,r.dot(IntType),d)
+    case (IntType,FiniteMappingType(k,r,d)) => FiniteMappingType(k,IntType.dot(r),d)
 
-    case (FiniteMappingType(k1, r1), FiniteMappingType(k2, r2)) =>
-      FiniteMappingType(ProductKeyType(k1,k2), r1.dot(r2))
+    case (FiniteMappingType(k1,r1,d1), FiniteMappingType(k2,r2,d2)) =>
+      FiniteMappingType(ProductKeyType(k1,k2), r1.dot(r2), d1 || d2)
 
     //Dot products of infinite mappings currently disallowed:
 
@@ -150,8 +150,8 @@ sealed trait RingType extends ExprType[RingType] {
     //or products with finite mappings by pushing the dot into the values.
     case (r1:ProductRingType,IntType) => ProductRingType(r1.ts.map(_.dot(IntType)):_*)
     case (IntType,r2:ProductRingType) => ProductRingType(r2.ts.map(IntType.dot(_)):_*)
-    case (r1:ProductRingType,FiniteMappingType(k1,r2)) => FiniteMappingType(k1,r1.dot(r2))
-    case (FiniteMappingType(k1,r1),r2:ProductRingType) => FiniteMappingType(k1,r1.dot(r2))
+    case (r1:ProductRingType,FiniteMappingType(k1,r2,d)) => FiniteMappingType(k1,r1.dot(r2),d)
+    case (FiniteMappingType(k1,r1,d),r2:ProductRingType) => FiniteMappingType(k1,r1.dot(r2),d)
 
     case (r1, r2) => throw InvalidRingDotException(s"Invalid types for dot operation: $r1 , $r2")
   }
@@ -162,10 +162,16 @@ sealed trait RingType extends ExprType[RingType] {
 
     case (IntType,IntType) => IntType
 
-    //If finite on LHS, result is a finite mapping regardless of RHS being finite or infinite::
-    case (FiniteMappingType(k1,r1),m: MappingType) if (k1 == m.k) => FiniteMappingType(k1, r1.dot(m.r))
+    //If finite on LHS and RHS, result is a finite mapping (distributed if either is distributed):
+    case (FiniteMappingType(k1,r1,d1),FiniteMappingType(k2,r2,d2)) if (k1 == k2) =>
+      FiniteMappingType(k1, r1.dot(r2), d1 || d2)
 
-    //Infinite on LHS or both infinite currently disallowed:
+    //If finite on LHS and infinite on RHS, result is finite mapping, distributed iff LHS is distributed:
+    case (FiniteMappingType(k1,r1,d1),InfiniteMappingType(k2,r2)) if (k1 == k2) =>
+      FiniteMappingType(k1, r1.dot(r2), d1)
+
+    //Infinite on LHS or both infinite currently disallowed: (by no means theoretically a problem but annoying
+    //to implement and not necessary)
 
     //case (m: MappingType,FiniteMappingType(k1,r1)) if (k1 == m.k) => FiniteMappingType(k1, m.r.resolvedDot(r1))
     //case (InfiniteMappingType(k1,r1),InfiniteMappingType(k2,r2)) if (k1 == k2) =>
@@ -186,7 +192,10 @@ sealed trait RingType extends ExprType[RingType] {
 
   def sum: RingType = this match {
     case UnresolvedRingType => UnresolvedRingType
-    case FiniteMappingType(_,r) => r
+    case FiniteMappingType(_,r,false) => r
+    //when doing bag union over values in a distributed collection, we keep it distributed
+    //by flatmapping over the values then doing reduceByKey.
+    case FiniteMappingType(_,FiniteMappingType(k,r,false),true) => FiniteMappingType(k,r,true)
     case r => throw InvalidRingSumException(s"Invalid type for sum operation: $r")
   }
 
@@ -224,22 +233,25 @@ sealed trait MappingType extends RingType {
 }
 
 
-case class FiniteMappingType(k: KeyType, r: RingType) extends MappingType {
-  override def toString = r match {
-    case IntType => s"Bag($k)"
-    case _ => s"$k→$r"
+
+case class FiniteMappingType(k: KeyType, r: RingType, dist: Boolean = false) extends MappingType {
+  override def toString = (r,dist) match {
+    case (IntType,false) => s"Bag($k)"
+    case (IntType,true) => s"DistBag($k)"
+    case (_,false) => s"$k→$r"
+    case (_,true) => s"Dist($k→$r)"
   }
-  def shred = FiniteMappingType(k.shred, r.shred)
+  def shred = FiniteMappingType(k.shred, r.shred, dist)
 }
 
 object BagType {
-  def apply(k: KeyType): RingType = FiniteMappingType(k, IntType)
+  def apply(k: KeyType, dist: Boolean = false): RingType = FiniteMappingType(k, IntType, dist)
 }
 
 
 case class InfiniteMappingType(k: KeyType, r: RingType) extends MappingType {
   override def toString = s"$k=>$r"
-  def shred = FiniteMappingType(k.shred, r.shred)
+  def shred = InfiniteMappingType(k.shred, r.shred) //todo - this was finite before, cant be right?
 }
 
 

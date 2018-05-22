@@ -3,10 +3,12 @@ package slender.execution
 import slender._
 
 import scala.reflect.runtime.currentMirror
-import scala.reflect.runtime.universe.{Expr => UniverseExpr,_}
+import scala.reflect.runtime.universe.{Expr => UniverseExpr, _}
 import scala.tools.reflect.ToolBox
 
 trait ExecutionContext {
+  def setup: Seq[Tree] = Seq.empty[Tree]
+  def tearDown: Seq[Tree] = Seq.empty[Tree]
   def apply(ref: String): Tree
 }
 
@@ -15,8 +17,11 @@ trait CodeGen {
   def apply(expr: Expr[_])(implicit ctx: ExecutionContext): Tree = {
     validate(expr)
     q"""
+         ..${ctx.setup}
          ..${predef(expr)}
-         ${generate(expr)}
+         val result = ${generate(expr)}
+         ..${ctx.tearDown}
+         result
      """
   }
   def generate(expr: Expr[_])(implicit ctx: ExecutionContext): Tree
@@ -55,9 +60,25 @@ trait ToolboxExecutionContext extends ExecutionContext {
       Select(sel, TermName(name))
     }
   }
-  def apply(ref: String) = Select(myTree, TermName(ref))
+  def apply(ref: String): Tree = Select(myTree, TermName(ref))
 }
 
+trait LocalSparkExecutionContext extends ToolboxExecutionContext {
+  override def setup = List(
+    //q"""val spark = org.apache.spark.sql.SparkSession.builder.appName("test").config("spark.master", "local").getOrCreate()""",
+    q"import slender.TestSparkExecutionContext.spark.implicits._"
+  )
+  val spark = org.apache.spark.sql.SparkSession.builder
+    .appName("test")
+    .config("spark.master", "local")
+    .getOrCreate()
+
+//  override def apply(ref: String): Tree = {
+//    val localCollection = super.apply(ref)//Select(myTree, TermName(ref))
+//    Apply(Select(Ident(TermName("spark")), TermName("createDataset")), List(localCollection))
+//  }
+  //override def tearDown = List(q"spark.stop")
+}
 
 class LocalCodeGen extends CodeGen {
 
@@ -77,7 +98,7 @@ class LocalCodeGen extends CodeGen {
 
     case p : ProductExpr[_] => tuple(p.children.map(generate))
 
-    case PhysicalCollection(kt, vt, ref) => q"${ctx(ref)}"
+    case p : PhysicalCollection => ctx(p.ref)
 
     case Sum(c) => unaryApply(sum(c.exprType))(c)
 
@@ -171,7 +192,8 @@ class LocalCodeGen extends CodeGen {
 
   def typeTree(exprType: ExprType[_]): Tree = exprType match {
     case t : PrimitiveType[_] => Ident(t.tpe.typeSymbol)
-    case FiniteMappingType(k, v) => tq"scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"
+    case FiniteMappingType(k,v,false) => tq"scala.collection.immutable.Map[${typeTree(k)},${typeTree(v)}]"
+    case FiniteMappingType(k,v,true) => tq"org.apache.spark.sql.Dataset[${typeTree(k)},${typeTree(v)}]"
     case InfiniteMappingType(k, v) => tq"${typeTree(k)} => ${typeTree(v)}"
     case t: ProductExprType[_] => {
       val ident = Select(Ident(TermName("scala")), TypeName(s"Tuple${t.ts.length}"))
@@ -185,7 +207,7 @@ class LocalCodeGen extends CodeGen {
 
   def sum(t: RingType): Tree = anonFunc(t) {
     t match {
-      case FiniteMappingType(_, vT) => {
+      case FiniteMappingType(_,vT,false) => {
         val acc = zero(vT)
         val combine = add(vT, vT)
         q"_x1.values.foldRight($acc)($combine)"
@@ -197,7 +219,7 @@ class LocalCodeGen extends CodeGen {
   def negate(t: RingType): Tree = anonFunc(t) {
     t match {
       case IntType => q"-_x1"
-      case FiniteMappingType(k,v) => q"_x1 mapValues ${negate(v)}"
+      case FiniteMappingType(k,v,false) => q"_x1 mapValues ${negate(v)}"
       case p : ProductRingType => tuple(p.ts.map(negate))
       case _ : UnresolvedExprType[_] => throw UnresolvedExprTypeException("Cannot negate unresolved type expression.")
       case _ : InfiniteMappingType => throw new IllegalStateException("Cannot negate infinite mapping type.")
@@ -207,7 +229,7 @@ class LocalCodeGen extends CodeGen {
   def not(t: RingType): Tree = anonFunc(t) {
     t match {
       case IntType => q"if (_x1 == 0) 1 else 0"
-      case FiniteMappingType(k,v) => q"_x1 mapValues ${negate(v)}"
+      case FiniteMappingType(k,v,false) => q"_x1 mapValues ${negate(v)}"
       case p : ProductRingType => tuple(p.ts.map(negate))
       case _ : UnresolvedExprType[_] => throw UnresolvedExprTypeException("Cannot not unresolved type expression.")
       case _ : InfiniteMappingType => throw new IllegalStateException("Cannot not infinite mapping type.")
@@ -216,7 +238,7 @@ class LocalCodeGen extends CodeGen {
 
   def zero(t: RingType): Tree = t match {
     case IntType => q"0"
-    case FiniteMappingType(k, v) => q"""Map.empty[${typeTree(k)},${typeTree(v)}]"""
+    case FiniteMappingType(k,v,false) => q"""Map.empty[${typeTree(k)},${typeTree(v)}]"""
     case p : ProductRingType => tuple(p.ts.map(zero))
     case _ : UnresolvedExprType[_] => throw new IllegalStateException("No zero for unresolved type.")
     case _ : InfiniteMappingType => throw new IllegalStateException("No zero infinite mapping type.")
@@ -227,7 +249,7 @@ class LocalCodeGen extends CodeGen {
 
       case (IntType,IntType) => q"_x1 + _x2"
 
-      case (t@FiniteMappingType(_, rt),t2) if t == t2 =>
+      case (t@FiniteMappingType(_,rt,false),t2) if t == t2 =>
         q"_x1 ++ _x2.map { case (_k,_v) => _k -> ${add(rt,rt)}(_v,_x1.getOrElse(_k,${zero(rt)})) }"
 
       case (p:ProductRingType,p2:ProductRingType) if (p == p2) => {
@@ -255,12 +277,12 @@ class LocalCodeGen extends CodeGen {
 
       case (r1:ProductRingType,r2:ProductRingType) if (r1 == r2) => ???
 
-      case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) if (k1 == k2 && v1 == v2) =>
+      case (FiniteMappingType(k1,v1,false),FiniteMappingType(k2,v2,false)) if (k1 == k2 && v1 == v2) =>
         q"""
            _x1 map { case (_k1,_v1) => _k1 -> ${multiply(v1,v2)}(_v1,_x2.getOrElse(_k1,${zero(v1)})) }
          """
 
-      case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) if (k1 == k2) => //TODO - do missing keys work the same as product wrt zero?
+      case (FiniteMappingType(k1,v1,false),FiniteMappingType(k2,v2,false)) if (k1 == k2) => //TODO - do missing keys work the same as product wrt zero?
         q"""
            _x1 map { case (_k1,_v1) => _k1 -> ${dot(v1, v2)}(_v1,_x2.getOrElse(_k1,${zero(v2)})) }
          """
@@ -301,27 +323,27 @@ class LocalCodeGen extends CodeGen {
         tuple(elems)
       }
 
-      case (FiniteMappingType(_,vT),IntType) => {
+      case (FiniteMappingType(_,vT,false),IntType) => {
         val innerDot = dot(vT,IntType)
         q"_x1.mapValues(_v => $innerDot(_v, _x2))"
       }
 
-      case (IntType,FiniteMappingType(_,vT)) => {
+      case (IntType,FiniteMappingType(_,vT,false)) => {
         val innerDot = dot(IntType,vT)
         q"_x2.mapValues(_v => $innerDot(_x1, _v))"
       }
 
-      case (FiniteMappingType(_,vT),r:ProductRingType) => {
+      case (FiniteMappingType(_,vT,false),r:ProductRingType) => {
         val innerDot = dot(vT,r)
         q"_x1.mapValues(_v => $innerDot(_v, _x2))"
       }
 
-      case (r:ProductRingType,FiniteMappingType(_,vT)) => {
+      case (r:ProductRingType,FiniteMappingType(_,vT,false)) => {
         val innerDot = dot(r,vT)
         q"_x2.mapValues(_v => $innerDot(_x1, _v))"
       }
 
-      case (FiniteMappingType(k1,v1),FiniteMappingType(k2,v2)) => {
+      case (FiniteMappingType(k1,v1,false),FiniteMappingType(k2,v2,false)) => {
         val innerDot = dot(v1,v2)
         q"""
           _x1.flatMap { case (_k1,_v1) =>
@@ -360,7 +382,6 @@ class LocalCodeGen extends CodeGen {
     }
     //todo - remove dependency on toolbox
     val ex = currentMirror.mkToolBox().parse(s"val ${go(v)} = $varName")
-    //println(ex)
     ex
   }
 }

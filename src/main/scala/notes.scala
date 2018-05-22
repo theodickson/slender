@@ -1,4 +1,4 @@
-case class Label542(x: (Int,Int))
+//case class Label542(x: (Int,Int))
 //
 //Map(
 //  (1, Map(

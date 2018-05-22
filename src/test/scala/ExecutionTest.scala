@@ -4,10 +4,9 @@ import slender.execution._
 import slender.execution.implicits._
 import slender.dsl.implicits._
 
-import scala.reflect.runtime.universe._
 import org.scalatest.FunSuite
 
-object MyExecutionContext extends ToolboxExecutionContext {
+object TestExecutionContext extends ToolboxExecutionContext {
 
   val stringCounts =
     Map(
@@ -63,16 +62,11 @@ object MyExecutionContext extends ToolboxExecutionContext {
 
 class ExecutionTests extends FunSuite {
 
-  val ctx = MyExecutionContext
+  val ctx = TestExecutionContext
 
   import ctx._
 
-  val interpreter = LocalInterpreter(MyExecutionContext)
-
-  test("Evaluate Int.") {
-    val result = interpreter.apply(IntExpr(1))
-    assert(result == 1)
-  }
+  val interpreter = LocalInterpreter(TestExecutionContext)
 
   test("Retrieve list collection unchanged.") {
     val result = interpreter.apply(stringCounts)
@@ -88,11 +82,6 @@ class ExecutionTests extends FunSuite {
   test("Sum simple bag.") {
     val result = interpreter.apply(Sum(stringCounts))
     assert(result == 6)
-  }
-
-  test("Sum mapping to pairs.") {
-    val result = interpreter.apply(Sum(stringIntPairs))
-    assert(result == (6,6))
   }
 
   test("Sum mapping to nested pairs.") {
@@ -126,11 +115,6 @@ class ExecutionTests extends FunSuite {
     ))
   }
 
-  test("Dot test") {
-    val expr = Dot(stringCounts,nestedStringBag)
-    val result = interpreter.apply(expr)
-  }
-
   test("Inf mapping simple test") {
     val expr = For ("x" <-- stringCounts) Collect 2
     val result = interpreter(expr)
@@ -152,8 +136,6 @@ class ExecutionTests extends FunSuite {
   test("Map-valued yield test") {
     val expr = For ("x" <-- nestedStringBag) Yield "x"
     val result = interpreter(expr)
-//    println(expr.explain)
-//    println(result)
   }
 
   test("Filtering test") {
@@ -166,62 +148,27 @@ class ExecutionTests extends FunSuite {
     val group: KeyExpr => RingExpr = k =>
       For (("k1","k2") <-- bagOfPairs iff k === "k1") Yield "k2"
     val query = toK(group(StringKeyExpr("a")))
-    println(query.explain)
     val result = interpreter(query)
-    println(interpreter.showProgram(query))
-    println(result)
   }
 
 
   test("Double key-nesting test") {
-//    val query =
-//      For ("x" <-- bagOfTriples) Yield
-//        ("x"._1, toK(
-//          For ("y" <-- bagOfTriples iff "y"._1 === "x"._1) Yield
-//            ("y"._2, toK(
-//              For ("z" <-- bagOfTriples iff "z"._2 === "y"._2) Yield "z"._3
-//            )
-//            )
-//        )
-//        )
     val query =
-    For (("x1","x2","x3") <-- bagOfTriples) Yield
-      ("x1", toK(
-        For (("y1","y2","y3") <-- bagOfTriples iff "y1" === "x1") Yield
-          ("y2", toK(
-            For (("z1","z2","z3") <-- bagOfTriples iff "z2" === "y2") Yield "z3"
-          )
-          )
-      )
-      )
-    println(query.explain)
-    println(query.shred.explain)
-    println(query.shred.renest.explain)
-    println(interpreter(query))
-    println(interpreter(query.shred))
-    println(interpreter(query.shred.renest))
-  }
-
-  test("Key-nesting test") {
-    val query =
-      For (("x1","x2") <-- bagOfIntPairs) Yield
+      For(("x1", "x2", "x3") <-- bagOfTriples) Yield
         ("x1", toK(
-          For (("y1","y2") <-- bagOfIntPairs iff "y1" === "x1") Yield
-            "y2")
+          For(("y1", "y2", "y3") <-- bagOfTriples iff "y1" === "x1") Yield
+            ("y2", toK(
+              For(("z1", "z2", "z3") <-- bagOfTriples iff "z2" === "y2") Yield "z3"
+            )
+            )
         )
-    val result = interpreter(query)
-    println(query.explain)
-    println(query.shred.explain)
-    println(query.shred.renest.explain)
-    //    println(interpreter.showProgram(query))
-    //    println(interpreter.showProgram(query.shred))
-    //    println(interpreter.showProgram(query.shred.renest))
-    //    val shreddedResult = interpreter(query.shred.renest)
-    //    val shreddedProgram = interpreter.showProgram(query.shred.renest)
+        )
+    assert(interpreter(query) == interpreter(query.shred.renest))
+    //    println(query.explain)
     //    println(query.shred.explain)
-    //    println(shreddedProgram)
-    println(interpreter(query))
-    println(interpreter(query.shred))
-    println(interpreter(query.shred.renest))
+    //    println(query.shred.renest.explain)
+    //    println(interpreter(query))
+    //    println(interpreter(query.shred))
+    //    println(interpreter(query.shred.renest))
   }
 }

@@ -195,6 +195,8 @@ object implicits {
 
   /**IntelliJ is not managing to resolve the conversions via the type-class mediator pattern even though its compiling
     * so here are a bunch of explicit conversions to stop IDE errors. Hopefully can sort this out at some point.
+    * At time of writing everything compiles and tests run successfully with the below commented out so should
+    * periodically check that's still the case!
     */
 
 
