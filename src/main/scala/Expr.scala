@@ -1,13 +1,7 @@
 package slender
 
-import definitions._
-import slender.execution.implicits._
-
-import scala.collection.mutable.StringBuilder
-import scala.reflect.runtime.universe._
-
 import algebra._
-import algebra.implicits._
+
 
 object types {
   type BoundVars = Map[TypedVariable[_],Any]
@@ -15,18 +9,18 @@ object types {
 
 import types._
 
-sealed trait Expr[O] {
+sealed trait Expr[Out,Shredded] {
 
 //  def exprType: ExprType[_]
 
-  def children: Seq[Expr[_]]
+  def children: Seq[Expr[_,_]]
 
-//  def shred: T
+  def shred: Expr[Shredded,Shredded]
 //  def renest: T
 
-  def eval: O = _eval(Map.empty)
+  def eval: Out = _eval(Map.empty)
 
-  def _eval(vars: BoundVars): O
+  def _eval(vars: BoundVars): Out
 
   def id = hashCode.abs.toString.take(3).toInt
 
@@ -64,23 +58,23 @@ sealed trait Expr[O] {
 //  }
 }
 
-sealed trait NullaryExpr[O] extends Expr[O] { //self : T =>
-  def children = List.empty[Expr[_]]
-//  def shred = this
+sealed trait NullaryExpr[T] extends Expr[T,T] { //self : T =>
+  def children = List.empty[Expr[_,_]]
+  def shred = this
 //  def renest = this
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = this
 }
 
 
 sealed trait UnaryExpr {
-  def c1: Expr[_]
+  def c1: Expr[_,_]
   def children = List(c1)
 }
 //
 //
-sealed trait BinaryExpr[O] {
-  def c1: Expr[_]
-  def c2: Expr[_]
+sealed trait BinaryExpr {
+  def c1: Expr[_,_]
+  def c2: Expr[_,_]
   def children = List(c1, c2)
 }
 //
@@ -98,12 +92,12 @@ sealed trait BinaryExpr[O] {
 
 
 
-sealed trait KeyExpr[O] extends Expr[O] {
-//  def exprType: KeyType
-}
+//sealed trait KeyExpr[O,S] extends Expr[O,S] {
+////  def exprType: KeyType
+//}
 
 
-sealed trait NullaryKeyExpr[O] extends KeyExpr[O] with NullaryExpr[O]
+//sealed trait NullaryKeyExpr[T] extends KeyExpr[T,T] with NullaryExpr[T]
 
 
 sealed trait PrimitiveExpr[V] extends NullaryExpr[V] {
@@ -113,20 +107,20 @@ sealed trait PrimitiveExpr[V] extends NullaryExpr[V] {
 //  def literal = reify[V](value).tree
 }
 
-case class PrimitiveKeyExpr[T : TypeTag](value: T)
-                              //(implicit val ev1: TypeTag[T], val ev2: Liftable[T])
-  extends NullaryKeyExpr[T] with PrimitiveExpr[T] {
-//  val exprType = PrimitiveKeyType(typeOf[T])
-  override def toString = value.toString
-}
+//case class PrimitiveKeyExpr[T](value: T)
+//                              //(implicit val ev1: TypeTag[T], val ev2: Liftable[T])
+//  extends NullaryKeyExpr[T] with PrimitiveExpr[T] {
+////  val exprType = PrimitiveKeyType(typeOf[T])
+//  override def toString = value.toString
+//}
 
-object IntKeyExpr {
-  def apply(i: Int) = PrimitiveKeyExpr(i)
-}
-
-object StringKeyExpr {
-  def apply(s: String) = PrimitiveKeyExpr(s)
-}
+//object IntKeyExpr {
+//  def apply(i: Int) = PrimitiveKeyExpr(i)
+//}
+//
+//object StringKeyExpr {
+//  def apply(s: String) = PrimitiveKeyExpr(s)
+//}
 
 
 //case class KeyProductExpr(children: List[KeyExpr]) extends KeyExpr with ProductExpr[KeyExpr] {
@@ -162,12 +156,14 @@ object StringKeyExpr {
 //}
 
 
-sealed trait VariableKeyExpr[O] extends KeyExpr[O] {
+sealed trait VariableKeyExpr[O] extends Expr[O,O] {
+  override def shred = this
   //def matchTypes(keyType: KeyType): Map[String,KeyType]
   def _eval(vars: BoundVars): O = ???
 }
 
-sealed trait Variable[O] extends VariableKeyExpr[O] with NullaryKeyExpr[O] {
+sealed trait Variable[O] extends VariableKeyExpr[O] with NullaryExpr[O] {
+  override def shred = this
   def name: String
   override def variables = Set(this)
   override def freeVariables = Set(this)
@@ -176,6 +172,7 @@ sealed trait Variable[O] extends VariableKeyExpr[O] with NullaryKeyExpr[O] {
 }
 
 case class TypedVariable[O](name: String) extends Variable[O] {
+  override def shred: TypedVariable[O] = this
   override def toString = s""""$name""""
 //  override def explain: String = s""""$name": $exprType"""
 //  override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
@@ -219,30 +216,30 @@ case class UntypedVariable(name: String) extends Variable[Nothing] {
 //}
 
 
-sealed trait ToK[O] extends KeyExpr[O] with UnaryExpr
+//sealed trait ToK[O,S] extends KeyExpr[O,S] with UnaryExpr
 
-case class BoxedRingExpr[O](c1: RingExpr[O]) extends ToK[O] {
+case class BoxedRingExpr[O,S](c1: Expr[O,S])(implicit ring: Ring[O]) extends Expr[O,Label[S]] with UnaryExpr {
 //  val exprType = c1.exprType.box
   override def toString = s"[$c1]"
   def _eval(vars: BoundVars) = c1._eval(vars)
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 //    BoxedRingExpr(c1.replaceTypes(vars, overwrite))
-//  def shred = LabelExpr(c1.shred)
+  def shred = LabelExpr(c1.shred)
 //  def renest = ???
 }
 //
 //
-//sealed trait Label {
-//  def definition: String
-//}
+case class Label[T](vars: BoundVars)
 //
-//case class LabelExpr(c1: RingExpr) extends ToK with Label {
+case class LabelExpr[O,S](c1: Expr[O,S]) extends Expr[Label[S],Label[S]] with UnaryExpr {
 //  val exprType =
 //    if (!c1.isResolved) throw new IllegalStateException("Cannot create labeltype from unresolved ring type.")
 //    else LabelType(c1.exprType)
-//
-//  override def toString = s"Label($id)"
-//
+
+  def _eval(vars: BoundVars): Label[S] = Label(vars) //todo - filter?
+
+  override def toString = s"Label($id)"
+
 //  def explainFreeVariables = freeVariables.map(_.explain).mkString("\n\t")
 //
 //  def definition: String = {
@@ -255,56 +252,53 @@ case class BoxedRingExpr[O](c1: RingExpr[O]) extends ToK[O] {
 //
 //  override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 //    LabelExpr(c1.replaceTypes(vars, overwrite))
-//
-//  override def shred =
-//    throw InvalidShreddingException("Cannot shred a LabelExpr, it's already shredded.")
-//
+
+  override def shred =
+    throw InvalidShreddingException("Cannot shred a LabelExpr, it's already shredded.")
+
 //  def renest = BoxedRingExpr(FromLabel(LabelExpr(c1.renest))) //todo
+
+  override def isShredded = true
+}
+
+
+
+//sealed trait RingExpr[O,S] extends Expr[O,S] {
+////  def exprType: RingType
+////  def shredAndExplain: String = {
+////    explain + "\n" + shred.explain + "\n\n"
+////  }
+//}
+
 //
-//  override def isShredded = true
+//sealed trait NullaryRingExpr[O] extends RingExpr[O] with NullaryExpr[O]
+//
+//
+//sealed trait UnaryRingExpr[O] extends RingExpr[O] with UnaryExpr
+//
+//
+//sealed trait MappingExpr[O] extends RingExpr[O] {
+////  def keyType: KeyType
+////  def valueType: RingType
+////  def exprType: RingType = keyType --> valueType
+//}
+////
+////
+////sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr {
+////  //def ref: String
+////  //override def toString = ref.toString
+////}
+////
+//sealed trait LogicalMappingExpr[K,R,O] extends MappingExpr[O] with BinaryExpr[O] {
+//  def key: KeyExpr[K]
+//  def value: RingExpr[R]
+//  def c1 = key
+//  def c2 = value
 //}
 //
-//
+//sealed trait PrimitiveRingExpr[O] extends RingExpr[O] with PrimitiveExpr[O]
 
-
-
-
-sealed trait RingExpr[O] extends Expr[O] {
-//  def exprType: RingType
-//  def shredAndExplain: String = {
-//    explain + "\n" + shred.explain + "\n\n"
-//  }
-}
-
-
-sealed trait NullaryRingExpr[O] extends RingExpr[O] with NullaryExpr[O]
-
-
-sealed trait UnaryRingExpr[O] extends RingExpr[O] with UnaryExpr
-
-
-sealed trait MappingExpr[O] extends RingExpr[O] {
-//  def keyType: KeyType
-//  def valueType: RingType
-//  def exprType: RingType = keyType --> valueType
-}
-//
-//
-//sealed trait PhysicalMapping extends MappingExpr with NullaryRingExpr {
-//  //def ref: String
-//  //override def toString = ref.toString
-//}
-//
-sealed trait LogicalMappingExpr[K,R,O] extends MappingExpr[O] with BinaryExpr[O] {
-  def key: KeyExpr[K]
-  def value: RingExpr[R]
-  def c1 = key
-  def c2 = value
-}
-
-sealed trait PrimitiveRingExpr[O] extends RingExpr[O] with PrimitiveExpr[O]
-
-case class IntExpr(value: Int) extends PrimitiveRingExpr[Int] {
+case class IntExpr(value: Int) extends PrimitiveExpr[Int] {
 //  val exprType = IntType
   override def toString = s"$value"
 }
@@ -316,18 +310,20 @@ case class IntExpr(value: Int) extends PrimitiveRingExpr[Int] {
 //  override def shred = this//ShreddedPhysicalCollection(keyType.shred, valueType.shred, ref)
 //}
 
-case class PhysicalCollection[K,V](mappingType: MappingType, value: Map[K,V]) extends PrimitiveRingExpr[Map[K,V]] {
+case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit ev: Collection[C,K,R])
+  extends PrimitiveExpr[C[K,R]] {
 //  val keyType = mappingType.k
 //  val valueType = mappingType.r
 //  assert(keyType != UnresolvedKeyType && valueType != UnresolvedRingType)
 //  val exprType = FiniteMappingType(keyType, valueType, dist=false)
-  override def toString = s"PhysicalCollection($mappingType)"
+//  override def toString = s"PhysicalCollection($mappingType)"
 //  override def shred = this//ShreddedPhysicalCollection(keyType.shred, valueType.shred, ref)
 }
 
-object PhysicalCollection {
-  def apply[K,V](phys: Map[K,V])(implicit ev: TypeTag[Map[K,V]]): PhysicalCollection[K,V] = PhysicalCollection(getMappingType(phys),phys)
-}
+//object PhysicalCollection {
+//  import slender.algebra.implicits._
+//  def apply[K,R](rdd: RDD[(K,R)]): PhysicalCollection[PairRDD,K,R] = PhysicalCollection(PairRDD(rdd))
+//}
 
 //object PhysicalBag {
 //  def apply(keyType: KeyType, ref: String, dist: Boolean = false): PhysicalCollection =
@@ -360,10 +356,11 @@ object PhysicalCollection {
 //}
 
 
-case class InfiniteMappingExpr[K,R](key: TypedVariable[K], value: RingExpr[R]) extends LogicalMappingExpr[K,R,K => R] {
+case class InfiniteMappingExpr[K,R,RS](key: TypedVariable[K], value: Expr[R,RS])
+  extends Expr[K => R,K => RS] with BinaryExpr {
 
   //assert(key.isInstanceOf[VariableKeyExpr])
-
+  def c1 = key; def c2 = value
   def _eval(vars: BoundVars) = (k: K) => value._eval(vars + (key -> k))
 //  val keyType = key.exprType
 //
@@ -371,12 +368,13 @@ case class InfiniteMappingExpr[K,R](key: TypedVariable[K], value: RingExpr[R]) e
 //
 //  override val exprType = keyType ==> valueType
 
+  def shred = InfiniteMappingExpr(key.shred, value.shred)
   override def toString = s"{$key => $value}"
 
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): RingExpr =
 //    InfiniteMappingExpr(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
 //
-//  def shred = InfiniteMappingExpr(key.shred, value.shred)
+
 //  def renest = InfiniteMappingExpr(key.renest, value.renest)
 }
 
@@ -405,19 +403,19 @@ case class InfiniteMappingExpr[K,R](key: TypedVariable[K], value: RingExpr[R]) e
 //}
 
 
-sealed trait BinaryRingOpExpr[O] extends RingExpr[O] with BinaryExpr[O] {
+sealed trait BinaryRingOpExpr[O,S] extends Expr[O,S] with BinaryExpr {
   def opString: String
   override def brackets = ("(",")")
   override def toString = s"${c1.closedString} $opString ${c2.closedString}"
 }
 
 
-case class AddExpr[O](c1: RingExpr[O], c2: RingExpr[O])(implicit add: Add[O]) extends BinaryRingOpExpr[O] {
+case class AddExpr[O,S](c1: Expr[O,S], c2: Expr[O,S])(implicit ring: Ring[O], ringS: Ring[S]) extends BinaryRingOpExpr[O,S] {
 //  val exprType: RingType = c1.exprType + c2.exprType
 
   def opString = "+"
-
-  def _eval(vars: BoundVars) = add(c1._eval(vars),c2._eval(vars))
+  def shred = AddExpr(c1.shred, c2.shred) //todo might not be able to resolve
+  def _eval(vars: BoundVars) = ring.add(c1._eval(vars),c2._eval(vars))
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 //    Add(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
 //
@@ -426,12 +424,13 @@ case class AddExpr[O](c1: RingExpr[O], c2: RingExpr[O])(implicit add: Add[O]) ex
 }
 //
 //
-case class MultiplyExpr[T1,T2,O](c1: RingExpr[T1], c2: RingExpr[T2])
-                                (implicit mult: Multiply[T1,T2,O]) extends BinaryRingOpExpr[O] {
+case class MultiplyExpr[T1,T2,S1,S2,O,OS]
+                       (c1: Expr[T1,S1], c2: Expr[T2,S2])
+                       (implicit mult: Multiply[T1,T2,O], multS: Multiply[S1,S2,OS]) extends BinaryRingOpExpr[O,OS] {
 //  val exprType: RingType = c1.exprType * c2.exprType
   def opString = "*"
   def _eval(vars: BoundVars) = mult(c1._eval(vars),c2._eval(vars))
-
+  def shred = MultiplyExpr(c1.shred,c2.shred)
 //  override def freeVariables = c2 match {
 //    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables -- k.freeVariables
 //    case _ => c1.freeVariables ++ c2.freeVariables
@@ -481,10 +480,12 @@ case class MultiplyExpr[T1,T2,O](c1: RingExpr[T1], c2: RingExpr[T2])
 }
 
 
-case class DotExpr[T1,T2,O](c1: RingExpr[T1], c2: RingExpr[T2])(implicit dot: Dot[T1,T2,O]) extends BinaryRingOpExpr[O] {
+case class DotExpr[T1,T2,S1,S2,O,OS](c1: Expr[T1,S1], c2: Expr[T2,S2])
+                                    (implicit dot: Dot[T1,T2,O], dotS: Dot[S1,S2,OS]) extends BinaryRingOpExpr[O,OS] {
 //  val exprType: RingType = c1.exprType dot c2.exprType
   def opString = "⊙"
   def _eval(vars: BoundVars) = dot(c1._eval(vars),c2._eval(vars))
+  def shred = DotExpr(c1.shred, c2.shred)
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 //    Dot(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
 //  def shred = Dot(c1.shred, c2.shred)
@@ -492,8 +493,11 @@ case class DotExpr[T1,T2,O](c1: RingExpr[T1], c2: RingExpr[T2])(implicit dot: Do
 }
 
 
-case class SumExpr[I,O](c1: RingExpr[I])(implicit sum: Sum[I,O]) extends UnaryRingExpr[O] {
-  def _eval(vars: BoundVars) = sum(c1._eval(vars))
+case class SumExpr[C[_,_],K,R,KS,RS](c1: Expr[C[K,R],C[KS,RS]])
+                                    (implicit coll: Collection[C,K,R], collS: Collection[C,KS,RS])
+  extends Expr[R,RS] with UnaryExpr {
+  def _eval(vars: BoundVars): R = coll.sum(c1._eval(vars))
+  def shred = SumExpr[C,KS,RS,KS,RS](c1.shred)
 //  override val exprType: RingType = c1.exprType.sum
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = Sum(c1.replaceTypes(vars, overwrite))
 //  def shred = Sum(c1.shred)
@@ -546,7 +550,7 @@ case class SumExpr[I,O](c1: RingExpr[I])(implicit sum: Sum[I,O]) extends UnaryRi
 //}
 //
 //
-//case class Sng(key: KeyExpr, value: RingExpr) extends LogicalMappingExpr {
+case class Sng[K,KS,R,RS](key: Expr[K,KS], value: Expr[R,RS]) extends Expr[Map[K,R],Map[KS,RS]] with BinaryExpr {
 //  val keyType = key.exprType
 //  val valueType = value.exprType
 ////  assert(keyType != UnresolvedKeyType && valueType != UnresolvedRingType)
@@ -555,20 +559,23 @@ case class SumExpr[I,O](c1: RingExpr[I])(implicit sum: Sum[I,O]) extends UnaryRi
 //    case (UnresolvedKeyType,_) | (_,UnresolvedRingType) => UnresolvedRingType
 //    case _ => FiniteMappingType(keyType,valueType,false)
 //  }
-//
+  def c1 = key; def c2 = value
+
+  def _eval(vars: BoundVars): Map[K,R] = Map(key._eval(vars) -> value._eval(vars))
+
 //  override def toString = value match {
 //    case IntExpr(1) => s"sng($key)"
 //    case _ => s"sng($key, $value)"
 //  }
-//
+
 //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 //    Sng(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
-//
-//  def shred = Sng(key.shred, value.shred)
+
+  def shred = Sng(key.shred, value.shred)
 //  def renest = Sng(key.renest, value.renest)
-//}
-//
-//
+}
+
+
 //sealed trait FromK extends RingExpr with UnaryExpr[KeyExpr]
 //
 //object FromK {
