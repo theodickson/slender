@@ -1,23 +1,23 @@
-//package slender
-//
-////import slender.dsl.implicits._
-//import slender.definitions._
-//import org.scalatest.FunSuite
-//
-//object collections {
+package slender
+
+//import slender.dsl.implicits._
+import org.scalatest.FunSuite
+
+object collections {
 //  val stringCounts1 = PhysicalCollection(StringKeyType, IntType, "stringCounts1")
 //  val stringCounts2 = PhysicalCollection(StringKeyType, IntType, "stringCounts2")
 //  val bagOfBags = PhysicalBag(BoxedRingType(FiniteMappingType(StringKeyType, IntType)), "bagOfBags")
 //  val intCounts = PhysicalCollection(IntKeyType, IntType, "intCounts")
 //  val bagOfPairs = PhysicalBag(ProductKeyType(StringKeyType,IntKeyType), "bagOfPairs")
 //  val const = IntExpr(1)
-//}
-//
-//class DslTests extends FunSuite {
-//
-//  import slender.dsl.implicits._
-//  import collections._
-//
+}
+
+class DslTests extends FunSuite {
+
+  import slender.algebra.dsl._
+  import slender.algebra.implicits._
+  import collections._
+
 //  test("Operators") {
 //    assert(
 //      stringCounts1 + stringCounts2 == Add(stringCounts1,stringCounts2) &&
@@ -28,14 +28,21 @@
 //    )
 //  }
 //
-//  test("Simple for-comprehension") {
-//    val query = For ("x" <-- stringCounts1) Collect 1
+  test("Simple for-comprehension") {
+    val stringCounts1 = Map("a" -> 1, "b" -> 2, "c" -> 3)
+    val query = For ("x" <-- stringCounts1) Collect 1
 //    assert(query.isTyped)
 //    assert(query.exprType == IntType)
 //    assert(query ==
 //      Sum(stringCounts1 * {"x" ==> 1}).inferTypes
-//    )
-//  }
+    println(query.eval)
+  }
+
+  test("Nested for comprehension") {
+    val nestedBag = Map(Map("a" -> 1)->1)
+    val query = For ("x" <-- nestedBag) Collect "x".::[Map[Int,Map[Int,Int]]]
+    println(query.eval)
+  }
 //
 //  test("Simple yield") {
 //    val query = For ("x" <-- stringCounts1) Yield "x"
@@ -134,4 +141,4 @@
 //    val typedQuery = query.inferTypes(Map("z" -> StringKeyType))
 //    assert(typedQuery.isTyped)
 //  }
-//}
+}
