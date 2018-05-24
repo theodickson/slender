@@ -28,21 +28,25 @@ class DslTests extends FunSuite {
 //    )
 //  }
 //
-  test("Simple for-comprehension") {
-    val stringCounts1 = Map("a" -> 1, "b" -> 2, "c" -> 3)
-    val query = For ("x" <-- stringCounts1) Collect 1
-//    assert(query.isTyped)
-//    assert(query.exprType == IntType)
-//    assert(query ==
-//      Sum(stringCounts1 * {"x" ==> 1}).inferTypes
-    println(query.eval)
-  }
-
-  test("Nested for comprehension") {
-    val nestedBag = Map(Map("a" -> 1)->1)
-    val query = For ("x" <-- nestedBag) Collect "x".::[Map[Int,Map[Int,Int]]]
-    println(query.eval)
-  }
+//  test("Simple for-comprehension") {
+//    val stringCounts1 = PhysicalCollection(Map("a" -> 1, "b" -> 2, "c" -> 3))
+//    val inner = "x".::[String] <-- stringCounts1
+//    val builder = For(inner)
+//    builde
+//
+//    val query = For ("x".::[String] <-- (stringCounts1)) Collect 1
+////    assert(query.isTyped)
+////    assert(query.exprType == IntType)
+////    assert(query ==
+////      Sum(stringCounts1 * {"x" ==> 1}).inferTypes
+//    println(query.eval)
+//  }
+//
+//  test("Nested for comprehension") {
+//    val nestedBag = Map(Map("a" -> 1)->1)
+//    val query = For ("x" <-- nestedBag) Collect "x".::[Map[String,Int]]
+//    println(query.eval)
+//  }
 //
 //  test("Simple yield") {
 //    val query = For ("x" <-- stringCounts1) Yield "x"
