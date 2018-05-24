@@ -11,16 +11,16 @@ object types {
 
 import types._
 
-sealed trait Expr {
+sealed trait Expr[T] {
 
-  type Self <: Expr
-  type T
+  type Self <: Expr[T]
+//  type T
 
 //  def children: Seq[Expr[Nothing,Nothing]]
 
-  def eval: T = _eval(Map.empty)
-
-  def _eval(vars: BoundVars): T
+//  def eval: T = _eval(Map.empty)
+//
+//  def _eval(vars: BoundVars): T
 
 //  def shred[S,ES](implicit shredder: Shredder[T,S,Self,ES]): ES = shredder(this)
 
@@ -165,9 +165,9 @@ sealed trait VariableExpr[O] {
 }
 
 
-case class Variable[O](name: String) extends Expr with VariableExpr[O] with NullaryExpr {
+case class Variable[O](name: String) extends Expr[O] with VariableExpr[O] with NullaryExpr {
   type Self = Variable[O]
-  type T = O
+//  type T = O
   override def toString = s""""$name""""
 //  override def explain: String = s""""$name": $exprType"""
 //  override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
@@ -247,16 +247,16 @@ case class Variable[O](name: String) extends Expr with VariableExpr[O] with Null
 //}
 
 
-case class IntExpr(value: Int) extends Expr with PrimitiveExpr[Int] {
+case class IntExpr(value: Int) extends Expr[Int] with PrimitiveExpr[Int] {
   type Self = IntExpr
-  type T = Int
+//  type T = Int
   override def toString = s"$value"
 }
 
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit ev: Collection[C,K,R])
-  extends Expr with PrimitiveExpr[C[K,R]] {
-  type T = C[K,R]
+  extends Expr[C[K,R]] with PrimitiveExpr[C[K,R]] {
+//  type T = C[K,R]
   type Self = PhysicalCollection[C,K,R]
 }
 
@@ -378,14 +378,18 @@ case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit ev: Collection
 //  def _eval(vars: BoundVars) = dot(c1._eval(vars),c2._eval(vars))
 //}
 
-case class SelfDotExpr3[T1,E1 <: Expr,O](c1: E1, c2: E1)(implicit ev: c1.T =:= T1, dot: Dot[T1,T1,O])
-  extends Expr {
-  type Self = SelfDotExpr3[T1,E1,O]
-  type T = O
+case class SelfDotExpr3[T1,E[X] <: Expr[X],O](c1: E[T1], c2: E[T1])(implicit dot: Dot[T1,T1,O])
+  extends Expr[T1] {
+//  type Self = SelfDotExpr3[T1,E1]
+//  type T = O
   def opString = "⊙"
-  def _eval(vars: BoundVars) = dot(c1._eval(vars),c2._eval(vars))
+  def _eval(vars: BoundVars) = ??? //dot(c1._eval(vars),c2._eval(vars))
 }
 
+
+//trait FromExpr[T,E]
+//
+//implicit def
 
 //case class DotExpr[E1 <: Expr, E2 <: Expr,O](c1: E1, c2: E2)(implicit dot: Dot[c1.T,c2.T,O])
 ////(implicit dot: Dot[T1,T2,O])

@@ -31,7 +31,6 @@ object implicits {
     def apply(t1: Int, t2: Int): Int = t1 * t2
   }
 
-
   implicit object IntMultiply extends Multiply[Int, Int, Int] {
     def apply(t1: Int, t2: Int): Int = t1 * t2
   }
@@ -95,5 +94,4 @@ object implicits {
         t2.map { case (k2, v2) => (k1, k2) -> recur(v1, v2) }
       }
     }
-
 }

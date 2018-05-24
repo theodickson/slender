@@ -37,6 +37,7 @@ class EvaluatorTests extends FunSuite {
 //    val query = SelfDotExpr(stringCounts1,stringCounts2)(productDots[String,String,Int,Int,Int](IntDot))
 //    val query2 = SelfDotExpr2[Map[String,Int],PhysicalCollection[Map,String,Int],Map[(String,String),Int]](stringCounts1,stringCounts2)
     val query3 = SelfDotExpr3(stringCounts1,stringCounts2)
+
 //    val query22 = SelfDotExpr2(stringCounts1,stringCounts2)
 //    val query3 = SelfDotExpr2(IntExpr(1),IntExpr(1))
 //    query3
@@ -46,8 +47,8 @@ class EvaluatorTests extends FunSuite {
 //    val result2 = query2.eval
 //    println(result)
 //    println(result2)
-      val result3 = query3.eval
-    println(result3)
+      //val result3 = query3.eval
+    //println(result3)
 //    query2
   }
 
