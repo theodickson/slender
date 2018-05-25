@@ -2,6 +2,9 @@ package slender
 
 import org.scalatest.FunSuite
 import slender.algebra.implicits._
+import slender.execution.implicits._
+import slender.shredding._
+
 import org.apache.spark.sql.SparkSession
 import slender.algebra.{Dot, PairRDD}
 
@@ -36,8 +39,15 @@ class EvaluatorTests extends FunSuite {
   test("Dot test") {
 //    val query = SelfDotExpr(stringCounts1,stringCounts2)(productDots[String,String,Int,Int,Int](IntDot))
 //    val query2 = SelfDotExpr2[Map[String,Int],PhysicalCollection[Map,String,Int],Map[(String,String),Int]](stringCounts1,stringCounts2)
-    val query3 = SelfDotExpr3(stringCounts1,stringCounts2)
+      val query3 = SelfDotExpr(stringCounts1,stringCounts2)
+      val result = query3.eval
+      println(result)
 
+      println(query3.shred.eval)
+
+
+
+//      query3
 //    val query22 = SelfDotExpr2(stringCounts1,stringCounts2)
 //    val query3 = SelfDotExpr2(IntExpr(1),IntExpr(1))
 //    query3
