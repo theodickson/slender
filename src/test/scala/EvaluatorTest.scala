@@ -29,6 +29,12 @@ class EvaluatorTests extends FunSuite {
     )
   )
 
+  val bagOfIntPairPairs = PhysicalCollection(
+    Map(
+      ((1,1),(1,1)) -> 1
+    )
+  )
+
   //val stringCountsRdd = PhysicalCollection(PairRDD(sc.parallelize(List("a" -> 1, "b" -> 2, "c" -> 3))))
 
 //  test("Tuple key test") {
@@ -55,18 +61,27 @@ class EvaluatorTests extends FunSuite {
 //  }
 
   test("Tuple variable eval") {
-    val varExpr = Variable[Int]("x")
+    val varExpr = Tuple2VariableExpr(Tuple2VariableExpr(Variable[Int]("x"), Variable[Int]("y")),Tuple2VariableExpr(Variable[Int]("x"), Variable[Int]("y")))
+    assertThrows[NoSuchElementException](varExpr.eval)
+  }
+
+  test("") {
+    val varExpr = Variable[String]("x")
+    val varExpr2 = Tuple2VariableExpr(Variable[Int]("x"), Variable[Int]("y"))
+    val varExpr3 = Tuple2VariableExpr(
+      Tuple2VariableExpr(Variable[Int]("x"), Variable[Int]("y")),
+      Tuple2VariableExpr(Variable[Int]("z"), Variable[Int]("w"))
+    )
     val expr = SumExpr(MultiplyExpr(stringCounts1, InfiniteMappingExpr(varExpr,SngExpr(varExpr,IntExpr(1)))))
-//    val expr = SumExpr(MultiplyExpr(bagOfIntPairs, InfiniteMappingExpr(varExpr,IntExpr(1))))
-////    InfiniteMappingExpr(varExpr,IntExpr(1)).eval
-//    InfiniteMappingExpr(Variable[Int]("x"),IntExpr(1))
-//    println(SngExpr(varExpr,IntExpr(1)).eval)
-//     println(expr.eval)
-    println(SngExpr(varExpr,IntExpr(1)).eval)
-//    (
-//      InfiniteMappingEval[Tuple2VariableExpr[Variable[Int],Variable[Int],Int,Int],IntExpr,(Int,Int),Int]
-//    )
-//    println(SngExpr(Variable[Int]("x"),IntExpr(1)).eval)
+    val expr2 = SumExpr(MultiplyExpr(bagOfIntPairs, InfiniteMappingExpr(varExpr2,SngExpr(varExpr2,IntExpr(1)))))
+    val expr3 = SumExpr(MultiplyExpr(bagOfIntPairPairs, InfiniteMappingExpr(varExpr3,SngExpr(varExpr3,IntExpr(1)))))
+//    expr.eval
+    println(expr3.eval)
+  }
+
+  test("Project test") {
+    val expr = Project1KeyExpr(Tuple2KeyExpr(IntKeyExpr(1),IntKeyExpr(1)))
+    println(expr.eval)
   }
 
 //  test("Nested dot test") {

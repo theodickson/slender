@@ -71,10 +71,14 @@ case class Tuple2VariableExpr[V1 <: VariableExpr[_],V2 <: VariableExpr[_],T1,T2]
   def bind(t: (T1,T2)) = c1.bind(t._1) ++ c2.bind(t._2)
 }
 
-//case class Tuple3VariableExpr[K1 <: VariableExpr, K2 <: VariableExpr, K3 <: VariableExpr](c1: K1, c2: K2, c3: K3)
-//  extends VariableExpr with TernaryExpr with ProductExpr {
-//  type Self = Tuple3VariableExpr[K1,K2,K3]
-//}
+case class Tuple3VariableExpr[V1 <: VariableExpr[_],V2 <: VariableExpr[_],V3 <: VariableExpr[_],T1,T2,T3]
+  (c1: V1, c2: V2, c3: V3)
+  (implicit ev1: V1 <:< VariableExpr[T1], ev2: V2 <:< VariableExpr[T2], ev3: V3 <:< VariableExpr[T3])
+  extends VariableExpr[(T1,T2,T3)]
+    with TernaryExpr with ProductExpr {
+  type Self = Tuple3VariableExpr[V1,V2,V3,T1,T2,T3]
+  def bind(t: (T1,T2,T3)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
+}
 
 
 trait ToK extends UnaryKeyExpr

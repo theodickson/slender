@@ -3,6 +3,8 @@ package slender
 trait Ring[R] extends Serializable {
   def zero: R
   def add(x1: R, x2: R): R
+  def not(x1: R): R
+  def negate(x1: R): R
 }
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {

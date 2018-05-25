@@ -6,8 +6,9 @@ trait AlgebraImplicits {
 
   implicit object IntRing extends Ring[Int] {
     def zero = 0
-
     def add(t1: Int, t2: Int) = t1 + t2
+    def not(t1: Int): Int = if (t1 == 0) 1 else 0
+    def negate(t1: Int): Int = -t1
   }
 
   implicit object IntDot extends Dot[Int, Int, Int] {
@@ -22,12 +23,15 @@ trait AlgebraImplicits {
     new Collection[PairRDD, K, R] {
       def zero = ??? // todo - need Spark context do initialize empty RDD but then cant serialize. however shouldnt ever need emptyRDD in practice.
       def add(x1: PairRDD[K, R], x2: PairRDD[K, R]) =
-        x1.rdd.union(x2.rdd).groupByKey.mapValues(_.reduce(ring.add))
+        x1.union(x2.rdd).groupByKey.mapValues(_.reduce(ring.add))
 
-      //aggregateByKey(ring.zero)(ring.add,ring.add)
-      def sum(c: PairRDD[K, R]): R = c.rdd.values.reduce(ring.add)
+      def not(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
 
-      def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.rdd.map { case (k, v) => f(k, v) }
+      def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
+
+      def sum(c: PairRDD[K, R]): R = c.values.reduce(ring.add)
+
+      def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
     }
 
   implicit def mapToCollection[K, R](implicit ring: Ring[R]): Collection[Map, K, R] = new Collection[Map, K, R] {
@@ -35,6 +39,10 @@ trait AlgebraImplicits {
 
     def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
       t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
+
+    def not(t1: Map[K,R]) = t1.mapValues(ring.not)
+
+    def negate(t1: Map[K,R]) = t1.mapValues(ring.negate)
 
     def sum(c: Map[K, R]): R = c.values.reduce(ring.add)
 

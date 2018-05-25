@@ -18,11 +18,33 @@ case class PhysicalCollection[C[_,_],K,R](value: C[K,R])
   type Self = PhysicalCollection[C,K,R]
 }
 
+case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
+  type Self = Tuple2RingExpr[K1,K2]
+}
 
-case class InfiniteMappingExpr[K,R <: RingExpr](key: VariableExpr[K], value: R)
+case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
+  extends TernaryRingExpr with ProductExpr {
+  type Self = Tuple3RingExpr[K1,K2,K3]
+}
+
+
+case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr {
+  type Self = Project1RingExpr[K]
+}
+
+case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr {
+  type Self = Project2RingExpr[K]
+}
+
+case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr {
+  type Self = Project3RingExpr[K]
+}
+
+
+case class InfiniteMappingExpr[K <: VariableExpr[_],KT,R <: RingExpr](key: K, value: R)(implicit ev: K <:< VariableExpr[KT])
   extends BinaryRingExpr {
 
-  type Self = InfiniteMappingExpr[K,R]
+  type Self = InfiniteMappingExpr[K,KT,R]
   def c1 = key; def c2 = value
 
   override def toString = s"{$key => $value}"
@@ -100,52 +122,6 @@ case class AddExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
 
   type Self = AddExpr[E1,E2]
   def opString = "+"
-  //  override def freeVariables = c2 match {
-  //    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables -- k.freeVariables
-  //    case _ => c1.freeVariables ++ c2.freeVariables
-  //  }
-
-  //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = {
-  //    val newC1 = c1.replaceTypes(vars, overwrite)
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars ++ v.matchTypes(keyType), overwrite)
-  //        case _ => c2.replaceTypes(vars, overwrite)
-  //      }
-  //      case _ => c2.replaceTypes(vars, overwrite)
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
-  //
-  //  def shred = {
-  //    val newC1 = c1.shred
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-  //          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
-  //          replaced.shred
-  //        }
-  //        case _ => c2.shred
-  //      }
-  //      case _ => c2.shred
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
-  //
-  //  def renest = { //todo refactor
-  //    val newC1 = c1.renest
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-  //          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
-  //          replaced.renest
-  //        }
-  //        case _ => c2.renest
-  //      }
-  //      case _ => c2.renest
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
 }
 
 case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
@@ -153,121 +129,44 @@ case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
 
   type Self = DotExpr[E1,E2]
   def opString = "⊙"
-  //  override def freeVariables = c2 match {
-  //    case InfiniteMappingExpr(k: VariableKeyExpr, _) => c1.freeVariables ++ c2.freeVariables -- k.freeVariables
-  //    case _ => c1.freeVariables ++ c2.freeVariables
-  //  }
-
-  //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = {
-  //    val newC1 = c1.replaceTypes(vars, overwrite)
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => c2.replaceTypes(vars ++ v.matchTypes(keyType), overwrite)
-  //        case _ => c2.replaceTypes(vars, overwrite)
-  //      }
-  //      case _ => c2.replaceTypes(vars, overwrite)
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
-  //
-  //  def shred = {
-  //    val newC1 = c1.shred
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-  //          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
-  //          replaced.shred
-  //        }
-  //        case _ => c2.shred
-  //      }
-  //      case _ => c2.shred
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
-  //
-  //  def renest = { //todo refactor
-  //    val newC1 = c1.renest
-  //    val newC2 = newC1.exprType match {
-  //      case FiniteMappingType(keyType,_,_) => c2 match {
-  //        case InfiniteMappingExpr(v: VariableKeyExpr,_) => {
-  //          val replaced = c2.replaceTypes(v.matchTypes(keyType), true)
-  //          replaced.renest
-  //        }
-  //        case _ => c2.renest
-  //      }
-  //      case _ => c2.renest
-  //    }
-  //    Multiply(newC1, newC2)
-  //  }
 }
 
 case class SumExpr[E <: Expr](c1: E) extends UnaryRingExpr {
   type Self = SumExpr[E]
-  //  def _eval(vars: BoundVars): R = coll.sum(c1._eval(vars))
-  //  override val exprType: RingType = c1.exprType.sum
-  //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = Sum(c1.replaceTypes(vars, overwrite))
-  //  def shred = Sum(c1.shred)
-  //  def renest = Sum(c1.renest)
 }
-////
-////
-////case class Not(c1: RingExpr) extends UnaryRingExpr {
-////  val exprType = c1.exprType
-////  override def toString = s"¬${c1.closedString}"
-////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = Not(c1.replaceTypes(vars, overwrite))
-////  def shred = Not(c1.shred)
-////  def renest = Not(c1.renest)
-////}
-////
-////
-////case class Negate(c1: RingExpr) extends UnaryRingExpr {
-////  val exprType = c1.exprType
-////  override def toString = s"-${c1.closedString}"
-////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
-////    Negate(c1.replaceTypes(vars, overwrite))
-////  def shred = Negate(c1.shred)
-////  def renest = Negate(c1.renest)
-////}
-////
-////trait Predicate extends RingExpr with BinaryExpr[KeyExpr,KeyExpr] {
-////  def opString: String
-////  override def brackets = ("(",")")
-////  override def toString = s"$c1 $opString $c2"
-////}
-////
-////case class EqualsPredicate(c1: KeyExpr, c2: KeyExpr) extends Predicate {
-////  val exprType = c1.exprType compareEq c2.exprType
-////  def opString = "="
-////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
-////    EqualsPredicate(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite))
-////  def shred = EqualsPredicate(c1.shred, c2.shred)
-////  def renest = EqualsPredicate(c1.renest, c2.renest)
-////}
-////
-////case class IntPredicate(c1: KeyExpr, c2: KeyExpr, p: (Int,Int) => Boolean, opString: String)
-////                       (implicit val ev1: TypeTag[(Int,Int) => Boolean])
-////  extends Predicate {
-////  val exprType = c1.exprType compareOrd c2.exprType
-////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
-////    IntPredicate(c1.replaceTypes(vars, overwrite), c2.replaceTypes(vars, overwrite), p, opString)
-////  def shred = IntPredicate(c1.shred, c2.shred, p, opString)
-////  def renest = IntPredicate(c1.renest, c2.renest, p, opString)
-////  def literal = reify(p)
-////}
-////
-//////
+
+case class NotExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+  type Self = NotExpr[E]
+}
+
+case class NegateExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+  type Self = NegateExpr[E]
+}
+
+
+trait Predicate extends BinaryRingExpr {
+  def opString: String
+//  override def brackets = ("(",")")
+  override def toString = s"$c1 $opString $c2"
+}
+
+case class EqualsPredicate[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends Predicate {
+  type Self = EqualsPredicate[K1,K2]
+  def opString = "="
+}
+
+case class IntPredicate[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2, p: (Int,Int) => Boolean, opString: String) extends Predicate {
+  type Self = IntPredicate[K1, K2]
+}
+
+object Predicate {
+  def apply[K1 <: KeyExpr, K2 <: KeyExpr](k1: K1, k2: K2) = EqualsPredicate(k1,k2)
+}
+
 case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
   extends BinaryRingExpr {
-
+  type Self = SngExpr[K,R]
   def c1 = key; def c2 = value
-
-  //  def _eval(vars: BoundVars): Map[K,R] = Map(key._eval(vars) -> value._eval(vars))
-
-  //  override def toString = value match {
-  //    case IntExpr(1) => s"sng($key)"
-  //    case _ => s"sng($key, $value)"
-  //  }
-
 }
 //
 //
