@@ -4,15 +4,15 @@ import scala.reflect.{ClassTag,classTag}
 
 trait KeyExpr extends Expr { //self : Self =>
 
-//  type Self <: KeyExpr
-//
-//  def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(this, k1)
-//  def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(this, k1))
-//
-//  def >[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ > _, ">")
-//  def <[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ < _, "<")
-//
-//  def -->[R <: RingExpr](r: R): (Self,R) = (this,r)
+  type Self <: KeyExpr
+
+  def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(this, k1)
+  def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(this, k1))
+
+  def >[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ > _, ">")
+  def <[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ < _, "<")
+
+  def -->[R <: RingExpr](r: R): (Self,R) = (this.asInstanceOf[Self],r)
 }
 
 trait NullaryKeyExpr extends KeyExpr with NullaryExpr
@@ -61,9 +61,9 @@ trait VariableExpr[T] extends KeyExpr {
 
 trait Variable[X <: UntypedVariable[X],T] extends VariableExpr[T] with NullaryKeyExpr
 
-case class TypedVariable[X <: UntypedVariable[X],T : ClassTag](name: X) extends Variable[X,T] {
+case class TypedVariable[X <: UntypedVariable[X],T](name: X) extends Variable[X,T] {
   type Self = TypedVariable[X,T]
-  override def toString = s""""$name:${classTag[T]}""""
+  override def toString = s""""$name:}""""
   def bind(t: T) = Map(this -> t)
   //  override def explain: String = s""""$name": $exprType"""
   //  override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
@@ -81,9 +81,9 @@ case class TypedVariable[X <: UntypedVariable[X],T : ClassTag](name: X) extends 
 trait UntypedVariable[T <: UntypedVariable[T]] extends Variable[T,Nothing] with NullaryKeyExpr {
   type Self = T// UntypedVariable
   def bind(t: Nothing) = ???
-  def tag[KT : ClassTag]: TypedVariable[T,KT] = TypedVariable[T,KT](this.asInstanceOf[T])
-//  def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
-//  def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[T,Nothing,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
+  def tag[KT]: TypedVariable[T,KT] = TypedVariable[T,KT](this.asInstanceOf[T])
+  def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
+  def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[T,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
 }
 
 

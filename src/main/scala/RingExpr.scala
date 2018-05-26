@@ -2,19 +2,19 @@ package slender
 
 trait RingExpr extends Expr { //self : Self =>
 
-//  type Self <: RingExpr
-//
-//  def +[R1 <: RingExpr](expr1: R1) = AddExpr(this,expr1)
-//
-//  def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(this,expr1)
-//
-//  def dot[R1 <: RingExpr](expr1: R1) = DotExpr(this,expr1)
-//
-//  def sum = SumExpr(this)
-//
-//  def unary_- = NegateExpr(this)
-//
-//  def unary_! = NotExpr(this)
+  type Self <: RingExpr
+
+  def +[R1 <: RingExpr](expr1: R1) = AddExpr(this,expr1)
+
+  def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(this,expr1)
+
+  def dot[R1 <: RingExpr](expr1: R1) = DotExpr(this,expr1)
+
+  def sum = SumExpr(this)
+
+  def unary_- = NegateExpr(this)
+
+  def unary_! = NotExpr(this)
 
 }
 
