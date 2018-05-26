@@ -89,10 +89,10 @@ class EvaluatorTests extends FunSuite {
 //    println(query.eval)
 //  }
 //
-//  test("Add test") {
-//    val query = AddExpr(stringCounts1,stringCounts2)
-//    println(query.eval)
-//  }
+  test("Add test") {
+    val query = stringCounts1 + stringCounts2
+    println(query.eval)
+  }
 //
 //  test("Inf mapping test") {
 //    val query = SumExpr(

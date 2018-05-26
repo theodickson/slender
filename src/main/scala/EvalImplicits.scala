@@ -117,12 +117,12 @@ trait EvalImplicits {
 
   implicit def EqualsPredicateEval[K1 <: KeyExpr,K2 <: KeyExpr,T](implicit eval1: Eval[K1,T], eval2: Eval[K2,T]) =
     new Eval[EqualsPredicate[K1,K2],Int] {
-      def apply(v1: EqualsPredicate[K1,K2], v2: BoundVars): Int = if (eval1(v1.c1,v2) == eval2(v1.c1,v2)) 1 else 0
+      def apply(v1: EqualsPredicate[K1,K2], v2: BoundVars): Int = if (eval1(v1.c1,v2) == eval2(v1.c2,v2)) 1 else 0
     }
 
   implicit def IntPredicateEval[K1 <: KeyExpr,K2 <: KeyExpr](implicit eval1: Eval[K1,Int], eval2: Eval[K2,Int]) =
     new Eval[IntPredicate[K1,K2],Int] {
-      def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c1,v2))) 1 else 0
+      def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c2,v2))) 1 else 0
     }
 
   implicit def Tuple2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2](implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]) =
