@@ -2,19 +2,19 @@ package slender
 
 trait RingExpr extends Expr { //self : Self =>
 
-//  type Self <: RingExpr
-//
-//  def +[R1 <: RingExpr](expr1: R1) = AddExpr(this,expr1)
-//
-//  def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(this,expr1)
-//
-//  def dot[R1 <: RingExpr](expr1: R1) = DotExpr(this,expr1)
-//
-//  def sum = SumExpr(this)
-//
-//  def unary_- = NegateExpr(this)
-//
-//  def unary_! = NotExpr(this)
+  type Self <: RingExpr
+
+  def +[R1 <: RingExpr](expr1: R1) = AddExpr(this,expr1)
+
+  def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(this,expr1)
+
+  def dot[R1 <: RingExpr](expr1: R1) = DotExpr(this,expr1)
+
+  def sum = SumExpr(this)
+
+  def unary_- = NegateExpr(this)
+
+  def unary_! = NotExpr(this)
 
 }
 
@@ -57,10 +57,26 @@ case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingE
 }
 
 
-case class InfiniteMappingExpr[K <: VariableExpr[_],KT,R <: RingExpr](key: K, value: R)(implicit ev: K <:< VariableExpr[KT])
+//case class InfiniteMappingExpr[K <: VariableExpr[_],KT,R <: RingExpr](key: K, value: R)//(implicit ev: K <:< VariableExpr[KT])
+//  extends BinaryRingExpr {
+//
+//  type Self = InfiniteMappingExpr[K,KT,R]
+//  def c1 = key; def c2 = value
+//
+//  override def toString = s"{$key => $value}"
+//
+//  //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): RingExpr =
+//  //    InfiniteMappingExpr(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
+//  //
+//
+//  //  def renest = InfiniteMappingExpr(key.renest, value.renest)
+//}
+
+
+case class InfiniteMappingExpr[K <: VariableExpr[_],R <: RingExpr](key: K, value: R)//(implicit ev: K <:< VariableExpr[KT])
   extends BinaryRingExpr {
 
-  type Self = InfiniteMappingExpr[K,KT,R]
+  type Self = InfiniteMappingExpr[K,R]
   def c1 = key; def c2 = value
 
   override def toString = s"{$key => $value}"
@@ -71,7 +87,6 @@ case class InfiniteMappingExpr[K <: VariableExpr[_],KT,R <: RingExpr](key: K, va
 
   //  def renest = InfiniteMappingExpr(key.renest, value.renest)
 }
-
 
 trait BinaryRingOpExpr extends BinaryRingExpr {
   def opString: String

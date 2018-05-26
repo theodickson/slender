@@ -7,15 +7,17 @@ trait Expr {
 
   def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(this.asInstanceOf[Self],Map.empty)
 
+//  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(this.asInstanceOf[Self])
+
   def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(this.asInstanceOf[Self])
 
   def id = hashCode.abs.toString.take(3).toInt
 
 
-  def variables: Set[Variable[_]] =
-    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.variables)
-  def freeVariables: Set[Variable[_]] =
-    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.freeVariables)
+//  def variables: Set[Variable[_]] =
+//    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.variables)
+//  def freeVariables: Set[Variable[_]] =
+//    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.freeVariables)
   def labels: List[LabelExpr[_]] =
     children.foldLeft(List.empty[LabelExpr[_]])((acc,v) => acc ++ v.labels)
 //  def labelDefinitions: Seq[String] = labels.map(_.definition)

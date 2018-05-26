@@ -4,8 +4,12 @@ package slender
 //remove the need to tag them
 trait EvalImplicits {
 
-  implicit def VariableEval[T]: Eval[Variable[T],T] = new Eval[Variable[T],T] {
-    def apply(v1: Variable[T],v2: BoundVars): T = v2(v1).asInstanceOf[T]
+//  implicit def VariableEval[T]: Eval[Variable[T],T] = new Eval[Variable[T],T] {
+//    def apply(v1: Variable[T],v2: BoundVars): T = v2(v1).asInstanceOf[T]
+//  }
+
+  implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[V,T],T] = new Eval[TypedVariable[V,T],T] {
+    def apply(v1: TypedVariable[V,T], v2: BoundVars): T = v2(v1).asInstanceOf[T]
   }
 
   implicit def Tuple2VariableEval[V1 <: VariableExpr[_],V2 <: VariableExpr[_],T1,T2]
@@ -50,19 +54,33 @@ trait EvalImplicits {
   //todo - for some reason my attempts (above) at a generic case for infinite mapping eval where the key is a generic
   //variable expr did not work. just couldnt find the implicit value. luckily, the below works, which is one case for
   //each concrete class of VariableExpr. extra luckily, the Tuple2 case works even when inside it are further levels of variableexpr.
-  implicit def InfiniteMappingEval[R <: RingExpr,KT,RT]
-  (implicit evalK: Eval[Variable[KT],KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[Variable[KT],KT,R],KT => RT] =
-    new Eval[InfiniteMappingExpr[Variable[KT],KT,R],KT => RT] {
-      def apply(v1: InfiniteMappingExpr[Variable[KT],KT,R], v2: BoundVars): KT => RT = (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
+  implicit def InfiniteMappingEval[V <: UntypedVariable[V],R <: RingExpr,KT,RT]
+  (implicit evalK: Eval[TypedVariable[V,KT],KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[TypedVariable[V,KT],R],KT => RT] =
+    new Eval[InfiniteMappingExpr[TypedVariable[V,KT],R],KT => RT] {
+      def apply(v1: InfiniteMappingExpr[TypedVariable[V,KT],R], v2: BoundVars): KT => RT = (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
     }
 
-  implicit def Tuple2InfiniteMappingEval[
-    R <: RingExpr,KT1,KT2,RT,V1 <: VariableExpr[_],V2 <: VariableExpr[_]
-  ](implicit evalK: Eval[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2)], evalR: Eval[R,RT]) = //: Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] =
-    new Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] {
-      def apply(v1: InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R], v2: BoundVars) = //: ((KT1,KT2)) => RT =
-        (k: (KT1,KT2)) => evalR(v1.value,v2 ++ v1.key.bind(k))
-    }
+//  implicit def Tuple2InfiniteMappingEval[
+//    R <: RingExpr,KT1,KT2,RT,V1 <: VariableExpr[_],V2 <: VariableExpr[_]
+//  ](implicit evalK: Eval[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2)], evalR: Eval[R,RT]) = //: Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] =
+//    new Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] {
+//      def apply(v1: InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R], v2: BoundVars) = //: ((KT1,KT2)) => RT =
+//        (k: (KT1,KT2)) => evalR(v1.value,v2 ++ v1.key.bind(k))
+//    }
+
+//  implicit def InfiniteMappingEval[R <: RingExpr,V <: UntypedVariable,KT,RT]
+//  (implicit evalK: Eval[Variable[V,KT],KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr1[Variable[V,KT],V,KT,R],KT => RT] =
+//    new Eval[InfiniteMappingExpr1[Variable[V,KT],V,KT,R],KT => RT] {
+//      def apply(v1: InfiniteMappingExpr1[Variable[V,KT],V,KT,R], v2: BoundVars): KT => RT = (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
+//    }
+  //
+  //  implicit def Tuple2InfiniteMappingEval[
+  //    R <: RingExpr,KT1,KT2,RT,V1 <: VariableExpr[_],V2 <: VariableExpr[_]
+  //  ](implicit evalK: Eval[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2)], evalR: Eval[R,RT]) = //: Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] =
+  //    new Eval[InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R],((KT1,KT2)) => RT] {
+  //      def apply(v1: InfiniteMappingExpr[Tuple2VariableExpr[V1,V2,KT1,KT2],(KT1,KT2),R], v2: BoundVars) = //: ((KT1,KT2)) => RT =
+  //        (k: (KT1,KT2)) => evalR(v1.value,v2 ++ v1.key.bind(k))
+  //    }
 
 
   implicit def MultiplyEval[E1 <: RingExpr,E2 <: RingExpr,T1,T2,O](implicit eval1: Eval[E1,T1],

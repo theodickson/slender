@@ -4,11 +4,11 @@ trait DSL {
 
   implicit class RingExprOps[R <: RingExpr](expr: R) {
 
-    def +[R1 <: RingExpr](expr1: R1) = AddExpr(expr,expr1)
+    def +[R1 <: RingExpr](expr1: R1) = AddExpr(expr, expr1)
 
-    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(expr,expr1)
+    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(expr, expr1)
 
-    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(expr,expr1)
+    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(expr, expr1)
 
     def sum = SumExpr(expr)
 
@@ -16,100 +16,74 @@ trait DSL {
 
     def unary_! = NotExpr(expr)
 
-//    def _1: RingExpr = ProjectRingExpr(e, 1)
-//    def _2: RingExpr = ProjectRingExpr(e, 2)
-//
-//    def && = * _
-//    def || = this.+ _
+    //    def _1: RingExpr = ProjectRingExpr(e, 1)
+    //    def _2: RingExpr = ProjectRingExpr(e, 2)
+    //
+    def && = * _
+
+    def || = this.+ _
   }
 
   implicit class KeyExprOps[K <: KeyExpr](val k: K) {
-//      def _1: KeyExpr = ProjectKeyExpr(k, 1)
-//      def _2: KeyExpr = ProjectKeyExpr(k, 2)
-//      def _3: KeyExpr = ProjectKeyExpr(k, 3)
+    //      def _1: KeyExpr = ProjectKeyExpr(k, 1)
+    //      def _2: KeyExpr = ProjectKeyExpr(k, 2)
+    //      def _3: KeyExpr = ProjectKeyExpr(k, 3)
 
     def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(k, k1)
+
     def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(k, k1))
 
     def >[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ > _, ">")
+
     def <[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ < _, "<")
 
-    def -->[R <: RingExpr](r: R): (K,R) = (k,r)
+    def -->[R <: RingExpr](r: R): (K, R) = (k, r)
   }
 
-  implicit class VariableExprOps[V[X] <: VariableExpr[X],KT](val k: V[KT]) {
-    def <--[R <: RingExpr](r: R): (V[KT], R) = (k,r)
-    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V[KT],KT,R] = InfiniteMappingExpr(k, r)
+  implicit class UntypedVariableOps[V <: UntypedVariable[V]](val k: V) {
+    //    def <--[R <: RingExpr](r: R): (V, R) = (k,r)
+    //    def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(k, r)
   }
 
+  implicit def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
+  implicit def sng[K <: KeyExpr](k: K): SngExpr[K, IntExpr] = SngExpr(k, IntExpr(1))
+
+  implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
+
+  case class ForComprehensionBuilder[V <: VariableExpr[_], R <: RingExpr, T](x: V, r1: R) {
+
+    //todo - nested levels of this wont work with this resolver call unless we add a low priority implicit for any expr
+    //which doesnt change it at all.
+
+    def Collect[R2 <: RingExpr, Out <: Expr](r2: R2)
+                                            (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out])
+    = resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+
+    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr](pair: (K, R2))
+                                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+      Collect(sng(pair._1, pair._2))
+
+    def Yield[K <: KeyExpr, Out <: Expr](k: K)
+                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
+      Yield(k, IntExpr(1))
+
+
+  }
+
+  object For {
+    def apply[V <: VariableExpr[_], R <: RingExpr, T](paired: (V, R)): ForComprehensionBuilder[V, R, T] =
+      ForComprehensionBuilder[V, R, T](paired._1, paired._2)
+  }
 
 }
 
-object test {
-  def main(args: Array[String]): Unit = {
-    val varExpr = Variable[String]("x")
-    val result = varExpr <-- IntExpr(1)
-    println(result)
-  }
-}
-//
-//object dsl {
-//
-////  sealed trait DSLVariable {
-////    def name: String
-////  }
-////
-////  case object X extends DSLVariable {
-////    def name = "x"
-////  }
-////
-////  trait DSLVariableBinding[V <: DSLVariable,K]
-//
-
-//  implicit class VariableKeyExprOps[K](k: Variable[K]) {
-//
-//    def <--[C[_,_],R,E <: Expr[C[K,R],E]](r: E): (Variable[K], E) = (k,r)
-//
-//    def ==>[R:Ring,E <: Expr[R,E]](v: E): InfiniteMappingExpr[K,R,E] = InfiniteMappingExpr(k,v)
-//  }
-//
-//
-//  implicit class StringImplicits(s: String) {
-//    def tag[T]: Variable[T] = Variable[T](s)
-//    def ::[T]: Variable[T] = tag[T]
-//    def <--[C[_,_],K,R,E <: Expr[C[K,R],E]](r: E): (Variable[K], E) = (tag[K],r)
-//  }
 //
 //  def toK[O:Ring,E <: Expr[O,E]](e: E): BoxedRingExpr[O,E] = BoxedRingExpr(e)
 //
 //  def fromK[O:Ring,E <: Expr[O,E]](e: BoxedRingExpr[O,E]): E = e.c1
 //
-//  def sng[K,E <: Expr[K,E]](e: E): Sng[K,Int,E,IntExpr] = Sng(e,IntExpr(1))
-//
-//  def sng[K,R:Ring,KE <: Expr[K,KE],RE <: Expr[R,RE]](k: KE, r: RE): Sng[K,R,KE,RE] = Sng(k, r)
-//
-//  implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
-////
-////  case class ForComprehensionBuilder2[C[_,_],K,KS,R,RS,V <: DSLVariable](x: V, r1)
-//
-//  case class ForComprehensionBuilder[C[_,_],K,R1,E1 <: Expr[C[K,R1],E1]](x: Variable[K], r1: E1) {
-//
-//    def Collect[R2,E2 <: Expr[R2,E2],O](r2: E2)
-//               (implicit mult: Multiply[C[K,R1],K=>R2,C[K,O]],
-//                         coll: Collection[C,K,O]) = {
-//      val infMapping = InfiniteMappingExpr[K,R2,E2](x,r2)
-//      val multiplied = MultiplyExpr[C[K,R1],K=>R2,E1,InfiniteMappingExpr[K,R2,E2],C[K,O]](r1,infMapping)(mult)
-//      SumExpr[C,K,O,MultiplyExpr[C[K,R1],K=>R2,E1,InfiniteMappingExpr[K,R2,E2],C[K,O]]](multiplied)(coll)
-////        SumExpr(MultiplyExpr(r1,InfiniteMappingExpr(x,r2)))
-//    }
-//
-////    def Yield(pair: YieldPair): RingExpr = Collect(sng(pair.k, pair.r))
-////
-////    def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
-//
-//  }
-//  //
+
 //  //  case class PredicatedForComprehensionBuilder(x: VariableKeyExpr, exprPred: (RingExpr, RingExpr)) {
 //  //    val r1 = exprPred._1
 //  //    val p = exprPred._2
@@ -289,31 +263,7 @@ object test {
 ////
 ////  def sng(e: KeyExpr, r: RingExpr) = Sng(e, r)
 ////
-////  case class ForComprehensionBuilder(x: VariableKeyExpr, r1: RingExpr) {
-////    def Collect(r2: RingExpr): RingExpr = Sum(r1 * {x ==> r2}).inferTypes
-////    def Yield(pair: YieldPair): RingExpr = Collect(sng(pair.k, pair.r))
-////    def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
-////  }
-////
-////  case class PredicatedForComprehensionBuilder(x: VariableKeyExpr, exprPred: (RingExpr, RingExpr)) {
-////    val r1 = exprPred._1
-////    val p = exprPred._2
-////    val builder = ForComprehensionBuilder(x, r1)
-////    def Yield(pair: YieldPair): RingExpr =
-////      builder.Yield(pair.k --> (p dot pair.r))
-////    def Yield(k: KeyExpr): RingExpr = builder.Yield(k --> p)
-////  }
-////
-////  object For {
-////    def apply(paired: (VariableKeyExpr, RingExpr)): ForComprehensionBuilder =
-////      ForComprehensionBuilder(paired._1, paired._2)
-////    def apply(paired: (VariableKeyExpr, (RingExpr,RingExpr))): PredicatedForComprehensionBuilder =
-////      PredicatedForComprehensionBuilder(paired._1, paired._2)
-////  }
-////
-////  case class YieldPair(k: KeyExpr, r: RingExpr)
-////
-////
+
 ////  /**IntelliJ is not managing to resolve the conversions via the type-class mediator pattern even though its compiling
 ////    * so here are a bunch of explicit conversions to stop IDE errors. Hopefully can sort this out at some point.
 ////    * At time of writing everything compiles and tests run successfully with the below commented out so should
