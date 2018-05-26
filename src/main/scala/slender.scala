@@ -1,6 +1,8 @@
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 
-package object slender extends AlgebraImplicits with ShreddingImplicits with EvalImplicits with Serializable {
+import scala.reflect.ClassTag
+
+package object slender extends AlgebraImplicits with ShreddingImplicits with EvalImplicits with DSL with Serializable {
 
   type BoundVars = Map[Variable[_],Any]
 
@@ -10,6 +12,11 @@ package object slender extends AlgebraImplicits with ShreddingImplicits with Eva
 
   implicit def fromPairRDD[K,R](pairRdd: PairRDD[K,R]): RDD[(K,R)] = pairRdd.rdd
 
-  implicit def pairRDDtoPairRDDFunctions[K,R](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] = pairRdd.rdd
+  implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
+    new PairRDDFunctions(pairRdd.rdd)
+
+  implicit def mapToPhysicalCollection[K,R](map: Map[K,R]): PhysicalCollection[Map,K,R] = PhysicalCollection(map)
+
+  implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)]): PhysicalCollection[PairRDD,K,R] = PhysicalCollection(rdd)
 
 }
