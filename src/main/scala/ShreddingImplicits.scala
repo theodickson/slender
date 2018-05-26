@@ -2,7 +2,7 @@ package slender
 
 trait ShreddingImplicits {
 
-  implicit def VariableShredder[K]: NonShredder[Variable[K]] = new NonShredder[Variable[K]] { }
+//  implicit def VariableShredder[K]: NonShredder[Variable[K]] = new NonShredder[Variable[K]] { }
 
   implicit def PrimitiveExprShredder[E <: PrimitiveExpr[_]]: NonShredder[E] = new NonShredder[E] {}
 

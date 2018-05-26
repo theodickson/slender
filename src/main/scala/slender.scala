@@ -4,7 +4,7 @@ import scala.reflect.ClassTag
 
 package object slender extends AlgebraImplicits with ShreddingImplicits with EvalImplicits with DSL with Serializable {
 
-  type BoundVars = Map[Variable[_],Any]
+  type BoundVars = Map[TypedVariable[_,_],Any]
 
   case class PairRDD[K,R](rdd: RDD[(K,R)])
 
@@ -19,4 +19,11 @@ package object slender extends AlgebraImplicits with ShreddingImplicits with Eva
 
   implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)]): PhysicalCollection[PairRDD,K,R] = PhysicalCollection(rdd)
 
+  trait X extends UntypedVariable[X] { override def toString = "x" }; implicit object X extends X
+  trait Y extends UntypedVariable[Y] { override def toString = "y" }; implicit object Y extends Y
+  trait Z extends UntypedVariable[Z] { override def toString = "z" }; implicit object Z extends Z
+  trait W extends UntypedVariable[W] { override def toString = "w" }; implicit object W extends W
+//  implicit object Y extends Y
+//  implicit object Z extends Z
+//  implicit object W extends W
 }

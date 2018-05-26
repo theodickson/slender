@@ -37,22 +37,26 @@ trait DSL {
     def -->[R <: RingExpr](r: R): (K,R) = (k,r)
   }
 
-  implicit class VariableExprOps[V[X] <: VariableExpr[X],KT](val k: V[KT]) {
-    def <--[R <: RingExpr](r: R): (V[KT], R) = (k,r)
-    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V[KT],KT,R] = InfiniteMappingExpr(k, r)
-  }
+//  implicit class VariableExprOps[V[X] <: VariableExpr[X],KT](val k: V[KT]) {
+//    def <--[R <: RingExpr](r: R): (V[KT], R) = (k,r)
+////    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V[KT],KT,R] = InfiniteMappingExpr(k, r)
+//  }
+
+//  implicit class VariableOps[V <: UntypedVariable,T](v: Variable[V,T]) {
+//    def <--[E <: RingExpr,C[_,_],K,R](expr: E)(implicit eval: Eval[E,C])
+//  }
 
 
 
 }
 
-object test {
-  def main(args: Array[String]): Unit = {
-    val varExpr = Variable[String]("x")
-    val result = varExpr <-- IntExpr(1)
-    println(result)
-  }
-}
+//object test {
+//  def main(args: Array[String]): Unit = {
+//    val varExpr = Variable[String]("x")
+//    val result = varExpr <-- IntExpr(1)
+//    println(result)
+//  }
+//}
 //
 //object dsl {
 //

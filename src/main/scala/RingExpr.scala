@@ -73,6 +73,22 @@ case class InfiniteMappingExpr[K <: VariableExpr[_],KT,R <: RingExpr](key: K, va
 }
 
 
+//case class InfiniteMappingExpr1[K <: Variable[_,_],V <: UntypedVariable,KT,R <: RingExpr](key: K, value: R)(implicit ev: K <:< Variable[V,KT])
+//  extends BinaryRingExpr {
+//
+//  type Self = InfiniteMappingExpr1[K,V,KT,R]
+//  def c1 = key; def c2 = value
+//
+//  override def toString = s"{$key => $value}"
+//
+//  //  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean): RingExpr =
+//  //    InfiniteMappingExpr(key.replaceTypes(vars, overwrite), value.replaceTypes(vars, overwrite))
+//  //
+//
+//  //  def renest = InfiniteMappingExpr(key.renest, value.renest)
+//}
+
+
 trait BinaryRingOpExpr extends BinaryRingExpr {
   def opString: String
   //  final def brackets = ("(",")")
