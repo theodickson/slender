@@ -15,9 +15,9 @@ trait Binder[V <: UntypedVariable[V],T,In <: Expr,Out <: Expr] extends (In => Ou
 trait NonBinder[V <: UntypedVariable[V],T,In <: Expr] extends Binder[V,T,In,In] { def apply(v1: In) = v1 }
 
 //Tags the Variables on the LHS of all outermost infinite mappings
-//trait Tagger[In <: Expr,Out <: Expr] extends (In => Out) with Serializable
-//
-//trait NonTagger[In <: Expr] extends Tagger[In,In] { def apply(v1: In) = v1 }
+trait Tagger[In <: Expr,Out <: Expr] extends (In => Out) with Serializable
+
+trait NonTagger[In <: Expr] extends Tagger[In,In] { def apply(v1: In) = v1 }
 
 object Binder {
   implicit def VariableNonBinder[V <: UntypedVariable[V],V1 <: UntypedVariable[V1],T] =
@@ -38,49 +38,49 @@ trait VariableResolutionImplicits extends EvalImplicits {
 
   def bind[V <: UntypedVariable[V],T,In<:Expr,Out<:Expr](in: In)(implicit binder: Binder[V,T,In,Out]): Out = binder(in)
 
-//  def tag[In <: Expr, Out <: Expr](in: In)(implicit tagger: Tagger[In,Out]): Out = tagger(in)
+  def tag[In <: Expr, Out <: Expr](in: In)(implicit tagger: Tagger[In,Out]): Out = tagger(in)
 
   implicit def PrimitiveExprResolver[E <: PrimitiveExpr[_]]: NonResolver[E] = new NonResolver[E] {}
 
-//  implicit def PrimitiveExprTagger[E <: PrimitiveExpr[_]]: NonTagger[E] = new NonTagger[E] {}
+  implicit def PrimitiveExprTagger[E <: PrimitiveExpr[_]]: NonTagger[E] = new NonTagger[E] {}
 
   implicit def PrimitiveExprBinder[V <: UntypedVariable[V],T,E <: PrimitiveExpr[_]](implicit ev: E <:< PrimitiveExpr[T]): NonBinder[V,T,E] =
     new NonBinder[V,T,E] {}
 
-
-//  implicit def SingleMultiplyTagger[LHS <: RingExpr,V <: UntypedVariable[V],R <: RingExpr,C[_,_],KT : ClassTag,RT]
-//  (implicit eval: Eval[LHS,C[KT,RT]], coll: Collection[C,KT,RT]): Tagger[
-//      MultiplyExpr[LHS,InfiniteMappingExpr[V,Nothing,R]],
-//      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],KT,R]]
-//        ] =
-//    new Tagger[
-//      MultiplyExpr[LHS,InfiniteMappingExpr[V,Nothing,R]],
-//      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],KT,R]]
-//        ] {
-//        def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,Nothing,R]]) =
-//          MultiplyExpr(v1.c1,InfiniteMappingExpr(v1.c2.key.tag[KT],v1.c2.value))
-//      }
-
-  implicit def toCollectionEval[C[_,_],K,R]: CollectionEval[PhysicalCollection[C,K,R],C,K,R] =
-    new CollectionEval[PhysicalCollection[C,K,R],C,K,R] { def apply(v1: PhysicalCollection[C,K,R], v2: BoundVars) = v1.value }
-
-  implicit val colEval = toCollectionEval[Map,Int,Int]
-
-  implicit def MultiplyInfResolver[
-    LHS <: RingExpr,V <: UntypedVariable[V],C[_,_],KT:ClassTag,RT,R1<:RingExpr,R2<:RingExpr,R3<:RingExpr]
-  (implicit eval: CollectionEval[LHS,C,KT,RT], binder: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
-//  (implicit eval: Eval[LHS,C[KT,RT]], coll: Collection[C,KT,RT], binder: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
-    Resolver[
-      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R3]]
-    ] =
-    new Resolver[
-      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R3]]
-      ] {
-      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
-        MultiplyExpr(v1.c1,InfiniteMappingExpr(v1.c2.key.tag[KT],resolver(binder(v1.c2.value))))
+  implicit val collEval: CollectionEval[PhysicalCollection[Map,Int,Int]] =
+    new CollectionEval[PhysicalCollection[Map,Int,Int]] {
+      def apply(v1: PhysicalCollection[Map,Int,Int], v2: BoundVars) = v1.value
     }
+
+  implicit def SingleMultiplyTagger[LHS <: RingExpr,V <: UntypedVariable[V],R <: RingExpr,C[_,_],KT : ClassTag,RT]
+  (implicit eval: CollectionEval[LHS,C,KT,RT]): Tagger[
+//  (implicit eval: Eval[LHS,C[KT,RT]], coll: Collection[C,KT,RT]): Tagger[
+      MultiplyExpr[LHS,InfiniteMappingExpr[V,R]],
+      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R]]
+        ] =
+    new Tagger[
+      MultiplyExpr[LHS,InfiniteMappingExpr[V,R]],
+      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R]]
+        ] {
+        def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R]]) =
+          MultiplyExpr(v1.c1,InfiniteMappingExpr(v1.c2.key.tag[KT],v1.c2.value))
+      }
+
+
+//  implicit def MultiplyInfResolver[
+//    LHS <: RingExpr,V <: UntypedVariable[V],C[_,_],KT:ClassTag,RT,R1<:RingExpr,R2<:RingExpr,R3<:RingExpr]
+//  (implicit eval: Eval[LHS,C[KT,RT]], coll: Collection[C,KT,RT], binder: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
+//    Resolver[
+//      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+//      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R3]]
+//    ] =
+//    new Resolver[
+//      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+//      MultiplyExpr[LHS,InfiniteMappingExpr[TypedVariable[V,KT],R3]]
+//      ] {
+//      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
+//        MultiplyExpr(v1.c1,InfiniteMappingExpr(v1.c2.key.tag[KT],resolver(binder(v1.c2.value))))
+//    }
 //
 //  def multiplyInfResolverAux[LHS <: RingExpr,V <: UntypedVariable[V],C[_,_],KT,RT,R1<:RingExpr,R2<:RingExpr,R3<:RingExpr]
 //  (eval: Eval[LHS,C[KT,RT]], resolver: Resolver[R2,R3])(implicit coll: Collection[C,KT,RT],binder: Binder[V,KT,R1,R2],ev: ClassTag[KT]) =
@@ -102,20 +102,15 @@ trait VariableResolutionImplicits extends EvalImplicits {
     new Binder[V,T,V,TypedVariable[V,T]] { def apply(v1: V): TypedVariable[V,T] = v1.tag[T] }
 
 
-//  implicit def SingleInfiniteMappingResolver[
-//    V <: UntypedVariable[V],KT,RHS1 <: RingExpr,RHS2 <: RingExpr,RHS3 <: RingExpr,RHS4 <: RingExpr
-//  ](implicit binder: Binder[V,KT,RHS1,RHS2], tagger: Tagger[RHS2,RHS3], resolver: Resolver[RHS3,RHS4]):
-//  Resolver[InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS1],InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS4]] =
-//    new Resolver[InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS1],InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS4]] {
-//      def apply(v1: InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS1]): InfiniteMappingExpr[TypedVariable[X,KT],KT,RHS4] =
-//        InfiniteMappingExpr(v1.c1,resolver(tagger(binder(v1.c2))))
-//    }
-//
-//  implicit def MultiplyResolver[L <: RingExpr, R <: RingExpr, L1 <: RingExpr, R1 <: RingExpr]
-//  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
-//    new Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] {
-//      def apply(v1: MultiplyExpr[L,R]) = MultiplyExpr(resolve1(v1.c1),resolve2(v1.c2))
-//    }
+  implicit def SingleInfiniteMappingResolver[
+    V <: UntypedVariable[V],KT,RHS1 <: RingExpr,RHS2 <: RingExpr,RHS3 <: RingExpr,RHS4 <: RingExpr
+  ](implicit binder: Binder[V,KT,RHS1,RHS2], tagger: Tagger[RHS2,RHS3], resolver: Resolver[RHS3,RHS4]):
+  Resolver[InfiniteMappingExpr[TypedVariable[X,KT],RHS1],InfiniteMappingExpr[TypedVariable[X,KT],RHS4]] =
+    new Resolver[InfiniteMappingExpr[TypedVariable[X,KT],RHS1],InfiniteMappingExpr[TypedVariable[X,KT],RHS4]] {
+      def apply(v1: InfiniteMappingExpr[TypedVariable[X,KT],RHS1]): InfiniteMappingExpr[TypedVariable[X,KT],RHS4] =
+        InfiniteMappingExpr(v1.c1,resolver(tagger(binder(v1.c2))))
+    }
+
 
 }
 //
@@ -124,23 +119,33 @@ object test extends VariableResolutionImplicits {
   def main(args: Array[String]): Unit = {
     def getTag[T](implicit ev1: ClassTag[T]): ClassTag[T] = ev1
     def getType[T](t: T)(implicit ev1: TypeTag[T]): TypeTag[T] = ev1
-    val bagOfInts = Map((1,1))
+    val bagOfInts = PhysicalCollection(Map((1,1)))
 
-    //narrows to the type of the object X when we want
-    val infMapping = InfiniteMappingExpr[X,IntExpr](X,IntExpr(1))
+
+    val infMapping = InfiniteMappingExpr[TypedVariable[X,Int],IntExpr](TypedVariable[X,Int](X),IntExpr(1))
+    val infMappingUntagged = InfiniteMappingExpr[X,IntExpr](X,IntExpr(1))
+    val resolver = SingleInfiniteMappingResolver(PrimitiveExprBinder[X,Int,IntExpr],PrimitiveExprTagger[IntExpr],PrimitiveExprResolver[IntExpr])
+    println(getType(infMapping))
+    println(getType(resolver(infMapping)))
+
+    val multExpr = MultiplyExpr(bagOfInts,infMapping)
+    val multExprUnresolved = MultiplyExpr(bagOfInts,infMappingUntagged)
+    println(getType(multExprUnresolved))
+    println(getType(tag(multExprUnresolved)))
+//    val resolved = resolve(infMapping)
 
 //    println(infMapping)
 //    println(resolve(infMapping))
 //    val infMapping = InfiniteMappingExpr[X,Nothing,IntExpr](X,IntExpr(1))
-    val multExpr = MultiplyExpr(PhysicalCollection(bagOfInts),infMapping)
+//    val multExpr = MultiplyExpr(PhysicalCollection(bagOfInts),infMapping)
 
 //    implicit val resolver = MultiplyInfResolver[PhysicalCollection[Map,Int,Int],X,Map,Int,Int,IntExpr,IntExpr,IntExpr](
 //      getTag[Int],PrimitiveExprEval[PhysicalCollection[Map,Int,Int],Map[Int,Int]],mapToCollection[Int,Int],PrimitiveExprBinder[X,Int,IntExpr],
 //      PrimitiveExprResolver[IntExpr]
 //    )
 //
-     val innerResolver = PrimitiveExprResolver[IntExpr]
-     val binder = PrimitiveExprBinder[X,Int,IntExpr]
+//     val innerResolver = PrimitiveExprResolver[IntExpr]
+//     val binder = PrimitiveExprBinder[X,Int,IntExpr]
 //     implicit val coll = mapToCollection[Int,Int]
 //     implicit val eval = PrimitiveExprEval[PhysicalCollection[Map,Int,Int],Map[Int,Int]]
 //      implicit val collEval = toCollectionEval[Map,Int,Int]
@@ -153,7 +158,6 @@ object test extends VariableResolutionImplicits {
 //    println(resolve(multExpr))
 //      val expr = For (X <-- bagOfInts) Collect IntExpr(1)
 //      implicit val
-      println(resolve(multExpr))
 //    println(resolve(expr).eval)
 //    val multExpr = MultiplyExpr(bagOfInts,infMapping)
 //    println(infMapping)
