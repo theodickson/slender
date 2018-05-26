@@ -37,10 +37,28 @@ trait DSL {
     def -->[R <: RingExpr](r: R): (K,R) = (k,r)
   }
 
-//  implicit class VariableExprOps[V[X] <: VariableExpr[X],KT](val k: V[KT]) {
-//    def <--[R <: RingExpr](r: R): (V[KT], R) = (k,r)
-////    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V[KT],KT,R] = InfiniteMappingExpr(k, r)
-//  }
+  implicit class UntypedVariableOps[V <: UntypedVariable[V]](val k: V) {
+//    def <--[R <: RingExpr](r: R): (V, R) = (k,r)
+//    def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[V,Nothing,R] = InfiniteMappingExpr(k, r)
+  }
+
+  case class ForComprehensionBuilder[V <: VariableExpr[_],R <: RingExpr,T](x: V, r1: R)
+                                                                          (implicit ev: V <:< VariableExpr[T]) {
+
+    def Collect[R2 <: RingExpr](r2: R2) = SumExpr(MultiplyExpr(r1,InfiniteMappingExpr(x,r2)))//.resolve
+
+  }
+
+  object For {
+    def apply[V <: VariableExpr[_],R <: RingExpr,T](paired: (V, R))
+                                                   (implicit ev: V <:< VariableExpr[T]): ForComprehensionBuilder[V,R,T] =
+      ForComprehensionBuilder[V,R,T](paired._1, paired._2)
+  }
+
+  //    def Yield(pair: YieldPair): RingExpr = Collect(sng(pair.k, pair.r))
+  //
+  //    def Yield(k: KeyExpr): RingExpr = Collect(sng(k))
+
 
 //  implicit class VariableOps[V <: UntypedVariable,T](v: Variable[V,T]) {
 //    def <--[E <: RingExpr,C[_,_],K,R](expr: E)(implicit eval: Eval[E,C])

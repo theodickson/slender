@@ -82,6 +82,8 @@ trait UntypedVariable[T <: UntypedVariable[T]] extends Variable[T,Nothing] with 
   type Self = T// UntypedVariable
   def bind(t: Nothing) = ???
   def tag[KT : ClassTag]: TypedVariable[T,KT] = TypedVariable[T,KT](this.asInstanceOf[T])
+//  def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
+//  def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[T,Nothing,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
 }
 
 

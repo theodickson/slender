@@ -7,6 +7,8 @@ trait Expr {
 
   def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(this.asInstanceOf[Self],Map.empty)
 
+  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(this.asInstanceOf[Self])
+
   def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(this.asInstanceOf[Self])
 
   def id = hashCode.abs.toString.take(3).toInt
