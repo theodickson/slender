@@ -77,6 +77,10 @@ case class TypedVariable[X <: UntypedVariable[X],T](name: X) extends Variable[X,
   //  override def freeVariables = Set(this)
 }
 
+trait UntypedVariableExpr[T <: UntypedVariableExpr[T]] extends VariableExpr[T] {
+  type Self = T
+  def tag[KT]: 
+}
 
 trait UntypedVariable[T <: UntypedVariable[T]] extends Variable[T,Nothing] with NullaryKeyExpr {
   type Self = T// UntypedVariable
