@@ -7,9 +7,13 @@ trait Expr {
 
   def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(this.asInstanceOf[Self],Map.empty)
 
-//  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(this.asInstanceOf[Self])
+  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(this.asInstanceOf[Self])
 
   def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(this.asInstanceOf[Self])
+
+  def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[Self,Shredded]]) = canShred.value.isDefined
+
+  def evaluable[T](implicit canEval: Perhaps[Eval[Self,_]]) = canEval.value.isDefined
 
   def id = hashCode.abs.toString.take(3).toInt
 
@@ -82,4 +86,8 @@ trait Project3Expr extends UnaryExpr {
 trait PrimitiveExpr[V] extends NullaryExpr {
   def value: V
   override def toString = value.toString
+}
+
+object Tuple2Expr {
+  def apply[R1 <: RingExpr, R2 <: RingExpr](r1: R1, r2: R2): Tuple2RingExpr[R1,R2] = Tuple2RingExpr(r1,r2)
 }

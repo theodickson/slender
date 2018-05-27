@@ -100,17 +100,9 @@ class EvaluatorTests extends FunSuite {
 //    println(query.eval)
 //  }
 //
-//  test("Inf mapping test") {
-//    val query = SumExpr(
-//      MultiplyExpr(
-//        stringCounts1,
-//        InfiniteMappingExpr(
-//          Variable[String]("x"),IntExpr(2)
-//        )
-//      )
-//    )
-//    println(query.eval)
-//  }
+  test("Inf mapping test") {
+
+  }
 //
 //  test("Rdd*inf mapping test") {
 //    val query = SumExpr(
