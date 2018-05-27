@@ -142,7 +142,9 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
 }
 
 
-object test extends VariableResolutionImplicits {
+object test {
+
+  import implicits._
 
   def main(args: Array[String]): Unit = {
     def getTag[T](implicit ev1: ClassTag[T]): ClassTag[T] = ev1
@@ -161,7 +163,9 @@ object test extends VariableResolutionImplicits {
 //    go(X)
 
 
-//    val expr2 = For ((Tuple2VariableExpr(Tuple2VariableExpr(X,Y),Z),unevenTuples)) Yield Z
+    //val tuple2maker = tuple2MakeVariableExpr[X,Y,X,Y]//(idMakeExpr[X],idMakeExpr[Y])
+
+//    val expr2 = For ( Tuple2VariableExpr(X,Y) <-- bagOfIntPairs) Yield toExpr[(X,Y),Tuple2VariableExpr[X,Y]]((X,Y))
 //    println(expr2.eval)
 //    val expr3 = For (X <-- bagOfInts) Collect ( For (Y <-- bagOfInts) Yield X )
 //    println(expr3.eval)
