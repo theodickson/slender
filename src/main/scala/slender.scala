@@ -5,7 +5,7 @@ import scala.reflect.ClassTag
 package object slender extends AlgebraImplicits with ShreddingImplicits with EvalImplicits
                                                 with DSL with VariableExprImplicits with Serializable {
 
-  type BoundVars = Map[TypedVariable[_,_],Any]
+  type BoundVars = Map[String,Any]
 
   case class PairRDD[K,R](rdd: RDD[(K,R)])
 

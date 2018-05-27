@@ -1,22 +1,21 @@
 package slender
 
-trait VariableExpr extends KeyExpr {
+trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr { self: V =>
   type Type
-  type Self <: VariableExpr
   def bind(t: Type): BoundVars
-  def <--[R <: RingExpr](r: R) = (this.asInstanceOf[Self],r)
-  def ==>[R <: RingExpr](r: R) = InfiniteMappingExpr(this.asInstanceOf[Self],r)
+  def <--[R <: RingExpr](r: R): (V,R) = (this,r)
+  def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(this,r)
 //  def <--[R <: RingExpr](r: R): (Self, R) = (this.asInstanceOf[Self],r)
 //  def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[Self,R] = InfiniteMappingExpr(this.asInstanceOf[Self],r)
 }
 
-trait Variable[X <: UntypedVariable[X]] extends VariableExpr with NullaryKeyExpr //{ type O = T }
+//trait Variable[X <: UntypedVariable[X]] extends VariableExpr[Variable[X]] with NullaryKeyExpr //{ type O = T }
 
-case class TypedVariable[X <: UntypedVariable[X],T](name: X) extends Variable[X] {
-  type Self = TypedVariable[X,T]
+case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]] with NullaryKeyExpr {
+  type Self = TypedVariable[T]
   type Type = T
-  override def toString = s""""$name""""
-  def bind(t: T) = Map(this -> t)
+  override def toString = name
+  def bind(t: T) = Map(this.name -> t)
   //  override def explain: String = s""""$name": $exprType"""
   //  override def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) = vars.get(name) match {
   //    case None | Some(`exprType`) => this
@@ -29,21 +28,24 @@ case class TypedVariable[X <: UntypedVariable[X],T](name: X) extends Variable[X]
   //  override def freeVariables = Set(this)
 }
 
-trait UntypedVariableExpr[T <: UntypedVariableExpr[T]] extends VariableExpr {
-  type Self <: UntypedVariableExpr[T]
+//trait UntypedVariableExpr[T <: UntypedVariableExpr[T]] extends VariableExpr[UntypedVariableExpr[T]] {
+//  type Self <: UntypedVariableExpr[T]
+//  type Type = Untyped
+//  def bind(t: Untyped) = ???
+////    def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
+////    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[T,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
+//}
+
+trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with NullaryKeyExpr { self: T =>
+  def name: String
+  def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name)
   type Type = Untyped
   def bind(t: Untyped) = ???
-//    def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
-//    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[T,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
-}
-
-trait UntypedVariable[T <: UntypedVariable[T]] extends Variable[T] with UntypedVariableExpr[T] with NullaryKeyExpr {
-  def tag[KT]: TypedVariable[T,KT] = TypedVariable[T,KT](this.asInstanceOf[T])
   override def toString = s""""$this:?""""
 }
 
-case class Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr](c1: V1, c2: V2)
-  extends VariableExpr with BinaryExpr with ProductExpr {
+case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
+  extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with ProductExpr {
   type Self = Tuple2VariableExpr[V1,V2]
   type Type = (c1.Type,c2.Type)
   def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
@@ -58,19 +60,21 @@ case class Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr](c1: V1, c2:
 //  def bind(t: (T1,T2,T3)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
 //}
 
-
-trait X extends UntypedVariable[X] { override def toString = "x" }
-trait Y extends UntypedVariable[Y] { override def toString = "y" }
-trait Z extends UntypedVariable[Z] { override def toString = "z" }
-trait W extends UntypedVariable[W] { override def toString = "w" }
+//trait NonBind { type Type; def bind(t: Type): BoundVars = ??? }
+//case class _X() extends VariableExpr[_X] with NullaryKeyExpr with NonBind { override def toString = "x" }
+trait X extends VariableExpr[X] with UntypedVariable[X] { override def name = "x" }
+trait Y extends VariableExpr[Y] with UntypedVariable[Y] { override def name = "y" }
+trait Z extends VariableExpr[Z] with UntypedVariable[Z] { override def name = "z" }
+trait W extends VariableExpr[W] with UntypedVariable[W] { override def name = "w" }
 
 trait VariableExprImplicits {
 
   type Untyped
 
-  implicit val X = new X {}
-  implicit val Y = new Y {}
-  implicit val Z = new Z {}
-  implicit val W = new W {}
+//  implicit val X = _X()
+    implicit val X = new X {}
+    implicit val Y = new Y {}
+    implicit val Z = new Z {}
+    implicit val W = new W {}
 
 }

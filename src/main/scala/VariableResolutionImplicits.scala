@@ -6,11 +6,11 @@ import scala.collection.immutable.Map
 
 trait Resolver[-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
-trait Binder[V <: VariableExpr,T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
+trait Binder[V <: VariableExpr[V],T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
 object Binder {
 
-  def nonBinder[V <: VariableExpr, T, E <: Expr]: Binder[V,T,E,E] =
+  def nonBinder[V <: VariableExpr[V], T, E <: Expr]: Binder[V,T,E,E] =
     new Binder[V,T,E,E] { def apply(v1: E) = v1 }
 
 }
@@ -21,30 +21,30 @@ object Resolver {
 
 
 trait LowPriorityVariableResolutionImplicits {
-  implicit def VariableNonBinder[V <: Variable[_],V1 <: Variable[_],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
+  implicit def VariableNonBinder[V <: VariableExpr[V],V1 <: VariableExpr[V1],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
   implicit def CantResolve[E <: Expr]: Resolver[E,E] = Resolver.nonResolver[E]
 }
 
 trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits {
 
   def resolve[In <: Expr, Out <: Expr](in: In)(implicit resolver: Resolver[In,Out]): Out = resolver(in)
-
-  def bind[V <: UntypedVariableExpr[V],T,In<:Expr,Out<:Expr](in: In)(implicit binder: Binder[V,T,In,Out]): Out = binder(in)
+//
+//  def bind[V <: UntypedVariableExpr[V],T,In<:Expr,Out<:Expr](in: In)(implicit binder: Binder[V,T,In,Out]): Out = binder(in)
 
   /** Base cases - primitive expressions and variables resolve to themselves, prim exprs bind to themselves, var */
   implicit def PrimitiveExprResolver[E <: PrimitiveExpr[_]]: Resolver[E,E] = Resolver.nonResolver[E]
 
-  implicit def VariableResolver[V <: UntypedVariable[V],T]: Resolver[TypedVariable[V,T],TypedVariable[V,T]] =
-    Resolver.nonResolver[TypedVariable[V,T]]
+  implicit def VariableResolver[V <: UntypedVariable[V],T]: Resolver[TypedVariable[T],TypedVariable[T]] =
+    Resolver.nonResolver[TypedVariable[T]]
 //
-  implicit def PrimitiveExprBinder[V <: VariableExpr,T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
+  implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
     Binder.nonBinder[V,T,E]
 
-  implicit def VariableBinder[V <: UntypedVariable[V],T]: Binder[V,T,V,TypedVariable[V,T]] =
-    new Binder[V,T,V,TypedVariable[V,T]] { def apply(v1: V): TypedVariable[V,T] = v1.tag[T] }
+  implicit def VariableBinder[V <: UntypedVariable[V],T]: Binder[V,T,V,TypedVariable[T]] =
+    new Binder[V,T,V,TypedVariable[T]] { def apply(v1: V): TypedVariable[T] = v1.tag[T] }
 
   implicit def UntypedTuple2Binder[
-  V <: UntypedVariable[V], T, V1 <: VariableExpr, V2 <: VariableExpr, V1B <: VariableExpr, V2B <: VariableExpr
+  V <: UntypedVariable[V], T, V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], V1B <: VariableExpr[V1B], V2B <: VariableExpr[V2B]
   ](implicit bind1: Binder[V,T,V1,V1B], bind2: Binder[V,T,V2,V2B]):
   Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] =
     new Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] {
@@ -52,7 +52,7 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
     }
 
   implicit def BindUntypedTuple2[
-  V1<:VariableExpr,V2<:VariableExpr,T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
+  V1<:VariableExpr[V1],V2<:VariableExpr[V2],T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
   ](implicit bind1: Binder[V1,T1,E1,E2],
     bind2: Binder[V2,T2,E2,E3]): Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] =
     new Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] {
@@ -61,7 +61,7 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
 
   /**Special multiply w/ inf mapping resolver*/
   implicit def MultiplyInfResolver[
-    LHS <: RingExpr,LHS1<:RingExpr, V<:VariableExpr,C[_,_],KT,VB <: VariableExpr,RT,R1<:RingExpr,R2<:RingExpr,R3<:RingExpr
+    LHS <: RingExpr,LHS1<:RingExpr, V<:VariableExpr[V],C[_,_],KT,VB <: VariableExpr[VB],RT,R1<:RingExpr,R2<:RingExpr,R3<:RingExpr
   ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
              bindLeft: Binder[V,KT,V,VB], bindRight: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
     Resolver[
@@ -105,7 +105,7 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
 //    MultiplyInfResolver(ev,eval,coll,binder,resolver)
 
   /**Special binder for inner infinite mappings - dont attempt to bind the key*/
-  implicit def InfMappingBinder[V <: UntypedVariable[V],T,K <: VariableExpr,R <: RingExpr,R1 <: RingExpr]
+  implicit def InfMappingBinder[V <: UntypedVariable[V],T,K <: VariableExpr[K],R <: RingExpr,R1 <: RingExpr]
   (implicit bindR: Binder[V,T,R,R1]): Binder[V,T,InfiniteMappingExpr[K,R],InfiniteMappingExpr[K,R1]] =
     new Binder[V,T,InfiniteMappingExpr[K,R],InfiniteMappingExpr[K,R1]] {
       def apply(v1: InfiniteMappingExpr[K,R]) = InfiniteMappingExpr(v1.key,bindR(v1.value))
@@ -151,14 +151,20 @@ object test extends VariableResolutionImplicits {
     val bagOfIntPairs = PhysicalCollection(Map((1,2) -> 1))
     val unevenTuples = PhysicalCollection(Map(((1,2),3) -> 1))
 
+    val query = For (X <-- bagOfInts) Collect IntExpr(2)
+      println(query.eval)
+//    println()
+//    println(query.eval)
+//    val expr = For ((X,bagOfInts)) Collect IntExpr(1)
+//    println(expr.eval)
+//    def go[V <: VariableExpr[V]](v: V) = println("hi")
+//    go(X)
 
-    val expr = For (X <-- bagOfInts) Collect IntExpr(1)
-    println(resolve(expr).eval)
 
-    val expr2 = For ((Tuple2VariableExpr(Tuple2VariableExpr(X,Y),Z),unevenTuples)) Yield Z
-
-    val expr3 = For (X <-- bagOfInts) Collect ( For (Y <-- bagOfInts) Yield X )
-//    println(resolve(expr2).eval)
+//    val expr2 = For ((Tuple2VariableExpr(Tuple2VariableExpr(X,Y),Z),unevenTuples)) Yield Z
+//    println(expr2.eval)
+//    val expr3 = For (X <-- bagOfInts) Collect ( For (Y <-- bagOfInts) Yield X )
+//    println(expr3.eval)
 
   }
 }

@@ -4,11 +4,11 @@ package slender
 //remove the need to tag them
 trait EvalImplicits {
 
-  implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[V,T],T] = new Eval[TypedVariable[V,T],T] {
-    def apply(v1: TypedVariable[V,T], v2: BoundVars): T = v2(v1).asInstanceOf[T]
+  implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
+    def apply(v1: TypedVariable[T], v2: BoundVars): T = v2(v1.name).asInstanceOf[T]
   }
 
-  implicit def Tuple2VariableEval[V1 <: VariableExpr,V2 <: VariableExpr,T1,T2]
+  implicit def Tuple2VariableEval[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],T1,T2]
   (implicit eval1: Eval[V1,T1], eval2: Eval[V2,T2]): Eval[Tuple2VariableExpr[V1,V2],(T1,T2)] =
     new Eval[Tuple2VariableExpr[V1,V2],(T1,T2)] {
       def apply(v1: Tuple2VariableExpr[V1,V2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
@@ -19,7 +19,7 @@ trait EvalImplicits {
     def apply(v1: E, v2: BoundVars): V = v1.value
   }
 
-  implicit def InfiniteMappingEval[V <: VariableExpr { type Type = KT },R <: RingExpr,KT,RT]
+  implicit def InfiniteMappingEval[V <: VariableExpr[V] { type Type = KT },R <: RingExpr,KT,RT]
   (implicit evalK: Eval[V,KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
     new Eval[InfiniteMappingExpr[V,R],KT => RT] {
       //todo

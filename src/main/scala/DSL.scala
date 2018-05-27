@@ -51,7 +51,7 @@ trait DSL {
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
-  case class ForComprehensionBuilder[V <: VariableExpr, R <: RingExpr](x: V, r1: R) {
+  case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr](x: V, r1: R) {
 
     //todo - nested levels of this wont work with this resolver call unless we add a low priority implicit for any expr
     //which doesnt change it at all.
@@ -80,7 +80,7 @@ trait DSL {
   }
 
   object For {
-    def apply[V <: VariableExpr, R <: RingExpr](paired: (V, R)): ForComprehensionBuilder[V, R] =
+    def apply[V <: VariableExpr[V], R <: RingExpr](paired: (V, R)): ForComprehensionBuilder[V, R] =
       ForComprehensionBuilder[V, R](paired._1, paired._2)
   }
 
