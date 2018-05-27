@@ -73,7 +73,7 @@ case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingE
 //}
 
 
-case class InfiniteMappingExpr[K <: VariableExpr[_],R <: RingExpr](key: K, value: R)//(implicit ev: K <:< VariableExpr[KT])
+case class InfiniteMappingExpr[K <: VariableExpr,R <: RingExpr](key: K, value: R)//(implicit ev: K <:< VariableExpr[KT])
   extends BinaryRingExpr {
 
   type Self = InfiniteMappingExpr[K,R]

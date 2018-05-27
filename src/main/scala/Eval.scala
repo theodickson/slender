@@ -1,6 +1,6 @@
 package slender
 
-trait Eval[-E <: Expr,+T] extends ((E,BoundVars) => T) with Serializable
+trait Eval[E <: Expr,T] extends ((E,BoundVars) => T) with Serializable
 
 //trait CollectionEval[-E <: Expr,C[_,_],K,R] extends ((E,BoundVars) => C[K,R]) with Serializable
 //
