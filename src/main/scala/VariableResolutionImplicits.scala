@@ -4,20 +4,11 @@ import scala.reflect.{ClassTag,classTag}
 import scala.reflect.runtime.universe._
 import scala.collection.immutable.Map
 
-
 trait Resolver[-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
-//trait Binder[V <: UntypedVariableExpr[V],T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 trait Binder[V <: VariableExpr,T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
-//trait VarBinder[V <: UntypedVariable[V],T,-In <: Expr,+Out <: Expr] extends Binder[V,T,In,Out]
-
-//trait NonBinder[-V <: VariableExpr[_],T,In <: Expr] extends Binder[V,T,In,In] { def apply(v1: In) = v1 }
-//trait NonBinder[V <: UntypedVariableExpr[V],T,In <: Expr] extends Binder[V,T,In,In] { def apply(v1: In) = v1 }
-
 object Binder {
-//  implicit def VariableNonBinder[V <: VariableExpr[_],V1 <: VariableExpr[_],T] = new NonBinder[V,T,V1] { }
-//  implicit def VariableNonBinder[V <: UntypedVariable[V],V1 <: UntypedVariable[V1],T] = new NonBinder[V,T,V1] { }
 
   def nonBinder[V <: VariableExpr, T, E <: Expr]: Binder[V,T,E,E] =
     new Binder[V,T,E,E] { def apply(v1: E) = v1 }
@@ -35,42 +26,16 @@ trait Priority1VariableResolutionImplicits {
 
 trait Priority2VariableResolutionImplicits extends Priority1VariableResolutionImplicits {
 
-  //create a binder for
-
-//  implicit def DownTuple2Binder[
-//    V <: VariableExpr[_],V1 <: Tuple2VariableExpr[_,_,_,_],VB1 <: Tuple2VariableExpr[_,_,_,_],
-//    VB2 <: Tuple2VariableExpr[_,_,_,_],T//,T1,T2
-//  ](implicit bind1: Binder[V,T,V1,VB1], bind2: Binder[V,T,VB1,VB2]): Binder[V,T,V1,VB2] = new Binder[V,T,V1,VB2] {
-//    def apply(v1: V1) = bind2(bind1(v1))
-//  }
-
-//  implicit def DownTuple2Binder[
-//    V <: VariableExpr[_],V1 <: VariableExpr[_],V1B <: VariableExpr[_],V2 <: VariableExpr[_],V2B <: VariableExpr[_],T,T1,T1B,T2,T2B
-//  ](implicit bind1: Binder[V,T,V1,V1B], bind2: Binder[V,T,V2,V2B],
-//    ev1: V1 <:< VariableExpr[T1],ev1b: V1B <:< VariableExpr[T1B],ev2: V2 <:< VariableExpr[T2],ev2b: V2B <:< VariableExpr[V2B]):
-//    Binder[V,T,Tuple2VariableExpr[V1,V2,_,_],Tuple2VariableExpr[V1B,V2B,_,_]] =
-//      new Binder[V,T,Tuple2VariableExpr[V1,V2,_,_],Tuple2VariableExpr[V1B,V2B,_,_]] {
-//    def apply(v1: Tuple2VariableExpr[V1,V2,_,_]) = Tuple2VariableExpr(bind1(v1.c1),bind2(v1.c2))
-//  }
-
-
   implicit def UntypedTuple2Binder[
-    V <: UntypedVariable[V], T, V1 <: Variable[_], V2 <: Variable[_], V1B <: Variable[_], V2B <: Variable[_]
+  V <: UntypedVariable[V], T, V1 <: VariableExpr, V2 <: VariableExpr, V1B <: VariableExpr, V2B <: VariableExpr
   ](implicit bind1: Binder[V,T,V1,V1B], bind2: Binder[V,T,V2,V2B]):
-    Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] =
+  Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] =
     new Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] {
       def apply(v1: Tuple2VariableExpr[V1,V2]) = Tuple2VariableExpr(bind1(v1.c1), bind2(v1.c2))
     }
-//  implicit def UpTuple2Binder[
-//  V1<:VariableExpr[_], V2<:VariableExpr[_],E1<:Expr,E2<:Expr,E3<:Expr
-//  ](implicit bind1: Binder[V1,T1,E1,E2],
-//    bind2: Binder[V2,T2,E2,E3]): Binder[Tuple2VariableExpr[V1,V2,T1,T2],(T1,T2),E1,E3] =
-//    new Binder[Tuple2VariableExpr[V1,V2,T1,T2],(T1,T2),E1,E3] {
-//      def apply(v1: E1) = bind2(bind1(v1))
-//    }
 
   implicit def BindUntypedTuple2[
-    V1<:UntypedVariable[V1], V2<:UntypedVariable[V2],T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
+    V1<:VariableExpr,V2<:VariableExpr,T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
   ](implicit bind1: Binder[V1,T1,E1,E2],
     bind2: Binder[V2,T2,E2,E3]): Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] =
     new Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] {
@@ -179,7 +144,7 @@ trait VariableResolutionImplicits extends Priority2VariableResolutionImplicits {
 
 }
 
-//
+
 object test extends VariableResolutionImplicits {
 
   def main(args: Array[String]): Unit = {
@@ -187,97 +152,15 @@ object test extends VariableResolutionImplicits {
     def getType[T](t: T)(implicit ev1: TypeTag[T]): TypeTag[T] = ev1
     val bagOfInts = PhysicalCollection(Map(1 -> 1))
     val bagOfIntPairs = PhysicalCollection(Map((1,2) -> 1))
+    val unevenTuples = PhysicalCollection(Map(((1,2),3) -> 1))
 
 
-//    val expr = For (X <-- bagOfInts) Collect IntExpr(1)
-//    println(resolve(expr))
+    val expr = For (X <-- bagOfInts) Collect IntExpr(1)
+    println(resolve(expr).eval)
 
-//    val expr2 = For (X <-- bagOfInts) Yield X
-//    println(resolve(expr2))
-//    val tupleVarExpr = Tuple2UntypedVariableExpr[X,Y](X,Y)
-//    val myBinder = selfBind(tupleVarExpr, (1,1))
-//    println(getType(myBinder))
-    val expr3 = For ((Tuple2VariableExpr(X,Y),bagOfIntPairs)) Collect IntExpr(1)
-    println(getType(resolve(expr3)))
-    println(resolve(expr3).eval)
-//      def foo[A](a: A)(implicit doFoo: CanFoo[A]): Unit = println(doFoo(a))
-//
-//      foo(1)
-//    println(getType(resolve(expr3)))
-//    println(getType(expr3))
-//    println(getType(
-//      Tuple2VariableExpr(TypedVariable[X,Int](X),Y)
-//    ))
-
-//    println(expr3.eval)
-
-//    val inner = For (Y <-- bagOfInts) Yield
-//    val outer = For (X <-- bagOfInts) Collect inner
-//    val expr = For (X <-- bagOfInts) Yield (X, For (Y <-- bagOfInts) Yield Y )
-//    println(resolve(expr).eval)
-      //val expr = For (X <-- bagOfInts) Yield ((X, For (Y <-- bagOfInts) Yield Y) )
-//
-//    println(getType(inner))
-//    println(getType(outer))
-////    println(getType(InfiniteMappingExpr(X,IntExpr(1))))
-//    println(getType(
-//      SumExpr(MultiplyExpr(bagOfInts,InfiniteMappingExpr(X,IntExpr(1))))
-//    ))
-//    println(getType(
-//      For (X <-- bagOfInts) Collect IntExpr(1)
-//    ))
-//    println(getType(For (X <-- bagOfInts)))
-//    println(getType(SngExpr(X,IntExpr(1))))
-//    println(getType(resolve(outer)))
-
-//    println(resolve(MultiplyExpr(multExprUnresolved,multExprUnresolved)).eval)
-//    println(expr2.eval)
-//    println(resolve(expr))
-//    println(resolve(expr).eval)
-//    println(getType(multExprUnresolved))
-//    println(getType(tag(multExprUnresolved)))
-//    val resolved = resolve(infMapping)
-
-//    println(infMapping)
-//    println(resolve(infMapping))
-//    val infMapping = InfiniteMappingExpr[X,Nothing,IntExpr](X,IntExpr(1))
-//    val multExpr = MultiplyExpr(PhysicalCollection(bagOfInts),infMapping)
-
-//    implicit val resolver = MultiplyInfResolver[PhysicalCollection[Map,Int,Int],X,Map,Int,Int,IntExpr,IntExpr,IntExpr](
-//      getTag[Int],PrimitiveExprEval[PhysicalCollection[Map,Int,Int],Map[Int,Int]],mapToCollection[Int,Int],PrimitiveExprBinder[X,Int,IntExpr],
-//      PrimitiveExprResolver[IntExpr]
-//    )
-//
-//     val innerResolver = PrimitiveExprResolver[IntExpr]
-//     val binder = PrimitiveExprBinder[X,Int,IntExpr]
-//     implicit val coll = mapToCollection[Int,Int]
-//     implicit val eval = PrimitiveExprEval[PhysicalCollection[Map,Int,Int],Map[Int,Int]]
-//      implicit val collEval = toCollectionEval[Map,Int,Int]
-//    implicit val tag = getTag[Int]
-//    val resolver = multiplyInfResolverAux(eval,innerResolver)
-
-//    println(getType(resolver))
-//    val resolver2 = multiplyInfResolverAux2(coll)
-//    val resolver3 = multiplyInfResolverAux3
-//    println(resolve(multExpr))
-//      val expr = For (X <-- bagOfInts) Collect IntExpr(1)
-//      implicit val
-//    println(resolve(expr).eval)
-//    val multExpr = MultiplyExpr(bagOfInts,infMapping)
-//    println(infMapping)
-//    println(multExpr)
-//    val taggedMult = tag(multExpr)//(MultiplySingleTagger[]))
-//    val resolvedInner = resolve(taggedMult.c2)
-//    println(resolvedInner)
-//    val resolved = resolve(tag(multExpr))
-//    println(resolved)
-//    println(taggedMult.getClass)
-//    println(resolvedMult)
-//    println(bind[X,Int,X,TypedVariable[X,Int]](X))
-//    println(bind[X,Int,X,X](X))
-
-
+    val expr2 = For ((Tuple2VariableExpr(Tuple2VariableExpr(X,Y),Z),unevenTuples)) Yield Z
+    println(resolve(expr2).eval)
 
   }
 }
-//
+
