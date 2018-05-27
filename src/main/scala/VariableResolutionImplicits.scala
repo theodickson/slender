@@ -20,30 +20,12 @@ object Resolver {
 }
 
 
-trait Priority1VariableResolutionImplicits {
+trait LowPriorityVariableResolutionImplicits {
   implicit def VariableNonBinder[V <: Variable[_],V1 <: Variable[_],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
+  implicit def CantResolve[E <: Expr]: Resolver[E,E] = Resolver.nonResolver[E]
 }
 
-trait Priority2VariableResolutionImplicits extends Priority1VariableResolutionImplicits {
-
-  implicit def UntypedTuple2Binder[
-  V <: UntypedVariable[V], T, V1 <: VariableExpr, V2 <: VariableExpr, V1B <: VariableExpr, V2B <: VariableExpr
-  ](implicit bind1: Binder[V,T,V1,V1B], bind2: Binder[V,T,V2,V2B]):
-  Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] =
-    new Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] {
-      def apply(v1: Tuple2VariableExpr[V1,V2]) = Tuple2VariableExpr(bind1(v1.c1), bind2(v1.c2))
-    }
-
-  implicit def BindUntypedTuple2[
-    V1<:VariableExpr,V2<:VariableExpr,T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
-  ](implicit bind1: Binder[V1,T1,E1,E2],
-    bind2: Binder[V2,T2,E2,E3]): Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] =
-    new Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] {
-      def apply(v1: E1) = bind2(bind1(v1))
-    }
-}
-
-trait VariableResolutionImplicits extends Priority2VariableResolutionImplicits {
+trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits {
 
   def resolve[In <: Expr, Out <: Expr](in: In)(implicit resolver: Resolver[In,Out]): Out = resolver(in)
 
@@ -61,6 +43,21 @@ trait VariableResolutionImplicits extends Priority2VariableResolutionImplicits {
   implicit def VariableBinder[V <: UntypedVariable[V],T]: Binder[V,T,V,TypedVariable[V,T]] =
     new Binder[V,T,V,TypedVariable[V,T]] { def apply(v1: V): TypedVariable[V,T] = v1.tag[T] }
 
+  implicit def UntypedTuple2Binder[
+  V <: UntypedVariable[V], T, V1 <: VariableExpr, V2 <: VariableExpr, V1B <: VariableExpr, V2B <: VariableExpr
+  ](implicit bind1: Binder[V,T,V1,V1B], bind2: Binder[V,T,V2,V2B]):
+  Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] =
+    new Binder[V,T,Tuple2VariableExpr[V1,V2],Tuple2VariableExpr[V1B,V2B]] {
+      def apply(v1: Tuple2VariableExpr[V1,V2]) = Tuple2VariableExpr(bind1(v1.c1), bind2(v1.c2))
+    }
+
+  implicit def BindUntypedTuple2[
+  V1<:VariableExpr,V2<:VariableExpr,T1,T2,E1<:Expr,E2<:Expr,E3<:Expr
+  ](implicit bind1: Binder[V1,T1,E1,E2],
+    bind2: Binder[V2,T2,E2,E3]): Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] =
+    new Binder[Tuple2VariableExpr[V1,V2],(T1,T2),E1,E3] {
+      def apply(v1: E1) = bind2(bind1(v1))
+    }
 
   /**Special multiply w/ inf mapping resolver*/
   implicit def MultiplyInfResolver[
@@ -159,7 +156,9 @@ object test extends VariableResolutionImplicits {
     println(resolve(expr).eval)
 
     val expr2 = For ((Tuple2VariableExpr(Tuple2VariableExpr(X,Y),Z),unevenTuples)) Yield Z
-    println(resolve(expr2).eval)
+
+    val expr3 = For (X <-- bagOfInts) Collect ( For (Y <-- bagOfInts) Yield X )
+//    println(resolve(expr2).eval)
 
   }
 }

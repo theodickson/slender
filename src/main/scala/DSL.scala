@@ -2,48 +2,48 @@ package slender
 
 trait DSL {
 
-  implicit class RingExprOps[R <: RingExpr](expr: R) {
+//  implicit class RingExprOps[R <: RingExpr](expr: R) {
+//
+//    def +[R1 <: RingExpr](expr1: R1) = AddExpr(expr, expr1)
+//
+//    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(expr, expr1)
+//
+//    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(expr, expr1)
+//
+//    def sum = SumExpr(expr)
+//
+//    def unary_- = NegateExpr(expr)
+//
+//    def unary_! = NotExpr(expr)
+//
+//    //    def _1: RingExpr = ProjectRingExpr(e, 1)
+//    //    def _2: RingExpr = ProjectRingExpr(e, 2)
+//    //
+//
+//  }
 
-    def +[R1 <: RingExpr](expr1: R1) = AddExpr(expr, expr1)
+//  implicit class KeyExprOps[K <: KeyExpr](val k: K) {
+//    //      def _1: KeyExpr = ProjectKeyExpr(k, 1)
+//    //      def _2: KeyExpr = ProjectKeyExpr(k, 2)
+//    //      def _3: KeyExpr = ProjectKeyExpr(k, 3)
+//
+//    def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(k, k1)
+//
+//    def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(k, k1))
+//
+//    def >[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ > _, ">")
+//
+//    def <[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ < _, "<")
+//
+//    def -->[R <: RingExpr](r: R): (K, R) = (k, r)
+//  }
 
-    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(expr, expr1)
+//
+//  implicit class VariableExprOps[V <: VariableExpr](val v: V) {
+//      def <--[R <: RingExpr](r: R): (V, R) = (v,r)
+//      def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(v,r)
+//  }
 
-    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(expr, expr1)
-
-    def sum = SumExpr(expr)
-
-    def unary_- = NegateExpr(expr)
-
-    def unary_! = NotExpr(expr)
-
-    //    def _1: RingExpr = ProjectRingExpr(e, 1)
-    //    def _2: RingExpr = ProjectRingExpr(e, 2)
-    //
-    def && = * _
-
-    def || = this.+ _
-  }
-
-  implicit class KeyExprOps[K <: KeyExpr](val k: K) {
-    //      def _1: KeyExpr = ProjectKeyExpr(k, 1)
-    //      def _2: KeyExpr = ProjectKeyExpr(k, 2)
-    //      def _3: KeyExpr = ProjectKeyExpr(k, 3)
-
-    def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(k, k1)
-
-    def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(k, k1))
-
-    def >[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ > _, ">")
-
-    def <[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ < _, "<")
-
-    def -->[R <: RingExpr](r: R): (K, R) = (k, r)
-  }
-
-  implicit class UntypedVariableOps[V <: UntypedVariable[V]](val k: V) {
-    //    def <--[R <: RingExpr](r: R): (V, R) = (k,r)
-    //    def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(k, r)
-  }
 
   implicit def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
@@ -56,25 +56,25 @@ trait DSL {
     //todo - nested levels of this wont work with this resolver call unless we add a low priority implicit for any expr
     //which doesnt change it at all.
 
-    def Collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]] =
-      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2)))
-
-    def Yield[K <: KeyExpr, R2 <: RingExpr](pair: (K, R2)): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,R2]]]] =
-      Collect(sng(pair._1, pair._2))
-
-    def Yield[K <: KeyExpr](k: K): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,IntExpr]]]] = Yield(k, IntExpr(1))
-
-//    def Collect[R2 <: RingExpr, Out <: Expr](r2: R2)
-//                                            (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out])
-//    = resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+//    def Collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]] =
+//      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2)))
 //
-//    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr](pair: (K, R2))
-//                                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+//    def Yield[K <: KeyExpr, R2 <: RingExpr](pair: (K, R2)): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,R2]]]] =
 //      Collect(sng(pair._1, pair._2))
 //
-//    def Yield[K <: KeyExpr, Out <: Expr](k: K)
-//                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
-//      Yield(k, IntExpr(1))
+//    def Yield[K <: KeyExpr](k: K): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,IntExpr]]]] = Yield(k, IntExpr(1))
+
+    def Collect[R2 <: RingExpr, Out <: Expr](r2: R2)
+                                            (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out])
+    = resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+
+    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr](pair: (K, R2))
+                                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+      Collect(sng(pair._1, pair._2))
+
+    def Yield[K <: KeyExpr, Out <: Expr](k: K)
+                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
+      Yield(k, IntExpr(1))
 
 
   }

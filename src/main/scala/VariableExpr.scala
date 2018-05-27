@@ -2,7 +2,10 @@ package slender
 
 trait VariableExpr extends KeyExpr {
   type Type
+  type Self <: VariableExpr
   def bind(t: Type): BoundVars
+  def <--[R <: RingExpr](r: R) = (this.asInstanceOf[Self],r)
+  def ==>[R <: RingExpr](r: R) = InfiniteMappingExpr(this.asInstanceOf[Self],r)
 //  def <--[R <: RingExpr](r: R): (Self, R) = (this.asInstanceOf[Self],r)
 //  def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[Self,R] = InfiniteMappingExpr(this.asInstanceOf[Self],r)
 }
@@ -30,20 +33,14 @@ trait UntypedVariableExpr[T <: UntypedVariableExpr[T]] extends VariableExpr {
   type Self <: UntypedVariableExpr[T]
   type Type = Untyped
   def bind(t: Untyped) = ???
-    def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
-    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[T,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
+//    def <--[R <: RingExpr](r: R): (T, R) = (this.asInstanceOf[T],r)
+//    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[T,R] = InfiniteMappingExpr(this.asInstanceOf[T],r)
 }
 
 trait UntypedVariable[T <: UntypedVariable[T]] extends Variable[T] with UntypedVariableExpr[T] with NullaryKeyExpr {
   def tag[KT]: TypedVariable[T,KT] = TypedVariable[T,KT](this.asInstanceOf[T])
   override def toString = s""""$this:?""""
 }
-
-//sealed trait Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr] extends VariableExpr
-//  with BinaryExpr with ProductExpr {
-//  def c1: V1
-//  def c2: V2
-//}
 
 case class Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr](c1: V1, c2: V2)
   extends VariableExpr with BinaryExpr with ProductExpr {
@@ -59,11 +56,6 @@ case class Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr](c1: V1, c2:
 //    with TernaryExpr with ProductExpr {
 //  type Self = Tuple3VariableExpr[V1,V2,V3,T1,T2,T3]
 //  def bind(t: (T1,T2,T3)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
-//}
-
-//case class Tuple2UntypedVariableExpr[V1 <: UntypedVariableExpr[V1], V2 <: UntypedVariableExpr[V2]](c1: V1, c2: V2)
-//  extends UntypedVariableExpr[Tuple2UntypedVariableExpr[V1,V2]] with Tuple2VariableExpr[V1,V2,Untyped,Untyped] {
-//  type Self = Tuple2UntypedVariableExpr[V1,V2]
 //}
 
 
@@ -82,16 +74,3 @@ trait VariableExprImplicits {
   implicit val W = new W {}
 
 }
-
-//object test {
-//  def main(args: Array[String]): Unit = {
-//    val variable = X
-//    val tagged = variable.tag[Int]
-//    val bound = tagged.bind(1)
-//    println(bound)
-//
-//    val bagOfInts = PhysicalCollection(Map(1 -> 1))
-//    val expr = SumExpr(MultiplyExpr(bagOfInts,InfiniteMappingExpr(TypedVariable[X,Int](X), IntExpr(1))))
-//    println(expr.eval)
-//  }
-//}

@@ -16,6 +16,10 @@ trait RingExpr extends Expr { //self : Self =>
 
   def unary_! = NotExpr(this)
 
+  def && = * _
+
+  def || = this.+ _
+
 }
 
 trait NullaryRingExpr extends RingExpr with NullaryExpr
