@@ -51,29 +51,37 @@ trait DSL {
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
-  case class ForComprehensionBuilder[V <: VariableExpr[_], R <: RingExpr, T](x: V, r1: R) {
+  case class ForComprehensionBuilder[V <: VariableExpr[_], R <: RingExpr](x: V, r1: R) {
 
     //todo - nested levels of this wont work with this resolver call unless we add a low priority implicit for any expr
     //which doesnt change it at all.
 
-    def Collect[R2 <: RingExpr, Out <: Expr](r2: R2)
-                                            (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out])
-    = resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+    def Collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]] =
+      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2)))
 
-    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr](pair: (K, R2))
-                                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+    def Yield[K <: KeyExpr, R2 <: RingExpr](pair: (K, R2)): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,R2]]]] =
       Collect(sng(pair._1, pair._2))
 
-    def Yield[K <: KeyExpr, Out <: Expr](k: K)
-                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
-      Yield(k, IntExpr(1))
+    def Yield[K <: KeyExpr](k: K): SumExpr[MultiplyExpr[R,InfiniteMappingExpr[V,SngExpr[K,IntExpr]]]] = Yield(k, IntExpr(1))
+
+//    def Collect[R2 <: RingExpr, Out <: Expr](r2: R2)
+//                                            (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out])
+//    = resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+//
+//    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr](pair: (K, R2))
+//                                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+//      Collect(sng(pair._1, pair._2))
+//
+//    def Yield[K <: KeyExpr, Out <: Expr](k: K)
+//                                        (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
+//      Yield(k, IntExpr(1))
 
 
   }
 
   object For {
-    def apply[V <: VariableExpr[_], R <: RingExpr, T](paired: (V, R)): ForComprehensionBuilder[V, R, T] =
-      ForComprehensionBuilder[V, R, T](paired._1, paired._2)
+    def apply[V <: VariableExpr[_], R <: RingExpr](paired: (V, R)): ForComprehensionBuilder[V, R] =
+      ForComprehensionBuilder[V, R](paired._1, paired._2)
   }
 
 }
