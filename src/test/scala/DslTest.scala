@@ -40,22 +40,22 @@ class DslTests extends FunSuite {
   test("") {
     import implicits._
 
-    val query1 = For (X <-- stringCounts1) Yield (X,
-      For (X <-- stringCounts1) Yield (
-        (X, For (X <-- stringCounts1) Yield X)
-      )
-    )
-    println(query1.eval)
-
-    val query = For ((X,Y) <-- bagOfIntPairs) Yield (
-      (X, For ((Z,W) <-- bagOfIntPairs) Yield (
-        (Z, For ((X1,Y1) <-- bagOfIntPairs) Yield (
-          (Y, For ((W1,W1) <-- bagOfIntPairs) Yield Z)
-        ))
-        )
-      )
-    )
-    println(query.eval)
+//    val query1 = For (X <-- stringCounts1) Yield (X,
+//      For (X <-- stringCounts1) Yield (
+//        (X, For (X <-- stringCounts1) Yield X)
+//      )
+//    )
+//    println(query1.eval)
+//
+//    val query = For ((X,Y) <-- bagOfIntPairs) Yield (
+//      (X, For ((Z,W) <-- bagOfIntPairs) Yield (
+//        (Z, For ((X1,Y1) <-- bagOfIntPairs) Yield (
+//          (Y, For ((W1,W1) <-- bagOfIntPairs) Yield Z)
+//        ))
+//        )
+//      )
+//    )
+//    println(query.eval)
   }
 
 }

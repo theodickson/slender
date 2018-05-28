@@ -147,6 +147,10 @@ case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
 ////  }
 ////}
 ////
+
+case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+  type Self = ToRingExpr[E]
+}
 //case class FromBoxedRing[R,E <: Expr[R,E]](c1: BoxedRingExpr[R,E]) extends Expr[R,FromBoxedRing[R,E]] with UnaryExpr[R,BoxedRingExpr[R,E]] {
 ////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 ////    FromBoxedRing(c1.replaceTypes(vars, overwrite))

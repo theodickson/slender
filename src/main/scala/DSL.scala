@@ -2,48 +2,6 @@ package slender
 
 trait DSL {
 
-//  implicit class RingExprOps[R <: RingExpr](expr: R) {
-//
-//    def +[R1 <: RingExpr](expr1: R1) = AddExpr(expr, expr1)
-//
-//    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(expr, expr1)
-//
-//    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(expr, expr1)
-//
-//    def sum = SumExpr(expr)
-//
-//    def unary_- = NegateExpr(expr)
-//
-//    def unary_! = NotExpr(expr)
-//
-//    //    def _1: RingExpr = ProjectRingExpr(e, 1)
-//    //    def _2: RingExpr = ProjectRingExpr(e, 2)
-//    //
-//
-//  }
-
-//  implicit class KeyExprOps[K <: KeyExpr](val k: K) {
-//    //      def _1: KeyExpr = ProjectKeyExpr(k, 1)
-//    //      def _2: KeyExpr = ProjectKeyExpr(k, 2)
-//    //      def _3: KeyExpr = ProjectKeyExpr(k, 3)
-//
-//    def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(k, k1)
-//
-//    def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(k, k1))
-//
-//    def >[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ > _, ">")
-//
-//    def <[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ < _, "<")
-//
-//    def -->[R <: RingExpr](r: R): (K, R) = (k, r)
-//  }
-
-//
-//  implicit class VariableExprOps[V <: VariableExpr](val v: V) {
-//      def <--[R <: RingExpr](r: R): (V, R) = (v,r)
-//      def ==>[R <: RingExpr,T](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(v,r)
-//  }
-//  trait MakeRing
   trait MakeExpr[X,E <: Expr] extends (X => E)
 
   implicit def toExpr[X,E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
@@ -83,7 +41,7 @@ trait DSL {
 
   def toK[E <: RingExpr](e: E): BoxedRingExpr[E] = BoxedRingExpr(e)
 
-//  def fromK[E <: RingExpr](e: BoxedRingExpr[E]): E = e.c1
+  def toRing[E <: Expr](e: E): ToRingExpr[E] = ToRingExpr(e)
 
   implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
@@ -91,17 +49,17 @@ trait DSL {
 
     def Collect[R2 <: RingExpr, Out <: Expr]
       (r2: R2)
-      (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out]) =
+      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]], Out]) =
         resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
 
     def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
       (pair: (K, R2))
-      (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
+      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
         Collect(sng(pair._1, pair._2))
 
     def Yield[K <: KeyExpr, Out <: Expr]
       (k: K)
-      (implicit resolver: Resolver[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
+      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
         Yield(k, IntExpr(1))
 
   }
@@ -110,10 +68,10 @@ trait DSL {
     def apply[V <: VariableExpr[V], R <: RingExpr](paired: (V, R)): ForComprehensionBuilder[V, R] =
       ForComprehensionBuilder[V, R](paired._1, paired._2)
   }
-//
-//  implicit class IffImplicit[V <: VariableExpr[V], R <: RingExpr](pair: (V,R)) {
-//    def iff[R1 <: RingExpr](r1: R1) = (pair._1,pair._2 dot r1)
-//  }
+
+  implicit class IffImplicit[V <: VariableExpr[V], R <: RingExpr](pair: (V,R)) {
+    def iff[R1 <: RingExpr](r1: R1): (V,(R,R1)) = (pair._1,pair._2 dot r1)
+  }
 
 }
 

@@ -41,17 +41,19 @@ case class Tuple3VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <
 }
 
 
-trait _X extends VariableExpr[_X] with UntypedVariable[_X] { override def name = "x" }
-trait _Y extends VariableExpr[_Y] with UntypedVariable[_Y] { override def name = "y" }
-trait _Z extends VariableExpr[_Z] with UntypedVariable[_Z] { override def name = "z" }
-trait _W extends VariableExpr[_W] with UntypedVariable[_W] { override def name = "w" }
+trait _X extends UntypedVariable[_X] { override def name = "x" }
+trait _Y extends UntypedVariable[_Y] { override def name = "y" }
+trait _Z extends UntypedVariable[_Z] { override def name = "z" }
+trait _W extends UntypedVariable[_W] { override def name = "w" }
 
-trait _X1 extends VariableExpr[_X1] with UntypedVariable[_X1] { override def name = "x1" }
-trait _Y1 extends VariableExpr[_Y1] with UntypedVariable[_Y1] { override def name = "y1" }
-trait _Z1 extends VariableExpr[_Z1] with UntypedVariable[_Z1] { override def name = "z1" }
-trait _W1 extends VariableExpr[_W1] with UntypedVariable[_W1] { override def name = "w1" }
+trait _X1 extends UntypedVariable[_X1] { override def name = "x1" }
+trait _Y1 extends UntypedVariable[_Y1] { override def name = "y1" }
+trait _Z1 extends UntypedVariable[_Z1] { override def name = "z1" }
+trait _W1 extends UntypedVariable[_W1] { override def name = "w1" }
 
 trait Variables {
+
+
 
   val X = new _X {}
   val Y = new _Y {}

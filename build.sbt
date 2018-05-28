@@ -12,4 +12,4 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value
 )
 
-//scalacOptions in ThisBuild += "-Xlog-implicits"
+scalacOptions in ThisBuild += "-Xlog-implicits"

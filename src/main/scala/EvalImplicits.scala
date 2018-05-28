@@ -77,6 +77,11 @@ trait EvalImplicits {
       def apply(v1: BoxedRingExpr[R],v2: BoundVars): T = eval(v1.c1,v2)
     }
 
+  implicit def ToRingEval[E <: Expr,RT](implicit eval: Eval[E,RT], ring: Ring[RT]): Eval[ToRingExpr[E],RT] =
+    new Eval[ToRingExpr[E],RT] {
+      def apply(v1: ToRingExpr[E],v2: BoundVars): RT = eval(v1.c1,v2)
+    }
+
   implicit def LabelEval[R <: RingExpr,T](implicit eval: Eval[R,T]): Eval[LabelExpr[R],Label[R,T]] =
     new Eval[LabelExpr[R],Label[R,T]] {
       //todo = filter vars to free variables actually in v1.c1

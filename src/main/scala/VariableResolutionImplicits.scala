@@ -1,6 +1,24 @@
 package slender
 
-trait Resolver[-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
+/**Base trait for resolvers.
+  * Instances of ResolverBase may be provided by the implicit CantResolve method, which which will be provide a
+  * 'do-nothing' resolver for any expression.
+  * Instances of Resolver are only provided by methods which construct fully correct resolvers. I.e. those whose output is
+  * an expression without any untyped variables.
+  *
+  * This split exists so that the main 'resolve' method on an expression can require a correct resolver. Thus explicit
+  * uses of '.resolve' will not compile unless the expression can genuinely be resolved.
+  *
+  * However, the For comprehension consturct, which we would like to automatically resolve its output expressions,
+  * must therefore be able to call resolve on its output without being able to fully resolve the output, since this
+  * will not be possible for inner For comprehensions which reference outer variables.
+  *
+  * This has the side-effect of not being able to tell if the result of an outermost For comprehension is actually
+  * resolved without either calling 'isResolved' or explicitly re-resolving, but its a good interim solution.
+*/
+trait ResolverBase[-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
+
+trait Resolver[-In <: Expr,+Out <: Expr] extends ResolverBase[In,Out]
 
 trait Binder[V <: VariableExpr[V],T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
@@ -14,8 +32,8 @@ object Resolver {
 }
 
 trait LowPriorityVariableResolutionImplicits {
+  implicit def CantResolve[E <: Expr]: ResolverBase[E,E] = new ResolverBase[E,E] { def apply(v1: E) = v1 }
   implicit def VariableNonBinder[V <: VariableExpr[V],V1 <: VariableExpr[V1],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
-  implicit def CantResolve[E <: Expr]: Resolver[E,E] = Resolver.nonResolver[E]
 }
 
 trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits {
@@ -89,6 +107,13 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
   (implicit bindL: Binder[V,T,L,L1], bindR: Binder[V,T,R,R1]): Binder[V,T,MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
     new Binder[V,T,MultiplyExpr[L,R],MultiplyExpr[L1,R1]] { def apply(v1: MultiplyExpr[L,R]) = MultiplyExpr(bindL(v1.c1),bindR(v1.c2)) }
 
+  implicit def DotBinder[V <: UntypedVariable[V],T,L <: RingExpr,R <: RingExpr,L1 <: RingExpr,R1 <: RingExpr]
+  (implicit bindL: Binder[V,T,L,L1], bindR: Binder[V,T,R,R1]): Binder[V,T,DotExpr[L,R],DotExpr[L1,R1]] =
+    new Binder[V,T,DotExpr[L,R],DotExpr[L1,R1]] { def apply(v1: DotExpr[L,R]) = DotExpr(bindL(v1.c1),bindR(v1.c2)) }
+
+  implicit def ToRingBinder[V <: UntypedVariable[V],T,R <: Expr,R1 <: Expr]
+  (implicit bind: Binder[V,T,R,R1]): Binder[V,T,ToRingExpr[R],ToRingExpr[R1]] =
+    new Binder[V,T,ToRingExpr[R],ToRingExpr[R1]] { def apply(v1: ToRingExpr[R]) = ToRingExpr(bind(v1.c1)) }
 
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
@@ -138,6 +163,17 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
     new Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] {
       def apply(v1: MultiplyExpr[L,R]) = MultiplyExpr(resolve1(v1.c1),resolve2(v1.c2))
     }
+
+  implicit def DotResolver[L <: RingExpr, R <: RingExpr, L1 <: RingExpr, R1 <: RingExpr]
+  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[DotExpr[L,R],DotExpr[L1,R1]] =
+    new Resolver[DotExpr[L,R],DotExpr[L1,R1]] {
+      def apply(v1: DotExpr[L,R]) = DotExpr(resolve1(v1.c1),resolve2(v1.c2))
+    }
+
+  implicit def ToRingResolver[R <: Expr,R1 <: Expr]
+  (implicit resolve: Resolver[R,R1]):Resolver[ToRingExpr[R],ToRingExpr[R1]] =
+    new Resolver[ToRingExpr[R],ToRingExpr[R1]] { def apply(v1: ToRingExpr[R]) = ToRingExpr(resolve(v1.c1)) }
+
 
 }
 //
