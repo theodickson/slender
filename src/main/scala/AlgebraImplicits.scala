@@ -1,6 +1,7 @@
 package slender
 
 import scala.reflect.ClassTag
+import scala.collection.immutable.Map
 
 trait AlgebraImplicits {
 
@@ -35,14 +36,14 @@ trait AlgebraImplicits {
     }
 
   implicit def mapToCollection[K, R](implicit ring: Ring[R]): Collection[Map, K, R] = new Collection[Map, K, R] {
-    def zero = Map.empty[K, R]
+    def zero: Map[K, R] = Map.empty[K,R]
 
     def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
       t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
 
-    def not(t1: Map[K,R]) = t1.mapValues(ring.not)
+    def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }//t1.mapValues(ring.not)
 
-    def negate(t1: Map[K,R]) = t1.mapValues(ring.negate)
+    def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) } //Values(ring.negate)
 
     def sum(c: Map[K, R]): R = c.values.reduce(ring.add)
 
@@ -75,12 +76,12 @@ trait AlgebraImplicits {
 
   implicit def pushDownDotLeft[K, R, O](implicit recur: Dot[R, Int, O]): Dot[Map[K, R], Int, Map[K, O]] =
     new Dot[Map[K, R], Int, Map[K, O]] {
-      def apply(t1: Map[K, R], t2: Int): Map[K, O] = t1 mapValues { v => recur(v, t2) }
+      def apply(t1: Map[K, R], t2: Int): Map[K, O] = t1 map { case (k,v) => (k,recur(v, t2)) }
     }
 
   implicit def pushDownDotRight[K, R, O](implicit recur: Dot[Int, R, O]): Dot[Int, Map[K, R], Map[K, O]] =
     new Dot[Int, Map[K, R], Map[K, O]] {
-      def apply(t1: Int, t2: Map[K, R]): Map[K, O] = t2 mapValues { v => recur(t1, v) }
+      def apply(t1: Int, t2: Map[K, R]): Map[K, O] = t2 map { case (k,v) => (k,recur(t1, v)) }
     }
 
   implicit def productDots[K1, K2, R1, R2, O](implicit recur: Dot[R1, R2, O]): Dot[Map[K1, R1], Map[K2, R2], Map[(K1, K2), O]] =

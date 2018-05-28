@@ -31,21 +31,45 @@ object Resolver {
   def nonResolver[E <: Expr]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
 }
 
-trait LowPriorityVariableResolutionImplicits {
+trait Priority1VariableResolutionImplicits {
   implicit def CantResolve[E <: Expr]: ResolverBase[E,E] = new ResolverBase[E,E] { def apply(v1: E) = v1 }
   implicit def VariableNonBinder[V <: VariableExpr[V],V1 <: VariableExpr[V1],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
+
+//  trait BinaryConstructor[B[_ <: Expr,_ <: Expr],E1 <: Expr,E2 <: Expr] {
+//    def apply(v1: E1, v2: E2): B[E1,E2]
+//  }
+//
+//  implicit def MyDotConstructor[E1 <: Expr, E2 <: Expr]: BinaryConstructor[MyDotExpr,E1,E2] =
+//    new BinaryConstructor[MyDotExpr,E1,E2] {
+//      def apply(v1: E1, v2: E2): MyDotExpr[E1,E2] = MyDotExpr(v1,v2)
+//    }
+//
+//  case class MyDotExpr[E1 <: Expr, E2 <: Expr](c1: E1, c2: E2) extends MyBinaryExpr[E1,E2]
+//
+//  implicit def BinaryResolver[E1 <: Expr, E2 <: Expr, E1B <: Expr, E2B <: Expr, B[_,_],B1 <: MyBinaryExpr[E1,E2],
+//  B2 <: MyBinaryExpr[E1B,E2B]]
+//  (implicit ev: B[E1B,E2B] =:= B2,
+//   resolve1: Resolver[E1,E1B], resolve2: Resolver[E2,E2B], construct: BinaryConstructor[B,E1B,E2B]):
+//  Resolver[B1,B2] = new Resolver[B1,B2] {
+//    def apply(v1: B1) = construct(resolve1(v1.c1),resolve2(v1.c2))
+//  }
 }
 
-trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits {
+trait Priority2VariableResolutionImplicits extends Priority1VariableResolutionImplicits {
 
   /** Binding base cases - primitive expressions don't need to bind anything, variables bind iff they are untyped variables
     * matching the type in the binder. (otherwise they use the low priority non-binding case)
     */
-  implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
-    Binder.nonBinder[V,T,E]
+//  implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
+//    Binder.nonBinder[V,T,E]
 
-  implicit def VariableBinder[V <: UntypedVariable[V],T]: Binder[V,T,V,TypedVariable[T]] =
-    new Binder[V,T,V,TypedVariable[T]] { def apply(v1: V): TypedVariable[T] = v1.tag[T] }
+//  implicit def IntExprBinder[V <: VariableExpr[V],T]: Binder[V,T,IntExpr,IntExpr] = Binder.nonBinder[V,T,IntExpr]
+
+  implicit def PhysicalCollectionNonBinder[V <: VariableExpr[V],T,C[_,_],K,R]:
+    Binder[V,T,PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] = Binder.nonBinder[V,T,PhysicalCollection[C,K,R]]
+
+  implicit def VariableBinder[V <: UntypedVariable[V],T,V1 <: UntypedVariable[V1]](implicit ev: V1 <:< V): Binder[V,T,V1,TypedVariable[T]] =
+    new Binder[V,T,V1,TypedVariable[T]] { def apply(v1: V1): TypedVariable[T] = v1.tag[T] }
 
 
   /**Special case for lifting two binders to a binder for a Tuple2Variable Expr - this lifted binder simply applies
@@ -115,6 +139,24 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
   (implicit bind: Binder[V,T,R,R1]): Binder[V,T,ToRingExpr[R],ToRingExpr[R1]] =
     new Binder[V,T,ToRingExpr[R],ToRingExpr[R1]] { def apply(v1: ToRingExpr[R]) = ToRingExpr(bind(v1.c1)) }
 
+  implicit def BoxedRingBinder[V <: UntypedVariable[V],T,R <: RingExpr,R1 <: RingExpr]
+  (implicit bind: Binder[V,T,R,R1]): Binder[V,T,BoxedRingExpr[R],BoxedRingExpr[R1]] =
+    new Binder[V,T,BoxedRingExpr[R],BoxedRingExpr[R1]] {
+      def apply(v1: BoxedRingExpr[R]) = BoxedRingExpr(bind(v1.c1))
+    }
+
+  implicit def Tuple2KeyBinder[V <: UntypedVariable[V],T,K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit bind1: Binder[V,T,K1,K1B], bind2: Binder[V,T,K2,K2B]): Binder[V,T,Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] =
+    new Binder[V,T,Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] {
+      def apply(v1: Tuple2KeyExpr[K1,K2]) = Tuple2KeyExpr(bind1(v1.c1),bind2(v1.c2))
+    }
+
+  implicit def EqualsPredicateBinder[V <: UntypedVariable[V],T,K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit bind1: Binder[V,T,K1,K1B], bind2: Binder[V,T,K2,K2B]): Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
+    new Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] {
+      def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(bind1(v1.c1),bind2(v1.c2))
+    }
+
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
   implicit def PrimitiveExprResolver[E <: PrimitiveExpr[_]]: Resolver[E,E] = Resolver.nonResolver[E]
@@ -174,8 +216,39 @@ trait VariableResolutionImplicits extends LowPriorityVariableResolutionImplicits
   (implicit resolve: Resolver[R,R1]):Resolver[ToRingExpr[R],ToRingExpr[R1]] =
     new Resolver[ToRingExpr[R],ToRingExpr[R1]] { def apply(v1: ToRingExpr[R]) = ToRingExpr(resolve(v1.c1)) }
 
+  implicit def BoxedRingResolver[R <: Expr,R1 <: RingExpr]
+  (implicit resolve: Resolver[R,R1]):Resolver[BoxedRingExpr[R],BoxedRingExpr[R1]] =
+    new Resolver[BoxedRingExpr[R],BoxedRingExpr[R1]] { def apply(v1: BoxedRingExpr[R]) = BoxedRingExpr(resolve(v1.c1)) }
+
+
+  implicit def Tuple2KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] =
+    new Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] {
+      def apply(v1: Tuple2KeyExpr[K1,K2]) = Tuple2KeyExpr(resolve1(v1.c1),resolve2(v1.c2))
+    }
+
+  implicit def Tuple2VariableResolver[K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B]]
+  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] =
+    new Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] {
+      def apply(v1: Tuple2VariableExpr[K1,K2]) = Tuple2VariableExpr(resolve1(v1.c1),resolve2(v1.c2))
+    }
+
+  implicit def EqualsPredicateResolver[K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
+    new Resolver[EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] {
+      def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(resolve1(v1.c1),resolve2(v1.c2))
+    }
+
 
 }
+
+trait Priority3VariableResolutionImplicits extends Priority2VariableResolutionImplicits {
+    implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
+      Binder.nonBinder[V,T,E]
+}
+
+trait VariableResolutionImplicits extends Priority3VariableResolutionImplicits
+
 //
 //
 //object test {

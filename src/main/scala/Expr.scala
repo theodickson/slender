@@ -67,6 +67,12 @@ trait BinaryExpr extends Expr with C1Expr with C2Expr {
   def children = List(c1, c2)
 }
 
+trait MyBinaryExpr[E1 <: Expr, E2 <: Expr] extends Expr {
+  def c1: E1
+  def c2: E2
+  def children = List(c1,c2)
+}
+
 trait TernaryExpr extends Expr with C1Expr with C2Expr with C3Expr {
   def children = List(c1, c2, c3)
 }

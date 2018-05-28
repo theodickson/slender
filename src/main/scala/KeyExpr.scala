@@ -12,8 +12,10 @@ trait KeyExpr extends Expr { //self : Self =>
   def >[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ > _, ">")
   def <[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ < _, "<")
 
-  def -->[R <: RingExpr](r: R): (Self,R) = (self,r)
+  def -->[R <: RingExpr](r: R): KeyRingPair[Self,R] = KeyRingPair(self,r)
 }
+
+case class KeyRingPair[V <: KeyExpr, R <: RingExpr](k: V, r: R)
 
 trait NullaryKeyExpr extends KeyExpr with NullaryExpr
 trait UnaryKeyExpr extends KeyExpr with UnaryExpr
@@ -54,9 +56,8 @@ case class Project3KeyExpr[K <: KeyExpr with C3Expr](c1: K) extends UnaryKeyExpr
   type Self = Project3KeyExpr[K]
 }
 
-trait ToK extends UnaryKeyExpr
 
-case class BoxedRingExpr[R <: Expr](c1: R) extends ToK {
+case class BoxedRingExpr[R <: Expr](c1: R) extends UnaryKeyExpr {
   type Self = BoxedRingExpr[R]
   override def toString = s"[$c1]"
 }
