@@ -6,13 +6,13 @@ trait KeyExpr extends Expr { //self : Self =>
 
   type Self <: KeyExpr
 
-  def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(this, k1)
-  def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(this, k1))
+  def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(self, k1)
+  def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(self, k1))
 
-  def >[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ > _, ">")
-  def <[K1 <: KeyExpr](k1: K1) = IntPredicate(this, k1, _ < _, "<")
+  def >[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ > _, ">")
+  def <[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ < _, "<")
 
-  def -->[R <: RingExpr](r: R): (Self,R) = (this.asInstanceOf[Self],r)
+  def -->[R <: RingExpr](r: R): (Self,R) = (self,r)
 }
 
 trait NullaryKeyExpr extends KeyExpr with NullaryExpr

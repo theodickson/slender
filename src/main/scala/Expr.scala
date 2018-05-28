@@ -1,15 +1,21 @@
 package slender
 
 trait Expr {
+
   type Self <: Expr
+
+  //todo - figure out if can make Expr F-bound or use the self type pattern somehow.
+  //dont think so - had to make VariablExpr F-bound, which interestingly meant UntypedVariable could not be F-bound,
+  //see that code for details.
+  def self: Self = this.asInstanceOf[Self]
 
   def children: List[Expr]
 
-  def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(this.asInstanceOf[Self],Map.empty)
+  def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(self,Map.empty)
 
-  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(this.asInstanceOf[Self])
+  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(self)
 
-  def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(this.asInstanceOf[Self])
+  def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(self)
 
   def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[Self,Shredded]]) = canShred.value.isDefined
 
@@ -17,6 +23,7 @@ trait Expr {
 
   def id = hashCode.abs.toString.take(3).toInt
 
+  def isResolved: Boolean = children.forall(_.isResolved)
 
 //  def variables: Set[Variable[_]] =
 //    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.variables)

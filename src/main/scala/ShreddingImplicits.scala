@@ -2,15 +2,15 @@ package slender
 
 trait ShreddingImplicits {
 
-//  implicit def VariableShredder[K]: NonShredder[Variable[K]] = new NonShredder[Variable[K]] { }
+  implicit def VariableShredder[V <: VariableExpr[V]]: NonShredder[V] = new NonShredder[V] {}
 
   implicit def PrimitiveExprShredder[E <: PrimitiveExpr[_]]: NonShredder[E] = new NonShredder[E] {}
 
-//  implicit def InfiniteMappingShredder[K,R <: RingExpr,RS <: RingExpr](implicit shred: Shredder[R,RS]):
-//  Shredder[InfiniteMappingExpr[K,R],InfiniteMappingExpr[K,RS]] =
-//    new Shredder[InfiniteMappingExpr[K,R],InfiniteMappingExpr[K,RS]] {
-//      def apply(v1: InfiniteMappingExpr[K,R]): InfiniteMappingExpr[K,RS] = InfiniteMappingExpr(v1.key,shred(v1.value))
-//    }
+  implicit def InfiniteMappingShredder[V <: VariableExpr[V],R <: RingExpr,RS <: RingExpr](implicit shred: Shredder[R,RS]):
+  Shredder[InfiniteMappingExpr[V,R],InfiniteMappingExpr[V,RS]] =
+    new Shredder[InfiniteMappingExpr[V,R],InfiniteMappingExpr[V,RS]] {
+      def apply(v1: InfiniteMappingExpr[V,R]): InfiniteMappingExpr[V,RS] = InfiniteMappingExpr(v1.key,shred(v1.value))
+    }
 
   implicit def MultiplyShredder[R1 <: RingExpr, R2 <: RingExpr, R1S <: RingExpr, R2S <: RingExpr]
   (implicit shred1: Shredder[R1,R1S], shred2: Shredder[R2,R2S]): Shredder[MultiplyExpr[R1,R2],MultiplyExpr[R1S,R2S]] =

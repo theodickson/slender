@@ -13,6 +13,7 @@ case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]]
   type Type = T
   override def toString = name
   def bind(t: T) = Map(this.name -> t)
+  override def isResolved = true
 }
 
 
@@ -22,6 +23,7 @@ trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with Nullary
   type Type = Untyped
   def bind(t: Untyped) = ???
   override def toString = s""""$this:?""""
+  override def isResolved = false
 }
 
 case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
@@ -31,18 +33,25 @@ case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1:
   def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
 }
 
+case class Tuple3VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3]](c1: V1, c2: V2, c3: V3)
+  extends VariableExpr[Tuple3VariableExpr[V1,V2,V3]] with BinaryExpr with ProductExpr {
+  type Self = Tuple3VariableExpr[V1,V2,V3]
+  type Type = (c1.Type,c2.Type,c3.Type)
+  def bind(t: (c1.Type,c2.Type,c3.Type)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
+}
+
 
 trait _X extends VariableExpr[_X] with UntypedVariable[_X] { override def name = "x" }
 trait _Y extends VariableExpr[_Y] with UntypedVariable[_Y] { override def name = "y" }
 trait _Z extends VariableExpr[_Z] with UntypedVariable[_Z] { override def name = "z" }
 trait _W extends VariableExpr[_W] with UntypedVariable[_W] { override def name = "w" }
 
-trait _X1 extends VariableExpr[_X1] with UntypedVariable[_X1] { override def name = "x" }
-trait _Y1 extends VariableExpr[_Y1] with UntypedVariable[_Y1] { override def name = "y" }
-trait _Z1 extends VariableExpr[_Z1] with UntypedVariable[_Z1] { override def name = "z" }
-trait _W1 extends VariableExpr[_W1] with UntypedVariable[_W1] { override def name = "w" }
+trait _X1 extends VariableExpr[_X1] with UntypedVariable[_X1] { override def name = "x1" }
+trait _Y1 extends VariableExpr[_Y1] with UntypedVariable[_Y1] { override def name = "y1" }
+trait _Z1 extends VariableExpr[_Z1] with UntypedVariable[_Z1] { override def name = "z1" }
+trait _W1 extends VariableExpr[_W1] with UntypedVariable[_W1] { override def name = "w1" }
 
-trait VariableExprImplicits {
+trait Variables {
 
   val X = new _X {}
   val Y = new _Y {}
