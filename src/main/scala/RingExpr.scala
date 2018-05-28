@@ -27,12 +27,12 @@ trait RingExpr[E <: Expr[E]] extends Expr[E] { self : E =>
 
 //trait PrimitiveRingExpr[T] extends RingExpr with PrimitiveExpr[T]
 
-case class IntExpr(value: Int) extends RingExpr[IntExpr] with PrimitiveExpr[Int] {
+case class IntExpr(value: Int) extends RingExpr[IntExpr] with PrimitiveExpr[Int,IntExpr] {
   type Self = IntExpr
 }
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])
-  extends RingExpr[PhysicalCollection[C,K,R]] with PrimitiveExpr[C[K,R]]
+  extends RingExpr[PhysicalCollection[C,K,R]] with PrimitiveExpr[C[K,R],PhysicalCollection[C,K,R]]
 
 //case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
 //  type Self = Tuple2RingExpr[K1,K2]

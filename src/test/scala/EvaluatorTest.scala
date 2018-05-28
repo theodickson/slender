@@ -39,28 +39,32 @@ class LocalTest extends FunSuite {
 
   //val stringCountsRdd = PhysicalCollection(PairRDD(sc.parallelize(List("a" -> 1, "b" -> 2, "c" -> 3))))
 
-  test("Tuple key test") {
-//      val expr = Tuple2KeyExpr(IntKeyExpr(1),IntKeyExpr(1))
-//      println(expr.eval)
-//    val intExpr = IntExpr(1)
-//    println(intExpr.eval)
-//
-//    val inf = InfiniteMappingExpr(Variable[String](""), intExpr)
-//    println(inf.eval)
-//
-//    val mult = MultiplyExpr(stringCounts1, inf)
-//
-//    println(mult.eval)
-//
-//    val collectQuery = SumExpr(mult)
-//    println(collectQuery.eval)
-//
-    val yieldQuery = SumExpr(MultiplyExpr(stringCounts1, InfiniteMappingExpr(TypedVariable[String]("x"),
-      SngExpr(TypedVariable[String]("x"), IntExpr(1))
-    )))
-//
-    println(yieldQuery.eval)
+  test("Collect test") {
+    val query = For (X <-- stringCounts1) Collect 1
+    assert(query.eval == 6)
   }
+//  test("Tuple key test") {
+////      val expr = Tuple2KeyExpr(IntKeyExpr(1),IntKeyExpr(1))
+////      println(expr.eval)
+////    val intExpr = IntExpr(1)
+////    println(intExpr.eval)
+////
+////    val inf = InfiniteMappingExpr(Variable[String](""), intExpr)
+////    println(inf.eval)
+////
+////    val mult = MultiplyExpr(stringCounts1, inf)
+////
+////    println(mult.eval)
+////
+////    val collectQuery = SumExpr(mult)
+////    println(collectQuery.eval)
+////
+//    val yieldQuery = SumExpr(MultiplyExpr(stringCounts1, InfiniteMappingExpr(TypedVariable[String]("x"),
+//      SngExpr(TypedVariable[String]("x"), IntExpr(1))
+//    )))
+////
+//    println(yieldQuery.eval)
+//  }
 
 
 

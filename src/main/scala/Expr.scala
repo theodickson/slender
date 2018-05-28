@@ -84,7 +84,7 @@ trait BinaryExpr extends C1Expr with C2Expr {
 //  override def toString = s"$c1._3"
 //}
 
-trait PrimitiveExpr[V] extends NullaryExpr {
+trait PrimitiveExpr[V,E <: Expr[E]] extends Expr[E] with NullaryExpr { self : E =>
   def value: V
   override def toString = value.toString
 }

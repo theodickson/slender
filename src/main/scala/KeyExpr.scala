@@ -18,7 +18,7 @@ trait KeyExpr[E <: Expr[E]] extends Expr[E] { self : E =>
 //trait TernaryKeyExpr extends KeyExpr with TernaryExpr
 
 
-case class PrimitiveKeyExpr[T](value: T) extends KeyExpr[PrimitiveKeyExpr[T]] with PrimitiveExpr[T]
+case class PrimitiveKeyExpr[T](value: T) extends KeyExpr[PrimitiveKeyExpr[T]] with PrimitiveExpr[T,PrimitiveKeyExpr[T]]
 
 object IntKeyExpr {
   def apply(i: Int) = PrimitiveKeyExpr(i)

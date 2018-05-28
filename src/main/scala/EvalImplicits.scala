@@ -21,7 +21,7 @@ trait EvalImplicits {
     }
 
 
-  implicit def PrimitiveExprEval[E <: Expr[E],V](implicit ev: E <:< PrimitiveExpr[V]): Eval[E,V] = new Eval[E,V] {
+  implicit def PrimitiveExprEval[E <: PrimitiveExpr[V,E],V]: Eval[E,V] = new Eval[E,V] { //(implicit ev: E <:< PrimitiveExpr[V,E])
     def apply(v1: E, v2: BoundVars): V = v1.value
   }
 
