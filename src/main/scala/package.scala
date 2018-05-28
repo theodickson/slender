@@ -9,6 +9,8 @@ trait types {
 
 package object slender extends types with Serializable {
 
+  implicit def boolToInt(b: Boolean): Int = if (b) 1 else 0
+
   //courtesy of http://missingfaktor.blogspot.co.uk/2013/12/optional-implicit-trick-in-scala.html
   case class Perhaps[T](value: Option[T])
 
@@ -28,7 +30,7 @@ package object slender extends types with Serializable {
   implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)]): PhysicalCollection[PairRDD,K,R] = PhysicalCollection(rdd)
 
   object implicits extends AlgebraImplicits with ShreddingImplicits with EvalImplicits
-    with DSL with VariableExprImplicits with VariableResolutionImplicits
+    with DSL with Variables with VariableResolutionImplicits
 }
 
 

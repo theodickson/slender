@@ -13,7 +13,7 @@ import org.scalatest.FunSuite
 //
 class DslTests extends FunSuite {
 
-  import slender.PhysicalCollection
+  import implicits._
 
   val stringCounts1 = PhysicalCollection(
     Map("a" -> 1, "b" -> 2, "c" -> 3)

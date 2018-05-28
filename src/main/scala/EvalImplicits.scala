@@ -14,6 +14,12 @@ trait EvalImplicits {
       def apply(v1: Tuple2VariableExpr[V1,V2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
     }
 
+  implicit def Tuple3VariableEval[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3],T1,T2,T3]
+  (implicit eval1: Eval[V1,T1], eval2: Eval[V2,T2], eval3: Eval[V3,T3]): Eval[Tuple3VariableExpr[V1,V2,V3],(T1,T2,T3)] =
+    new Eval[Tuple3VariableExpr[V1,V2,V3],(T1,T2,T3)] {
+      def apply(v1: Tuple3VariableExpr[V1,V2,V3], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2),eval3(v1.c3,v2))
+    }
+
 
   implicit def PrimitiveExprEval[E <: Expr,V](implicit ev: E <:< PrimitiveExpr[V]): Eval[E,V] = new Eval[E,V] {
     def apply(v1: E, v2: BoundVars): V = v1.value
