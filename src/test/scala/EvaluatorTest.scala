@@ -6,6 +6,8 @@ import org.apache.spark.sql.SparkSession
 
 class LocalTest extends FunSuite {
 
+  import implicits._
+
 //    val spark = SparkSession.builder
 //      .appName("test")
 //      .config("spark.master", "local")
@@ -37,28 +39,28 @@ class LocalTest extends FunSuite {
 
   //val stringCountsRdd = PhysicalCollection(PairRDD(sc.parallelize(List("a" -> 1, "b" -> 2, "c" -> 3))))
 
-//  test("Tuple key test") {
+  test("Tuple key test") {
 //      val expr = Tuple2KeyExpr(IntKeyExpr(1),IntKeyExpr(1))
 //      println(expr.eval)
-////    val intExpr = IntExpr(1)
-////    println(intExpr.eval)
-////
-////    val inf = InfiniteMappingExpr(Variable[String](""), intExpr)
-////    println(inf.eval)
-////
-////    val mult = MultiplyExpr(stringCounts1, inf)
-////
-////    println(mult.eval)
-////
-////    val collectQuery = SumExpr(mult)
-////    println(collectQuery.eval)
-////
-////    val yieldQuery = SumExpr(MultiplyExpr(stringCounts1, InfiniteMappingExpr(Variable[String]("x"),
-////      SngExpr(Variable[String]("x"), IntExpr(1))
-////    )))
-////
-////    println(yieldQuery.eval)
-//  }
+//    val intExpr = IntExpr(1)
+//    println(intExpr.eval)
+//
+//    val inf = InfiniteMappingExpr(Variable[String](""), intExpr)
+//    println(inf.eval)
+//
+//    val mult = MultiplyExpr(stringCounts1, inf)
+//
+//    println(mult.eval)
+//
+//    val collectQuery = SumExpr(mult)
+//    println(collectQuery.eval)
+//
+    val yieldQuery = SumExpr(MultiplyExpr(stringCounts1, InfiniteMappingExpr(TypedVariable[String]("x"),
+      SngExpr(TypedVariable[String]("x"), IntExpr(1))
+    )))
+//
+    println(yieldQuery.eval)
+  }
 
 
 
