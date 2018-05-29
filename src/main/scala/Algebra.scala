@@ -12,7 +12,19 @@ trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
   def map[R1](c: C[K,R], f: (K,R) => (K,R1)): C[K,R1]
 }
 
+trait NonCollectionRing[R] extends Ring[R]
+
+trait NumericRing[R] extends NonCollectionRing[R] {
+  def num: Numeric[R]
+
+  def zero: R = num.fromInt(0)
+  def one: R = num.fromInt(1)
+  def add(t1: R, t2: R): R = num.plus(t1,t2)
+  def not(t1: R): R = if (t1 == zero) one else zero
+  def negate(t1: R): R = num.negate(t1)
+}
+
+
 trait Dot[T1,T2,O] extends ((T1,T2) => O) with Serializable
 
 trait Multiply[T1,T2,O] extends ((T1,T2) => O) with Serializable
-

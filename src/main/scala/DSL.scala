@@ -127,6 +127,8 @@ trait LowPriorityDSL {
 
 trait DSL extends LowPriorityDSL {
 
+  //It's higher priority to make tuples of only variables into tuple variable expressions so that expressions
+  //can be resolved. It also means they have access to the <-- method needed to make For comprehensions look nice.
   implicit def tuple2MakeVariableExpr[X1,X2,R1 <: VariableExpr[R1], R2 <: VariableExpr[R2]]
   (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2VariableExpr[R1,R2]] =
     new MakeExpr[(X1,X2),Tuple2VariableExpr[R1,R2]] {

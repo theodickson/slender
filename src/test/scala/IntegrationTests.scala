@@ -32,6 +32,12 @@ class IntegrationTests extends FunSuite with TestUtils {
 //    println(query.eval)
 //  }
 
+  test("Simple query") {
+    val query = For(X <-- bagOfInts) Yield X
+    assert(query.isResolved)
+    assert(query.isEvaluable)
+  }
+
   test("Full packet query") {
     val serverData = Map(
       (1,
