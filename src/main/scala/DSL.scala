@@ -90,7 +90,7 @@ trait LowPriorityDSL {
 
   }
 
-  case class PredicatedForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: Predicate](x: V, r1: R, p: P) {
+  case class PredicatedForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](x: V, r1: R, p: P) {
 
     val builder = ForComprehensionBuilder(x,r1)
 
@@ -115,12 +115,12 @@ trait LowPriorityDSL {
     def apply[V <: VariableExpr[V], R <: RingExpr](pair: VariableRingPair[V, R]): ForComprehensionBuilder[V, R] =
       ForComprehensionBuilder[V, R](pair.k, pair.r)
 
-    def apply[V <: VariableExpr[V], R <: RingExpr, P <: Predicate](args: (V,R,P)): PredicatedForComprehensionBuilder[V,R,P] =
+    def apply[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](args: (V,R,P)): PredicatedForComprehensionBuilder[V,R,P] =
       PredicatedForComprehensionBuilder[V,R,P](args._1, args._2, args._3)
   }
 
   implicit class IffImplicit[V <: VariableExpr[V], R <: RingExpr](pair: VariableRingPair[V,R]) {
-    def iff[P <: Predicate](p: P): (V,R,P) = (pair.k,pair.r,p)
+    def iff[P <: RingExpr](p: P): (V,R,P) = (pair.k,pair.r,p)
   }
 
 }
@@ -141,10 +141,3 @@ trait DSL extends LowPriorityDSL {
     }
 
 }
-
-
-////
-////Variabl
-////
-
-////

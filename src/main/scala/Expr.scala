@@ -19,7 +19,7 @@ trait Expr {
 
   def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[Self,Shredded]]) = canShred.value.isDefined
 
-  def evaluable[T](implicit canEval: Perhaps[Eval[Self,_]]) = canEval.value.isDefined
+  def isEvaluable[T](implicit canEval: Perhaps[Eval[Self,_]]) = canEval.value.isDefined
 
   def id = hashCode.abs.toString.take(3).toInt
 
@@ -67,11 +67,16 @@ trait BinaryExpr extends Expr with C1Expr with C2Expr {
   def children = List(c1, c2)
 }
 
-trait MyBinaryExpr[E1 <: Expr, E2 <: Expr] extends Expr {
-  def c1: E1
-  def c2: E2
-  def children = List(c1,c2)
-}
+//trait MyBinaryExpr[E1 <: Expr, E2 <: Expr] extends Expr {
+//  def c1: E1
+//  def c2: E2
+//  def children = List(c1,c2)
+//}
+
+//
+//trait Constructor[-In,+Out] extends (In => Out)
+//
+//case class MyDotExpr[E1 <: RingExpr, E2 <: RingExpr](c1: E1, c2: E2) extends MyBinaryExpr[E1,E2]
 
 trait TernaryExpr extends Expr with C1Expr with C2Expr with C3Expr {
   def children = List(c1, c2, c3)

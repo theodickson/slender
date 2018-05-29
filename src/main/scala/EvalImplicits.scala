@@ -135,6 +135,7 @@ trait EvalImplicits {
   implicit def Project3_3KeyEval[K <: KeyExpr with C3Expr,KT3](implicit eval: Eval[K,(_,_,KT3)]) =
     new Eval[Project3KeyExpr[K],KT3] { def apply(v1: Project3KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._3 }
 
+
   implicit def Project2_1RingEval[K <: RingExpr with C1Expr,KT1](implicit eval: Eval[K,(KT1,_)]) =
     new Eval[Project1RingExpr[K],KT1] { def apply(v1: Project1RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._1 }
 

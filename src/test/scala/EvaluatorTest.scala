@@ -5,7 +5,7 @@ import org.apache.spark.sql.SparkSession
 
 
 class LocalTest extends FunSuite {
-
+  import implicits._
 //    val spark = SparkSession.builder
 //      .appName("test")
 //      .config("spark.master", "local")
