@@ -27,15 +27,14 @@ trait UnaryRingExpr extends RingExpr with UnaryExpr
 trait BinaryRingExpr extends RingExpr with BinaryExpr
 trait TernaryRingExpr extends RingExpr with TernaryExpr
 
+
+
+/**Primitive ring expressions*/
 trait PrimitiveRingExpr[T] extends RingExpr with PrimitiveExpr[T]
 
 case class NumericExpr[N : Numeric](value: N) extends PrimitiveRingExpr[N] {
   type Self = NumericExpr[N]
 }
-//
-//case class IntExpr(value: Int) extends PrimitiveRingExpr[Int] {
-//  type Self = IntExpr
-//}
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit collection: Collection[C,K,R])
   extends PrimitiveRingExpr[C[K,R]] {
@@ -47,50 +46,13 @@ object PhysicalCollection {
     PhysicalCollection(value.map((_,1)).toMap)
 }
 
-case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
-  type Self = Tuple2RingExpr[K1,K2]
-}
-
-case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryRingExpr with ProductExpr {
-  type Self = Tuple3RingExpr[K1,K2,K3]
-}
 
 
-case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr {
-  type Self = Project1RingExpr[K]
-}
-
-case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr {
-  type Self = Project2RingExpr[K]
-}
-
-case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr {
-  type Self = Project3RingExpr[K]
-}
-
-case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)
-  extends BinaryRingExpr {
-
-  type Self = InfiniteMappingExpr[K,R]
-  def c1 = key; def c2 = value
-
-  override def toString = s"{$key => $value}"
-
-}
-
+/**Standard ring operations*/
 trait BinaryRingOpExpr extends BinaryRingExpr {
   def opString: String
   //  final def brackets = ("(",")")
   //  override def toString = s"${c1.closedString} $opString ${c2.closedString}"
-}
-
-
-case class MultiplyExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
-  extends BinaryRingOpExpr {
-
-  type Self = MultiplyExpr[E1,E2]
-  def opString = "*"
 }
 
 case class AddExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
@@ -100,15 +62,18 @@ case class AddExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   def opString = "+"
 }
 
+case class MultiplyExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
+  extends BinaryRingOpExpr {
+
+  type Self = MultiplyExpr[E1,E2]
+  def opString = "*"
+}
+
 case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   extends BinaryRingOpExpr {
 
   type Self = DotExpr[E1,E2]
   def opString = "⊙"
-}
-
-case class SumExpr[E <: Expr](c1: E) extends UnaryRingExpr {
-  type Self = SumExpr[E]
 }
 
 case class NotExpr[E <: Expr](c1: E) extends UnaryRingExpr {
@@ -119,7 +84,32 @@ case class NegateExpr[E <: Expr](c1: E) extends UnaryRingExpr {
   type Self = NegateExpr[E]
 }
 
+case class SumExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+  type Self = SumExpr[E]
+}
 
+
+
+/**Mapping constructs*/
+case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)
+  extends BinaryRingExpr {
+
+  type Self = InfiniteMappingExpr[K,R]
+  def c1 = key; def c2 = value
+
+  override def toString = s"{$key => $value}"
+
+}
+
+case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
+  extends BinaryRingExpr {
+  type Self = SngExpr[K,R]
+  def c1 = key; def c2 = value
+}
+
+
+
+/**Predicates*/
 trait Predicate extends BinaryRingExpr {
   def opString: String
 //  override def brackets = ("(",")")
@@ -140,12 +130,9 @@ object Predicate {
   def apply[K1 <: KeyExpr, K2 <: KeyExpr](k1: K1, k2: K2) = EqualsPredicate(k1,k2)
 }
 
-case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
-  extends BinaryRingExpr {
-  type Self = SngExpr[K,R]
-  def c1 = key; def c2 = value
-}
 
+
+/**Conversions from rings*/
 ////sealed trait FromK extends RingExpr with UnaryExpr[E[KeyExpr]
 ////
 ////object FromK {
@@ -156,7 +143,6 @@ case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
 ////  }
 ////}
 ////
-
 case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
   type Self = ToRingExpr[E]
 }
@@ -176,3 +162,27 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
 //  def shred = ???
 ////  def renest = FromK(c1.renest)
 //}
+
+
+
+/**Tupling and projection*/
+case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
+  type Self = Tuple2RingExpr[K1,K2]
+}
+
+case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
+  extends TernaryRingExpr with ProductExpr {
+  type Self = Tuple3RingExpr[K1,K2,K3]
+}
+
+case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr {
+  type Self = Project1RingExpr[K]
+}
+
+case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr {
+  type Self = Project2RingExpr[K]
+}
+
+case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr {
+  type Self = Project3RingExpr[K]
+}

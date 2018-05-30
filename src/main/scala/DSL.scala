@@ -88,17 +88,6 @@ trait LowPriorityDSL {
       _collect(SngExpr(made.k, made.r))
     }
 
-
-    //todo- the trickiness in doing this without naming it differently is that if its one argument, the compiler cant tell
-    //if it should use this method and look for a separate Make for the key and the value, or the other method and look
-    //for a Make for the pair as a whole. probably need a separate Make case which automatically translates solo keys
-    //into k->1 pairs and then have one signatue.
-//    def Yield[KT, K <: KeyExpr, R <: RingExpr, Out <: Expr]
-//      (pair: (KT,R))
-//      (implicit make: MakeExpr[KT,K],
-//       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R]]]], Out]): Out =
-//      _collect(SngExpr(make(pair._1), pair._2)
-
   }
 
   case class PredicatedForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](x: V, r1: R, p: P) {
@@ -123,8 +112,6 @@ trait LowPriorityDSL {
       val made = make(k)
       builder._collect(SngExpr(made.k,DotExpr(made.r, p)))
     }
-
-
   }
 
   object For {
