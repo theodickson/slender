@@ -100,6 +100,37 @@ trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits
 }
 
 
+trait HighPriorityResolutionImplicits extends StandardPriorityResolutionImplicits {
+  //Note that the below doesnt strictly need to be here - as a there is no standalone resolver for an infinite mapping,
+  //the standard MultiplyResolver if tried for MultiplyExpr with an InfMapping on the RHS will fail. However, it's logical
+  //to aid the compiler by making it try this one first for such expressions.
+  /**Resolve a multiplication of a finite collection on the LHS with an inf mapping on the RHS.
+    * This is the 'main event' of variable resolution, and works as follows:
+    * 1 - Resolve the LHS
+    * 2 - Require that the LHS evaluates to a finite collection.
+    * 3 - Bind the key of the infinite mapping on the RHS (which may be a nested product of variables)
+    *     to the discovered key type of the finite collection.
+    * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
+    * 5 - Recursively resolve the value of the infinite mapping.*/
+  implicit def MultiplyInfResolver[
+  LHS <: RingExpr, LHS1 <: RingExpr, V <: VariableExpr[V], C[_,_], KT, VB <: VariableExpr[VB],
+  RT, R1 <: RingExpr, R2 <: RingExpr, R3 <: RingExpr
+  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
+    bindLeft: Binder[V,KT,V,VB], bindRight: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
+  Resolver[
+    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
+    ] =
+    new Resolver[
+      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+      MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
+      ] {
+      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
+        MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(bindLeft(v1.c2.key),resolver(bindRight(v1.c2.value))))
+    }
+}
+
+
 trait LowPriorityBindingImplicits {
   //The case that V1 <:< V and so actually binds to T takes precedence.
   implicit def VariableNonBinder[V <: UntypedVariable[V],V1 <: UntypedVariable[V1],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
@@ -129,8 +160,8 @@ trait StandardPriorityBindingImplicits extends LowPriorityBindingImplicits {
   /** Binding base cases - primitive expressions don't need to bind anything, variables bind iff they are untyped variables
     * matching the type in the binder. (otherwise they use the low priority non-binding case)
     */
-    implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
-      Binder.nonBinder[V,T,E]
+  implicit def PrimitiveExprBinder[V <: VariableExpr[V],T,E <: PrimitiveExpr[_]]: Binder[V,T,E,E] =
+    Binder.nonBinder[V,T,E]
 
 //  implicit def IntExprBinder[V <: VariableExpr[V],T]: Binder[V,T,IntExpr,IntExpr] = Binder.nonBinder[V,T,IntExpr]
 //
@@ -210,36 +241,6 @@ trait StandardPriorityBindingImplicits extends LowPriorityBindingImplicits {
   (implicit bind1: Binder[V,T,K1,K1B], bind2: Binder[V,T,K2,K2B]): Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
     new Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] {
       def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(bind1(v1.c1),bind2(v1.c2))
-    }
-}
-
-trait HighPriorityResolutionImplicits extends StandardPriorityResolutionImplicits {
-  //Note that the below doesnt strictly need to be here - as a there is no standalone resolver for an infinite mapping,
-  //the standard MultiplyResolver if tried for MultiplyExpr with an InfMapping on the RHS will fail. However, it's logical
-  //to aid the compiler by making it try this one first for such expressions.
-  /**Resolve a multiplication of a finite collection on the LHS with an inf mapping on the RHS.
-    * This is the 'main event' of variable resolution, and works as follows:
-    * 1 - Resolve the LHS
-    * 2 - Require that the LHS evaluates to a finite collection.
-    * 3 - Bind the key of the infinite mapping on the RHS (which may be a nested product of variables)
-    *     to the discovered key type of the finite collection.
-    * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
-    * 5 - Recursively resolve the value of the infinite mapping.*/
-  implicit def MultiplyInfResolver[
-    LHS <: RingExpr, LHS1 <: RingExpr, V <: VariableExpr[V], C[_,_], KT, VB <: VariableExpr[VB],
-    RT, R1 <: RingExpr, R2 <: RingExpr, R3 <: RingExpr
-  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
-    bindLeft: Binder[V,KT,V,VB], bindRight: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
-  Resolver[
-    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-    ] =
-    new Resolver[
-      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-      MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-      ] {
-      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
-        MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(bindLeft(v1.c2.key),resolver(bindRight(v1.c2.value))))
     }
 }
 

@@ -29,9 +29,13 @@ trait TernaryRingExpr extends RingExpr with TernaryExpr
 
 trait PrimitiveRingExpr[T] extends RingExpr with PrimitiveExpr[T]
 
-case class IntExpr(value: Int) extends PrimitiveRingExpr[Int] {
-  type Self = IntExpr
+case class NumericExpr[N : Numeric](value: N) extends PrimitiveRingExpr[N] {
+  type Self = NumericExpr[N]
 }
+//
+//case class IntExpr(value: Int) extends PrimitiveRingExpr[Int] {
+//  type Self = IntExpr
+//}
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit collection: Collection[C,K,R])
   extends PrimitiveRingExpr[C[K,R]] {
@@ -42,10 +46,6 @@ object PhysicalCollection {
   def apply[T](value: Set[T])(implicit collection: Collection[Map,T,Int]): PhysicalCollection[Map,T,Int] =
     PhysicalCollection(value.map((_,1)).toMap)
 }
-
-//case class WPhysicalCollection[T,K,R](value: T)(implicit ev: Collection[T,K,R]) {
-//  type Self = WPhysicalCollection[T,K,R]
-//}
 
 case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
   type Self = Tuple2RingExpr[K1,K2]

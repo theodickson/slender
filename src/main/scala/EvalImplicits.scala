@@ -1,7 +1,5 @@
 package slender
 
-//todo with external evaluation, there is scope to put variables into the type system and then possibly
-//remove the need to tag them
 trait EvalImplicits {
 
   implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
@@ -28,8 +26,8 @@ trait EvalImplicits {
   implicit def InfiniteMappingEval[V <: VariableExpr[V] { type Type = KT },R <: RingExpr,KT,RT]
   (implicit evalK: Eval[V,KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
     new Eval[InfiniteMappingExpr[V,R],KT => RT] {
-      //todo
-      def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT = (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))//.asInstanceOf[v1.key.Type]))
+      def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT =
+        (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
     }
 
 

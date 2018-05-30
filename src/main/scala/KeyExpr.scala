@@ -1,8 +1,6 @@
 package slender
 
-import scala.reflect.{ClassTag,classTag}
-
-trait KeyExpr extends Expr { //self : Self =>
+trait KeyExpr extends Expr {
 
   type Self <: KeyExpr
 

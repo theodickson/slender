@@ -6,7 +6,8 @@ trait LowPriorityDSL {
 
   implicit def toExpr[X,E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
 
-  implicit def intMakeRing: MakeExpr[Int,IntExpr] = new MakeExpr[Int,IntExpr] { def apply(v1: Int) = IntExpr(v1) }
+  implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] =
+    new MakeExpr[N,NumericExpr[N]] { def apply(v1: N) = NumericExpr(v1) }
 
   implicit def idMakeExpr[E <: Expr]: MakeExpr[E,E] = new MakeExpr[E,E] { def apply(v1: E) = v1 }
 
@@ -39,14 +40,27 @@ trait LowPriorityDSL {
 
   implicit def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
-  implicit def sng[K <: KeyExpr](k: K): SngExpr[K, IntExpr] = SngExpr(k, IntExpr(1))
+  implicit def sng[K <: KeyExpr](k: K): SngExpr[K, NumericExpr[Int]] = SngExpr(k, NumericExpr(1))
 
   def toK[E <: RingExpr](e: E): BoxedRingExpr[E] = BoxedRingExpr(e)
 
   def toRing[E <: Expr](e: E): ToRingExpr[E] = ToRingExpr(e)
 
-  implicit def intToIntExpr(i: Int): IntExpr = IntExpr(i)
 
+  trait MakeKeyRingPair[X,K <: KeyExpr,R <: RingExpr] extends (X => KeyRingPair[K,R])
+
+  implicit def IdMakeKeyRingPair[K <: KeyExpr, R <: RingExpr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
+    new MakeKeyRingPair[KeyRingPair[K,R],K,R] { def apply(v1: KeyRingPair[K,R]): KeyRingPair[K,R] = v1 }
+
+  implicit def ImplicitOne[X, K <: KeyExpr](implicit make: MakeExpr[X,K]): MakeKeyRingPair[X,K,NumericExpr[Int]] =
+    new MakeKeyRingPair[X,K,NumericExpr[Int]] {
+      def apply(v1: X): KeyRingPair[K,NumericExpr[Int]] = KeyRingPair(make(v1),NumericExpr(1))
+    }
+//
+//  implicit def ExplicitRing[X, Y, K <: KeyExpr, R <: RingExpr](implicit makeK: MakeExpr[X,K], makeR: MakeExpr[Y,R]):
+//    MakeKeyRingPair[(X,Y),K,R] = new MakeKeyRingPair[(X,Y),K,R] {
+//      def apply(v1: (X,Y)): KeyRingPair[K,R] = KeyRingPair(makeK(v1._1),makeR(v1._2))
+//  }
 
   case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr](x: V, r1: R) {
 
@@ -60,33 +74,30 @@ trait LowPriorityDSL {
       (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]) =
       _collect(make(r2))
 
-//    def YieldSng[K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
-//      (r2: SngExpr[K,R2])
-//      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out =
-//        Collect(r2)
-//
-    def Yield[T, K <: KeyExpr, Out <: Expr]
-      (k: T)
-      (implicit make: MakeExpr[T,K],
-       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
-        _collect(SngExpr(make(k), IntExpr(1)))
-
-    //todo - yield a k->v without a differently named method.
-
-//    def YieldSng[T, K <: KeyExpr, R <: RingExpr, Out <: Expr]
+//    def Yield[T, K <: KeyExpr, Out <: Expr]
 //      (k: T)
-//      (implicit make: MakeExpr[T,SngExpr[K,R]],
-//        resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]], Out]): Out =
-//          _collect(make(k))
+//      (implicit make: MakeExpr[T,K],
+//       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, NumericExpr[Int]]]]], Out]): Out =
+//        _collect(SngExpr(make(k), NumericExpr(1)))
 
-//    def CollectUn[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]] =
-//      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2)))
-//
-//    def YieldSngUn[K <: KeyExpr, R2 <: RingExpr](r2: SngExpr[K,R2]):
-//      SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]] = CollectUn(r2)
-//
-//    def YieldUn[K <: KeyExpr](k: K): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, IntExpr]]]] =
-//      CollectUn(SngExpr(k, IntExpr(1)))
+    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
+    (x: T)
+    (implicit make: MakeKeyRingPair[T,K,R2],
+     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out = {
+      val made = make(x)
+      _collect(SngExpr(made.k, made.r))
+    }
+
+
+    //todo- the trickiness in doing this without naming it differently is that if its one argument, the compiler cant tell
+    //if it should use this method and look for a separate Make for the key and the value, or the other method and look
+    //for a Make for the pair as a whole. probably need a separate Make case which automatically translates solo keys
+    //into k->1 pairs and then have one signatue.
+//    def Yield[KT, K <: KeyExpr, R <: RingExpr, Out <: Expr]
+//      (pair: (KT,R))
+//      (implicit make: MakeExpr[KT,K],
+//       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R]]]], Out]): Out =
+//      _collect(SngExpr(make(pair._1), pair._2)
 
   }
 
@@ -100,14 +111,19 @@ trait LowPriorityDSL {
               resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]], Out]) =
       builder._collect(DotExpr[R2,P](make(r2),p))
 
-//    def Yield[K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
-//    (pair: KeyRingPair[K, R2])
-//    (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, DotExpr[R2,P]]]]], Out]): Out =
-//      builder.Yield(KeyRingPair(pair.k,DotExpr[R2,P](pair.r,p)))
-    def Yield[T, K <: KeyExpr, Out <: Expr]
+//    def Yield[T, K <: KeyExpr, Out <: Expr]
+//    (k: T)
+//    (implicit make: MakeExpr[T,K], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, P]]]], Out]): Out =
+//      builder._collect(SngExpr(make(k),p))
+
+    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
     (k: T)
-    (implicit make: MakeExpr[T,K], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, P]]]], Out]): Out =
-      builder._collect(SngExpr(make(k),p))
+    (implicit make: MakeKeyRingPair[T,K,R2],
+     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, DotExpr[R2,P]]]]], Out]): Out = {
+      val made = make(k)
+      builder._collect(SngExpr(made.k,DotExpr(made.r, p)))
+    }
+
 
   }
 

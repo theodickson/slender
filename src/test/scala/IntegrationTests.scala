@@ -33,9 +33,10 @@ class IntegrationTests extends FunSuite with TestUtils {
 //  }
 
   test("Simple query") {
-    val query = For(X <-- bagOfInts) Yield X
+    val query = For(X <-- bagOfInts) Yield X --> NumericExpr(1)
     assert(query.isResolved)
     assert(query.isEvaluable)
+    println(query.eval)
   }
 
   test("Full packet query") {
