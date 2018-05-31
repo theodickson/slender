@@ -94,6 +94,12 @@ trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits
       def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(resolve1(v1.c1),resolve2(v1.c2))
     }
 
+  implicit def IntPredicateResolver[K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[IntPredicate[K1,K2],IntPredicate[K1B,K2B]] =
+    new Resolver[IntPredicate[K1,K2],IntPredicate[K1B,K2B]] {
+      def apply(v1: IntPredicate[K1,K2]) = IntPredicate(resolve1(v1.c1),resolve2(v1.c2), v1.p, v1.opString)
+    }
+
   implicit def ToRingResolver[R <: Expr,R1 <: Expr]
   (implicit resolve: Resolver[R,R1]):Resolver[ToRingExpr[R],ToRingExpr[R1]] =
     new Resolver[ToRingExpr[R],ToRingExpr[R1]] { def apply(v1: ToRingExpr[R]) = ToRingExpr(resolve(v1.c1)) }
@@ -293,6 +299,12 @@ trait StandardPriorityBindingImplicits extends LowPriorityBindingImplicits {
   (implicit bind1: Binder[V,T,K1,K1B], bind2: Binder[V,T,K2,K2B]): Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
     new Binder[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] {
       def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(bind1(v1.c1),bind2(v1.c2))
+    }
+
+  implicit def IntPredicateBinder[V <: VariableExpr[V],T,K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+  (implicit bind1: Binder[V,T,K1,K1B], bind2: Binder[V,T,K2,K2B]): Binder[V,T,IntPredicate[K1,K2],IntPredicate[K1B,K2B]] =
+    new Binder[V,T,IntPredicate[K1,K2],IntPredicate[K1B,K2B]] {
+      def apply(v1: IntPredicate[K1,K2]) = IntPredicate(bind1(v1.c1),bind2(v1.c2), v1.p, v1.opString)
     }
 
   implicit def ToRingBinder[V <: VariableExpr[V],T,R <: Expr,R1 <: Expr]
