@@ -3,11 +3,11 @@ package slender
 trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr { self: V =>
   type Type
   def bind(t: Type): BoundVars
-  def <--[R <: RingExpr](r: R): VariableRingPair[V,R] = VariableRingPair(this,r)
+  def <--[R <: RingExpr](r: R): VariableRingPredicate[V,R,NumericExpr[Int]] = VariableRingPredicate(this,r)
   def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(this,r)
 }
 
-case class VariableRingPair[V <: VariableExpr[V], R <: RingExpr](k: V, r: R)
+case class VariableRingPredicate[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](k: V, r: R, p: P = NumericExpr(1))
 
 case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]] with NullaryKeyExpr {
   type Self = TypedVariable[T]

@@ -31,15 +31,27 @@ class TPCHLocalTest extends FunSuite {
     /** For each customer, return their name, and for each date on which they've ordered,
       * return the date and all the part names they ordered on that date.
       */
+//    val q =
+//      For ((c_custkey,c_name,c_nationkey) <-- customer) Yield
+//        (c_name,
+//          For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (c_custkey === o_custkey)) Yield
+//            (o_orderdate,
+//              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey)) Collect
+//                (For ((p_partkey,p_name) <-- part iff (l_partkey === p_partkey)) Yield p_name)
+//      )
+//    )
+
+
     val q =
       For ((c_custkey,c_name,c_nationkey) <-- customer) Yield
         (c_name,
           For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (c_custkey === o_custkey)) Yield
             (o_orderdate,
-              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey)) Collect
-                (For ((p_partkey,p_name) <-- part iff (l_partkey === p_partkey)) Yield p_name)
-      )
-    )
+              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey),
+                   (p_partkey,p_name) <-- part iff (l_partkey === p_partkey))
+              Yield p_name
+            )
+        )
 
     assert(q.isResolved)
     assert(q.isEvaluable)
@@ -62,7 +74,7 @@ class TPCHLocalTest extends FunSuite {
     assert(q.isResolved)
     assert(q.isEvaluable)
     println(q.evalType)
-    println(q.eval)
+//    println(q.eval)
   }
 
 }

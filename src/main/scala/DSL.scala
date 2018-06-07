@@ -63,63 +63,154 @@ trait LowPriorityDSL extends ExtraLowPriorityDSL {
     new MakeKeyRingPair[X,K,NumericExpr[Int]] {
       def apply(v1: X): KeyRingPair[K,NumericExpr[Int]] = KeyRingPair(make(v1),NumericExpr(1))
     }
+
+//  case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr](x: V, r1: R) {
 //
-//  implicit def ExplicitRing[X, Y, K <: KeyExpr, R <: RingExpr](implicit makeK: MakeExpr[X,K], makeR: MakeExpr[Y,R]):
-//    MakeKeyRingPair[(X,Y),K,R] = new MakeKeyRingPair[(X,Y),K,R] {
-//      def apply(v1: (X,Y)): KeyRingPair[K,R] = KeyRingPair(makeK(v1._1),makeR(v1._2))
+//    def _collect[R2 <: RingExpr, Out <: Expr]
+//      (r2: R2)
+//      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]): Out =
+//        resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+//
+//    def Collect[T, R2 <: RingExpr, Out <: Expr]
+//      (r2: T)
+//      (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]) =
+//      _collect(make(r2))
+//
+//    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
+//    (x: T)
+//    (implicit make: MakeKeyRingPair[T,K,R2],
+//     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out = {
+//      val made = make(x)
+//      _collect(SngExpr(made.k, made.r))
+//    }
+//
 //  }
 
-  case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr](x: V, r1: R) {
+//  case class PredicatedForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr]
+//  (x: V, r1: R, p: P = NumericExpr(1)) {
+//
+//    val builder = ForComprehensionBuilder(x,r1)
+//
+//    def Collect[T, R2 <: RingExpr, Out <: Expr]
+//    (r2: T)
+//    (implicit make: MakeExpr[T,R2],
+//     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]], Out]) =
+//      builder._collect(DotExpr[R2,P](make(r2),p))
+//
+//    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
+//    (k: T)
+//    (implicit make: MakeKeyRingPair[T,K,R2],
+//     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, DotExpr[R2,P]]]]], Out]): Out = {
+//      val made = make(k)
+//      builder._collect(SngExpr(made.k,DotExpr(made.r, p)))
+//    }
+//  }
+  case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](vrp: VariableRingPredicate[V,R,P]) {
+    //todo - get rid of default NumericExpr(1)
+//    def _collect[R2 <: RingExpr, Out <: Expr]
+//    (r2: R2)
+//    (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]],Out]): Out =
+//      resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, DotExpr(r2,p)))))
 
-    def _collect[R2 <: RingExpr, Out <: Expr]
-      (r2: R2)
-      (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]): Out =
-        resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+    val x = vrp.k; val r1 = vrp.r; val p = vrp.p
+
+    def _collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]] =
+      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, DotExpr(r2,p))))
 
     def Collect[T, R2 <: RingExpr, Out <: Expr]
       (r2: T)
-      (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]) =
-      _collect(make(r2))
+      (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]],Out]) =
+        resolver(_collect(make(r2)))
 
     def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
-    (x: T)
-    (implicit make: MakeKeyRingPair[T,K,R2],
-     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out = {
-      val made = make(x)
-      _collect(SngExpr(made.k, made.r))
-    }
-
+      (x: T)
+      (implicit make: MakeKeyRingPair[T,K,R2],
+       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[SngExpr[K, R2],P]]]], Out]): Out = {
+        val made = make(x)
+        resolver(_collect(SngExpr(made.k, made.r)))
+      }
   }
 
-  case class PredicatedForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](x: V, r1: R, p: P) {
+  case class NestedForComprehensionBuilder[
+    V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, P1 <: RingExpr, P2 <: RingExpr
+  ](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
 
-    val builder = ForComprehensionBuilder(x,r1)
+    def Collect[T, R3 <: RingExpr, Out <: Expr]
+    (r3: T)(implicit make: MakeExpr[T, R3],
+            resolver: ResolverBase[
+              SumExpr[
+                MultiplyExpr[
+                  R1,
+                  InfiniteMappingExpr[
+                    V1,
+                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[R3, P2]]]], P1]]]],
+              Out
+              ]) = {
+      val made = make(r3)
+      builder1._collect(builder2._collect(made))
+    }
 
-    def Collect[T, R2 <: RingExpr, Out <: Expr]
-    (r2: T)
-    (implicit make: MakeExpr[T,R2],
-              resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]], Out]) =
-      builder._collect(DotExpr[R2,P](make(r2),p))
-
-    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
-    (k: T)
-    (implicit make: MakeKeyRingPair[T,K,R2],
-     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, DotExpr[R2,P]]]]], Out]): Out = {
-      val made = make(k)
-      builder._collect(SngExpr(made.k,DotExpr(made.r, p)))
+    def Yield[T, K <: KeyExpr, R3 <: RingExpr, Out <: Expr]
+    (r3: T)(implicit make: MakeKeyRingPair[T, K, R3],
+            resolver: ResolverBase[
+              SumExpr[
+                MultiplyExpr[
+                  R1,
+                  InfiniteMappingExpr[
+                    V1,
+                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[SngExpr[K, R3], P2]]]], P1]]]],
+              Out
+              ]) = {
+      val made = make(r3)
+      builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
     }
   }
+
+
+
+//  case class ForComprehensionBuilder2[V1 <: VariableExpr[V1], R1 <: RingExpr, V2 <: VariableExpr[V2], R2 <: RingExpr]
+//    (x1: V1, r1: R1, x2: V2, r2: R2) {
+//
+//    def _collect[R3 <: RingExpr, Out <: Expr]
+//    (r3: R3)
+//    (implicit resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]): Out =
+//      For (x1 <-- r1) Collect (For (x2 <-- r2) Collect r3)
+//      resolver(SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, r2))))
+//
+//    def Collect[T, R2 <: RingExpr, Out <: Expr]
+//    (r2: T)
+//    (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]) =
+//      _collect(make(r2))
+//
+//    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
+//    (x: T)
+//    (implicit make: MakeKeyRingPair[T,K,R2],
+//     resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, R2]]]], Out]): Out = {
+//      val made = make(x)
+//      _collect(SngExpr(made.k, made.r))
+//    }
+//
+//  }
 
   object For {
-    def apply[V <: VariableExpr[V], R <: RingExpr](pair: VariableRingPair[V, R]): ForComprehensionBuilder[V, R] =
-      ForComprehensionBuilder[V, R](pair.k, pair.r)
+    def apply[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](vrp: VariableRingPredicate[V,R,P]):
+      ForComprehensionBuilder[V, R, P] = ForComprehensionBuilder(vrp)
 
-    def apply[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](args: (V,R,P)): PredicatedForComprehensionBuilder[V,R,P] =
-      PredicatedForComprehensionBuilder[V,R,P](args._1, args._2, args._3)
+    def apply[
+      V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, P1 <: RingExpr, P2 <: RingExpr
+    ](vrp1: VariableRingPredicate[V1,R1,P1],
+      vrp2: VariableRingPredicate[V2,R2,P2]): NestedForComprehensionBuilder[V1, V2, R1, R2, P1, P2] = {
+      NestedForComprehensionBuilder(ForComprehensionBuilder(vrp1), ForComprehensionBuilder(vrp2))
+    }
   }
+//
+//    def apply[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](args: (V,R,P)):
+//      ForComprehensionBuilder[V,R,P] = ForComprehensionBuilder[V,R,P](args._1, args._2, args._3)
 
-  implicit class IffImplicit[V <: VariableExpr[V], R <: RingExpr](pair: VariableRingPair[V,R]) {
-    def iff[P <: RingExpr](p: P): (V,R,P) = (pair.k,pair.r,p)
+//    def apply
+
+  implicit class IffImplicit[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](pair: VariableRingPredicate[V,R,P]) {
+    def iff[P2 <: RingExpr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
   }
 
 }
