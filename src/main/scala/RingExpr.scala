@@ -1,5 +1,8 @@
 package slender
 
+import shapeless.ops.hlist.{ToList, ToTraversable}
+import shapeless.{HList, LUBConstraint}
+
 trait RingExpr extends Expr {
 
   type Self <: RingExpr
@@ -164,6 +167,20 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
 
 
 /**Tupling and projection*/
+//case class ProductRingExpr[L <: HList, Lub <: LUBConstraint[L, RingExpr]]
+//  (l: L)(implicit lub: Lub, trav: ToTraversable.Aux[L, List, Lub] { type Out <: List[RingExpr] }) extends RingExpr with ProductExpr {
+//  type Self = ProductRingExpr[L, Lub]
+//  def children: List[RingExpr] = l.toList[Lub](trav)
+//}
+
+case class ProductRingExpr[L <: HList](l: L)
+                                      (implicit lub: LUBConstraint[L,RingExpr],
+                                                toList: ToList[L, RingExpr])
+  extends RingExpr with ProductExpr {
+  type Self = ProductRingExpr[L]
+  def children: List[RingExpr] = l.toList//.asInstanceOf[List[RingExpr]]//l.toList(trav).map(_.asInstanceOf[RingExpr])//l.toList[Lub](trav)
+}
+
 case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
   type Self = Tuple2RingExpr[K1,K2]
 }

@@ -27,54 +27,54 @@ class TPCHLocalTest extends FunSuite {
   val (l_orderkey,l_partkey,l_suppkey) = (Y1,Y2,Y3)
   val (p_partkey,p_name) = (P1,P2)
 
-  test("Q1") {
-    /** For each customer, return their name, and for each date on which they've ordered,
-      * return the date and all the part names they ordered on that date.
-      */
+//  test("Q1") {
+//    /** For each customer, return their name, and for each date on which they've ordered,
+//      * return the date and all the part names they ordered on that date.
+//      */
+////    val q =
+////      For ((c_custkey,c_name,c_nationkey) <-- customer) Yield
+////        (c_name,
+////          For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (c_custkey === o_custkey)) Yield
+////            (o_orderdate,
+////              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey)) Collect
+////                (For ((p_partkey,p_name) <-- part iff (l_partkey === p_partkey)) Yield p_name)
+////      )
+////    )
+//
+//
 //    val q =
 //      For ((c_custkey,c_name,c_nationkey) <-- customer) Yield
 //        (c_name,
 //          For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (c_custkey === o_custkey)) Yield
 //            (o_orderdate,
-//              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey)) Collect
-//                (For ((p_partkey,p_name) <-- part iff (l_partkey === p_partkey)) Yield p_name)
-//      )
-//    )
-
-
-    val q =
-      For ((c_custkey,c_name,c_nationkey) <-- customer) Yield
-        (c_name,
-          For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (c_custkey === o_custkey)) Yield
-            (o_orderdate,
-              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey),
-                   (p_partkey,p_name) <-- part iff (l_partkey === p_partkey))
-              Yield p_name
-            )
-        )
-
-    assert(q.isResolved)
-    assert(q.isEvaluable)
-    println(q.evalType)
-//    println(q.eval)
-  }
-
-  test("Q2") {
-    /**For each supplier, return the name and the names of all customers who have used them*/
-    val q =
-      For ((s_suppkey,s_name,s_nationkey) <-- supplier) Yield
-        (s_name,
-          For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (s_suppkey === l_suppkey)) Collect
-            (
-              For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (l_orderkey === o_orderkey)) Collect (
-                For ((c_custkey,c_name,c_nationkey) <-- customer iff (o_custkey === c_custkey)) Yield c_name
-              )
-            )
-        )
-    assert(q.isResolved)
-    assert(q.isEvaluable)
-    println(q.evalType)
-//    println(q.eval)
-  }
+//              For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (l_orderkey === o_orderkey),
+//                   (p_partkey,p_name) <-- part iff (l_partkey === p_partkey))
+//              Yield p_name
+//            )
+//        )
+//
+//    assert(q.isResolved)
+//    assert(q.isEvaluable)
+//    println(q.evalType)
+////    println(q.eval)
+//  }
+//
+//  test("Q2") {
+//    /**For each supplier, return the name and the names of all customers who have used them*/
+//    val q =
+//      For ((s_suppkey,s_name,s_nationkey) <-- supplier) Yield
+//        (s_name,
+//          For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (s_suppkey === l_suppkey)) Collect
+//            (
+//              For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (l_orderkey === o_orderkey)) Collect (
+//                For ((c_custkey,c_name,c_nationkey) <-- customer iff (o_custkey === c_custkey)) Yield c_name
+//              )
+//            )
+//        )
+//    assert(q.isResolved)
+//    assert(q.isEvaluable)
+//    println(q.evalType)
+////    println(q.eval)
+//  }
 
 }
