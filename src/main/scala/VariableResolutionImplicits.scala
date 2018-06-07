@@ -109,7 +109,7 @@ trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits
   (implicit resolve: Resolver[R,R1]):Resolver[BoxedRingExpr[R],BoxedRingExpr[R1]] =
     new Resolver[BoxedRingExpr[R],BoxedRingExpr[R1]] { def apply(v1: BoxedRingExpr[R]) = BoxedRingExpr(resolve(v1.c1)) }
 
-  implicit def LabelResolver[R <: Expr,R1 <: RingExpr]
+  implicit def LabelResolver[R <: RingExpr,R1 <: RingExpr]
   (implicit resolve: Resolver[R,R1]):Resolver[LabelExpr[R],LabelExpr[R1]] =
     new Resolver[LabelExpr[R],LabelExpr[R1]] { def apply(v1: LabelExpr[R]) = LabelExpr(resolve(v1.c1)) }
 
@@ -153,36 +153,36 @@ trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits
       new Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] {
         def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
     }
-
-  implicit def Project1RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
-    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project1KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
-    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
-  }
-
-  implicit def Project2RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
-    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project2KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
-    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
-  }
-
-  implicit def Project3RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
-    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project3KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
-    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
-  }
+//
+//  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
+//    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project1KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
+//    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project2RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
+//    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project2KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
+//    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project3RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
+//    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project3KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
+//    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
+//  }
 
 
 
@@ -315,7 +315,7 @@ trait StandardPriorityBindingImplicits extends LowPriorityBindingImplicits {
   (implicit bind: Binder[V,T,R,R1]): Binder[V,T,BoxedRingExpr[R],BoxedRingExpr[R1]] =
     new Binder[V,T,BoxedRingExpr[R],BoxedRingExpr[R1]] { def apply(v1: BoxedRingExpr[R]) = BoxedRingExpr(bind(v1.c1)) }
 
-  implicit def LabelBinder[V <: VariableExpr[V],T,R <: Expr,R1 <: RingExpr]
+  implicit def LabelBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
   (implicit bind: Binder[V,T,R,R1]): Binder[V,T,LabelExpr[R],LabelExpr[R1]] =
     new Binder[V,T,LabelExpr[R],LabelExpr[R1]] { def apply(v1: LabelExpr[R]) = LabelExpr(bind(v1.c1)) }
 
@@ -363,29 +363,29 @@ trait StandardPriorityBindingImplicits extends LowPriorityBindingImplicits {
       def apply(v1: Tuple3RingExpr[K1,K2,K3]) = Tuple3RingExpr(bind1(v1.c1),bind2(v1.c2),bind3(v1.c3))
     }
 
-  implicit def Project1RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project1RingExpr[R],Project1RingExpr[R1]] =
-    new Binder[V,T,Project1RingExpr[R],Project1RingExpr[R1]] { def apply(v1: Project1RingExpr[R]) = Project1RingExpr(recur(v1.c1)) }
-
-  implicit def Project2RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project2RingExpr[R],Project2RingExpr[R1]] =
-    new Binder[V,T,Project2RingExpr[R],Project2RingExpr[R1]] { def apply(v1: Project2RingExpr[R]) = Project2RingExpr(recur(v1.c1)) }
-
-  implicit def Project3RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project3RingExpr[R],Project3RingExpr[R1]] =
-    new Binder[V,T,Project3RingExpr[R],Project3RingExpr[R1]] { def apply(v1: Project3RingExpr[R]) = Project3RingExpr(recur(v1.c1)) }
-
-  implicit def Project1KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project1KeyExpr[R],Project1KeyExpr[R1]] =
-    new Binder[V,T,Project1KeyExpr[R],Project1KeyExpr[R1]] { def apply(v1: Project1KeyExpr[R]) = Project1KeyExpr(recur(v1.c1)) }
-
-  implicit def Project2KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project2KeyExpr[R],Project2KeyExpr[R1]] =
-    new Binder[V,T,Project2KeyExpr[R],Project2KeyExpr[R1]] { def apply(v1: Project2KeyExpr[R]) = Project2KeyExpr(recur(v1.c1)) }
-
-  implicit def Project3KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
-  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project3KeyExpr[R],Project3KeyExpr[R1]] =
-    new Binder[V,T,Project3KeyExpr[R],Project3KeyExpr[R1]] { def apply(v1: Project3KeyExpr[R]) = Project3KeyExpr(recur(v1.c1)) }
+//  implicit def Project1RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project1RingExpr[R],Project1RingExpr[R1]] =
+//    new Binder[V,T,Project1RingExpr[R],Project1RingExpr[R1]] { def apply(v1: Project1RingExpr[R]) = Project1RingExpr(recur(v1.c1)) }
+//
+//  implicit def Project2RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project2RingExpr[R],Project2RingExpr[R1]] =
+//    new Binder[V,T,Project2RingExpr[R],Project2RingExpr[R1]] { def apply(v1: Project2RingExpr[R]) = Project2RingExpr(recur(v1.c1)) }
+//
+//  implicit def Project3RingBinder[V <: VariableExpr[V],T,R <: RingExpr,R1 <: RingExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project3RingExpr[R],Project3RingExpr[R1]] =
+//    new Binder[V,T,Project3RingExpr[R],Project3RingExpr[R1]] { def apply(v1: Project3RingExpr[R]) = Project3RingExpr(recur(v1.c1)) }
+//
+//  implicit def Project1KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project1KeyExpr[R],Project1KeyExpr[R1]] =
+//    new Binder[V,T,Project1KeyExpr[R],Project1KeyExpr[R1]] { def apply(v1: Project1KeyExpr[R]) = Project1KeyExpr(recur(v1.c1)) }
+//
+//  implicit def Project2KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project2KeyExpr[R],Project2KeyExpr[R1]] =
+//    new Binder[V,T,Project2KeyExpr[R],Project2KeyExpr[R1]] { def apply(v1: Project2KeyExpr[R]) = Project2KeyExpr(recur(v1.c1)) }
+//
+//  implicit def Project3KeyBinder[V <: VariableExpr[V],T,R <: KeyExpr,R1 <: KeyExpr]
+//  (implicit recur: Binder[V,T,R,R1]): Binder[V,T,Project3KeyExpr[R],Project3KeyExpr[R1]] =
+//    new Binder[V,T,Project3KeyExpr[R],Project3KeyExpr[R1]] { def apply(v1: Project3KeyExpr[R]) = Project3KeyExpr(recur(v1.c1)) }
 
 }
 

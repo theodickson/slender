@@ -5,11 +5,18 @@ trait Ring[R] extends Serializable {
   def add(x1: R, x2: R): R
   def not(x1: R): R
   def negate(x1: R): R
+  def filterZeros(x1: R): R = x1
 }
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
+  def innerRing: Ring[R]
   def sum(c: C[K,R]): R
   def map[R1](c: C[K,R], f: (K,R) => (K,R1)): C[K,R1]
+  def filter(c: C[K,R], f: (K,R) => Boolean): C[K,R]
+  override def filterZeros(c: C[K,R]): C[K,R] = {
+    val recursivelyFiltered = map(c, (k,r) => (k,innerRing.filterZeros(r)))
+    filter(recursivelyFiltered, (k,r) => r != innerRing.zero)
+  }
 }
 
 trait NonCollectionRing[R] extends Ring[R]
@@ -28,3 +35,9 @@ trait NumericRing[R] extends NonCollectionRing[R] {
 trait Dot[T1,T2,O] extends ((T1,T2) => O) with Serializable
 
 trait Multiply[T1,T2,O] extends ((T1,T2) => O) with Serializable
+
+trait OpImplicits {
+  implicit class CollectionImplicits[C[_,_],K,R](c: C[K,R])(implicit coll: Collection[C,K,R]) {
+    def filterZeros: C[K,R] = coll.filterZeros(c)
+  }
+}

@@ -1,8 +1,15 @@
 package slender
 
-trait LowPriorityDSL {
+trait MakeExpr[X,E <: Expr] extends (X => E)
 
-  trait MakeExpr[X,E <: Expr] extends (X => E)
+trait ExtraLowPriorityDSL {
+  implicit def toKMakeExpr[T,R <: RingExpr](implicit recur: MakeExpr[T,R]): MakeExpr[T,BoxedRingExpr[R]] =
+    new MakeExpr[T,BoxedRingExpr[R]] {
+      def apply(v1: T) = BoxedRingExpr(recur(v1))
+    }
+}
+
+trait LowPriorityDSL extends ExtraLowPriorityDSL {
 
   implicit def toExpr[X,E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
 
@@ -74,12 +81,6 @@ trait LowPriorityDSL {
       (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, R2]]],Out]) =
       _collect(make(r2))
 
-//    def Yield[T, K <: KeyExpr, Out <: Expr]
-//      (k: T)
-//      (implicit make: MakeExpr[T,K],
-//       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, NumericExpr[Int]]]]], Out]): Out =
-//        _collect(SngExpr(make(k), NumericExpr(1)))
-
     def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
     (x: T)
     (implicit make: MakeKeyRingPair[T,K,R2],
@@ -99,11 +100,6 @@ trait LowPriorityDSL {
     (implicit make: MakeExpr[T,R2],
               resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]], Out]) =
       builder._collect(DotExpr[R2,P](make(r2),p))
-
-//    def Yield[T, K <: KeyExpr, Out <: Expr]
-//    (k: T)
-//    (implicit make: MakeExpr[T,K], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, SngExpr[K, P]]]], Out]): Out =
-//      builder._collect(SngExpr(make(k),p))
 
     def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
     (k: T)

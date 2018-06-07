@@ -76,19 +76,17 @@ case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   def opString = "⊙"
 }
 
-case class NotExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+case class NotExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
   type Self = NotExpr[E]
 }
 
-case class NegateExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+case class NegateExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
   type Self = NegateExpr[E]
 }
 
-case class SumExpr[E <: Expr](c1: E) extends UnaryRingExpr {
+case class SumExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
   type Self = SumExpr[E]
 }
-
-
 
 /**Mapping constructs*/
 case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)

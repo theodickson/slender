@@ -25,11 +25,11 @@ package object slender extends types with Serializable {
   implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
     new PairRDDFunctions(pairRdd.rdd)
 
-  implicit def mapToPhysicalCollection[K,R](map: Map[K,R])
+  implicit def mapToPhysicalCollection[K,R](map: => Map[K,R])
                                            (implicit coll: Collection[Map,K,R]): PhysicalCollection[Map,K,R] =
     PhysicalCollection(map)
 
-  implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)])
+  implicit def rddToPhysicalCollection[K,R](rdd: => RDD[(K,R)])
                                            (implicit coll: Collection[PairRDD,K,R]): PhysicalCollection[PairRDD,K,R] =
     PhysicalCollection(rdd)
 

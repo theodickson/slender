@@ -70,9 +70,10 @@ trait EvalImplicits {
     def apply(v1: SngExpr[K,R], v2: BoundVars): Map[TK,TR] = Map(evalK(v1.key,v2) -> evalR(v1.value,v2))
   }
 
-  implicit def BoxedRingEval[R <: RingExpr,T](implicit eval: Eval[R,T]): Eval[BoxedRingExpr[R],T] =
+  implicit def BoxedRingEval[R <: RingExpr,T](implicit eval: Eval[R,T], ring: Ring[T]): Eval[BoxedRingExpr[R],T] =
     new Eval[BoxedRingExpr[R],T] {
-      def apply(v1: BoxedRingExpr[R],v2: BoundVars): T = eval(v1.c1,v2)
+      //todo - rethink filtering here and overall
+      def apply(v1: BoxedRingExpr[R],v2: BoundVars): T = ring.filterZeros(eval(v1.c1,v2))
     }
 
   implicit def ToRingEval[E <: Expr,RT](implicit eval: Eval[E,RT], ring: Ring[RT]): Eval[ToRingExpr[E],RT] =

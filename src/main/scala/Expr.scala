@@ -1,5 +1,7 @@
 package slender
 
+import scala.reflect.runtime.universe.{Type,TypeTag,typeTag}
+
 trait Expr {
 
   type Self <: Expr
@@ -12,6 +14,8 @@ trait Expr {
   def children: List[Expr]
 
   def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(self,Map.empty)
+
+  def evalType[T : TypeTag](implicit evaluator: Eval[Self,T]): Type = typeTag[T].tpe
 
   def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(self)
 

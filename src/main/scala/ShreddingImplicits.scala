@@ -5,6 +5,9 @@ trait ShreddingImplicits {
   implicit def VariableShredder[V <: VariableExpr[V]]: NonShredder[V] = new NonShredder[V] {}
 
   implicit def PrimitiveExprShredder[E <: PrimitiveExpr[_]]: NonShredder[E] = new NonShredder[E] {}
+//
+//  implicit def PhysicalCollectionShredder[C[_,_],K,R](implicit coll: Collection[C,K,R]):
+//    Shredder[PhysicalCollection[C,K,R],ShreddedPhysicalCollection[C,K,R]]
 
   implicit def InfiniteMappingShredder[V <: VariableExpr[V],R <: RingExpr,RS <: RingExpr](implicit shred: Shredder[R,RS]):
   Shredder[InfiniteMappingExpr[V,R],InfiniteMappingExpr[V,RS]] =

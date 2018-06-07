@@ -25,6 +25,7 @@ trait RingImplicits {
 
   implicit def RDDCollection[K: ClassTag, R: ClassTag](implicit ring: Ring[R]): Collection[PairRDD, K, R] =
     new Collection[PairRDD, K, R] {
+      val innerRing = ring
       def zero = ??? // todo - need Spark context do initialize empty RDD but then cant serialize. however shouldnt ever need emptyRDD in practice.
       def add(x1: PairRDD[K, R], x2: PairRDD[K, R]) =
         x1.union(x2.rdd).groupByKey.mapValues(_.reduce(ring.add))
@@ -36,10 +37,15 @@ trait RingImplicits {
       def sum(c: PairRDD[K, R]): R = c.values.reduce(ring.add) //
 
       def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
+
+      def filter(c: PairRDD[K,R], f: (K,R) => Boolean): PairRDD[K,R] = c.filter { case (k, v) => f(k, v) }
     }
 
   implicit def MapCollection[K, R](implicit ring: Ring[R]): Collection[Map, K, R] =
     new Collection[Map, K, R] {
+
+      val innerRing = ring
+
       def zero: Map[K, R] = Map.empty[K,R]
 
       def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
@@ -52,6 +58,8 @@ trait RingImplicits {
       def sum(c: Map[K, R]): R = c.values.reduce(ring.add)
 
       def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
+
+      def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
     }
 }
 
@@ -153,4 +161,4 @@ trait MultiplyImplicits {
 
 }
 
-trait AlgebraImplicits extends RingImplicits with DotImplicits with MultiplyImplicits
+trait AlgebraImplicits extends RingImplicits with DotImplicits with MultiplyImplicits with OpImplicits
