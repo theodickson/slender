@@ -45,9 +45,11 @@ trait LowPriorityDSL extends ExtraLowPriorityDSL {
     }
 
 
-  implicit def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
+  def sum[R <: RingExpr](r: R): SumExpr[R] = SumExpr(r)
 
-  implicit def sng[K <: KeyExpr](k: K): SngExpr[K, NumericExpr[Int]] = SngExpr(k, NumericExpr(1))
+  def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
+
+  def sng[K <: KeyExpr](k: K): SngExpr[K, NumericExpr[Int]] = SngExpr(k, NumericExpr(1))
 
   def toK[E <: RingExpr](e: E): BoxedRingExpr[E] = BoxedRingExpr(e)
 
