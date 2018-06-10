@@ -40,7 +40,7 @@ package object slender extends types with Serializable {
   implicit def rddToPhysicalBag[K](rdd: => RDD[K])(implicit coll: Collection[PairRDD,K,Int]): PhysicalCollection[PairRDD,K,Int] =
     PhysicalCollection[PairRDD, K, Int](rdd.map(k => (k,1)))
 
-  object implicits extends AlgebraImplicits with ShreddingImplicits with EvalImplicits
+  object implicits extends ExprImplicits with AlgebraImplicits with ShreddingImplicits with EvalImplicits
     with DSL with Variables with VariableResolutionImplicits
 }
 
