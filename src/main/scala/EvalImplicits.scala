@@ -52,9 +52,9 @@ trait EvalImplicits {
       def apply(v1: AddExpr[E1,E2], v2: BoundVars): T = ring.add(eval1(v1.c1,v2),eval2(v1.c2,v2))
     }
 
-  implicit def SumEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], coll: Collection[C,K,R]):
-  Eval[SumExpr[E],R] = new Eval[SumExpr[E],R] {
-    def apply(v1: SumExpr[E], v2: BoundVars): R = coll.sum(eval(v1.c1,v2))
+  implicit def SumEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], coll: Collection[C,K,R], sum: Sum[C[K,R],O]):
+  Eval[SumExpr[E],O] = new Eval[SumExpr[E],O] {
+    def apply(v1: SumExpr[E], v2: BoundVars): O = coll.sum(eval(v1.c1,v2))
   }
 
   implicit def NotEval[E <: RingExpr,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NotExpr[E],T] = new Eval[NotExpr[E],T] {

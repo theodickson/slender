@@ -1,5 +1,7 @@
 package slender
 
+import scala.reflect.ClassTag
+
 trait Ring[R] extends Serializable {
   def zero: R
   def add(x1: R, x2: R): R
@@ -10,7 +12,7 @@ trait Ring[R] extends Serializable {
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
   def innerRing: Ring[R]
-  def sum(c: C[K,R]): R
+  def sum[S](c: C[K,R])(implicit ev: Sum[C[K,R],S]): S
   def map[R1](c: C[K,R], f: (K,R) => (K,R1)): C[K,R1]
   def filter(c: C[K,R], f: (K,R) => Boolean): C[K,R]
   override def filterZeros(c: C[K,R]): C[K,R] = {
@@ -31,6 +33,7 @@ trait NumericRing[R] extends NonCollectionRing[R] {
   def negate(t1: R): R = num.negate(t1)
 }
 
+trait Sum[T,S] extends (T => S) with Serializable
 
 trait Dot[T1,T2,O] extends ((T1,T2) => O) with Serializable
 

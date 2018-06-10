@@ -221,7 +221,7 @@ trait HighPriorityResolutionImplicits extends StandardPriorityResolutionImplicit
 
 
 trait LowPriorityBindingImplicits {
-  //The case that V1 <:< V and so actually binds to T takes precedence.
+  //The case that V1 <:< V and so actually binds to T takes precedence, hence this non-binder is here.
   implicit def VariableNonBinder[V <: UntypedVariable[V],V1 <: UntypedVariable[V1],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
 
   //The standard (non-transitive) reconstructive methods for tuples take precedence so that there is no ambiguity in the specific

@@ -1,5 +1,7 @@
 package slender
 
+import org.apache.spark.rdd.PairRDDFunctions
+
 import scala.reflect.ClassTag
 import scala.collection.immutable.Map
 
@@ -23,7 +25,7 @@ trait RingImplicits {
       def negate(t1: (R1,R2,R3)): (R1,R2,R3) = (r1.negate(t1._1),r2.negate(t1._2),r3.negate(t1._3))
     }
 
-  implicit def RDDCollection[K: ClassTag, R: ClassTag](implicit ring: Ring[R]): Collection[PairRDD, K, R] =
+  implicit def RDDCollection[K : ClassTag, R : ClassTag](implicit ring: Ring[R]): Collection[PairRDD, K, R] =
     new Collection[PairRDD, K, R] {
       val innerRing = ring
       def zero = ??? // todo - need Spark context do initialize empty RDD but then cant serialize. however shouldnt ever need emptyRDD in practice.
@@ -34,7 +36,7 @@ trait RingImplicits {
 
       def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
 
-      def sum(c: PairRDD[K, R]): R = c.values.reduce(ring.add) //
+      def sum[S](c: PairRDD[K, R])(implicit ev: Sum[PairRDD[K,R],S]): S = ev(c) //
 
       def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
 
@@ -55,11 +57,31 @@ trait RingImplicits {
 
       def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) } //Values(ring.negate)
 
-      def sum(c: Map[K, R]): R = c.values.reduce(ring.add)
+      def sum[S](c: Map[K, R])(implicit ev: Sum[Map[K,R],S]): S = ev(c)
 
       def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
 
       def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
+    }
+}
+
+
+trait SumImplicits {
+
+  implicit def MapSum[K, R](implicit ring: Ring[R]): Sum[Map[K,R],R] = new Sum[Map[K,R],R] {
+    def apply(v1: Map[K,R]): R = v1.values.reduce(ring.add)
+  }
+
+  implicit def RddNumericSum[K : ClassTag, N : ClassTag](implicit ring: NumericRing[N]): Sum[PairRDD[K,N],N] = new Sum[PairRDD[K,N],N] {
+    def apply(v1: PairRDD[K,N]): N = v1.values.reduce(ring.add)
+  }
+
+  implicit def RddMapSum[K : ClassTag, K1 : ClassTag, R1 : ClassTag](implicit ring: Ring[R1], tag: ClassTag[Map[K1,R1]]): Sum[PairRDD[K,Map[K1,R1]],PairRDD[K1, R1]] =
+    new Sum[PairRDD[K,Map[K1,R1]], PairRDD[K1, R1]] {
+      def apply(v1: PairRDD[K, Map[K1, R1]]): PairRDD[K1, R1] = {
+        val flatMapped = new PairRDDFunctions[K1, R1](v1.values.flatMap(x => x))
+        flatMapped.reduceByKey(ring.add)
+      }
     }
 }
 
@@ -161,4 +183,4 @@ trait MultiplyImplicits {
 
 }
 
-trait AlgebraImplicits extends RingImplicits with DotImplicits with MultiplyImplicits with OpImplicits
+trait AlgebraImplicits extends RingImplicits with DotImplicits with MultiplyImplicits with SumImplicits with OpImplicits
