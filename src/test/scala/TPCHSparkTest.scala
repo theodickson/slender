@@ -44,9 +44,9 @@ class TPCHSparkTest extends FunSuite {
       //Create an orderkey --> Bag[custkey x orderdate] mapping from the orders table.
       val orderCustomers =
         For ((o_orderkey,o_custkey,o_orderdate) <-- orders) Yield o_orderkey --> sng((o_custkey,o_orderdate))
-      //Using a similar pattern to the above join, multiply the orderParts with the orderCustomers and sum to get a
-      //Bag[custkey x orderdate x partname] which contains all such triples. Then we use a For/Yield to turn this into a
-      //custkey --> Bag[orderdate x partname] mapping.
+//      Using a similar pattern to the above join, multiply the orderParts with the orderCustomers and sum to get a
+//      Bag[custkey x orderdate x partname] which contains all such triples. Then we use a For/Yield to turn this into a
+//      custkey --> Bag[orderdate x partname] mapping.
       val customerKeyOrders =
         For (((custkey,orderdate),partname1) <-- sum(orderCustomers * orderParts)) Yield custkey --> sng((orderdate,partname1))
       //Create a custkey --> Bag[custname] mapping from the customer table.
@@ -56,11 +56,12 @@ class TPCHSparkTest extends FunSuite {
       val customerOrders =
         For ((custname,(orderdate1,partname2)) <-- sum(customerNames * customerKeyOrders)) Yield
           custname --> sng(orderdate1,sng(partname2))
-
-//      assert(customerOrders.isResolved)
-//      assert(customerOrders.isEvaluable)
-      println(customerOrders.evalType)
-      //q.eval.collect.foreach(println)
+//      orderCustomers.resolve
+      customerOrders.resolve
+//      _assert(customerOrders.isResolved)
+//      _assert(customerOrders.isEvaluable)
+//      println(customerOrders.evalType)
+//      customerOrders.eval.collect.foreach(println)
     }
   //
   //  test("Q2") {

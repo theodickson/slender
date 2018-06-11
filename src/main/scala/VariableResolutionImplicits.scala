@@ -1,5 +1,7 @@
 package slender
 
+import shapeless._
+
 /**Base trait for resolvers.
   * Instances of ResolverBase may be provided by the implicit CantResolve method, which which will be provide a
   * 'do-nothing' resolver for any expression.
@@ -16,13 +18,18 @@ package slender
   * This has the side-effect of not being able to tell if the result of an outermost For comprehension is actually
   * resolved without either calling 'isResolved' or explicitly re-resolving, but its a good interim solution.
 */
-trait ResolverBase[-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
+trait ResolverBase[-In,+Out] extends (In => Out) with Serializable
 
-trait Resolver[-In <: Expr,+Out <: Expr] extends ResolverBase[In,Out]
+trait Resolver[-In,+Out] extends ResolverBase[In,Out]
 
 trait Binder[V <: VariableExpr[V],T,-In <: Expr,+Out <: Expr] extends (In => Out) with Serializable
 
 object Resolver {
+
+  def instance[In, Out](f: In => Out): Resolver[In,Out] = new Resolver[In,Out] {
+    def apply(v1: In): Out = f(v1)
+  }
+
   def nonResolver[E <: Expr]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
 }
 
@@ -32,7 +39,7 @@ object Binder {
 }
 
 
-trait LowPriorityResolutionImplicits {
+trait Priority0ResolutionImplicits {
   //A default ResolverBase for any expression, so that for-comprehensions in the DSL can resolve expressions before
   //returning them (inner expressions may not be resolvable when initially returned).
   //Note that the other methods here and the main Resolve method require a Resolver not a ResolverBase so none of
@@ -40,7 +47,50 @@ trait LowPriorityResolutionImplicits {
   implicit def CantResolve[E <: Expr]: ResolverBase[E,E] = new ResolverBase[E,E] { def apply(v1: E) = v1 }
 }
 
-trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits {
+trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
+
+//  implicit def HNilResolver: Resolver[GenExpr[HNil], GenExpr[HNil]] =
+//    Resolver.instance[GenExpr[HNil], GenExpr[HNil]](identity[GenExpr[HNil]])
+//
+//  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+//  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[GenExpr[T1], GenExpr[T2]]):
+//    Resolver[GenExpr[H1 :: T1], GenExpr[H2 :: T2]] = Resolver.instance[GenExpr[H1 :: T1], GenExpr[H2 :: T2]] {
+//    case GenExpr(h1 :: t1) => {
+//      val h2 = resolveH(h1)
+//      val t2 = resolveT(GenExpr(t1)).repr
+//      val hlist2 = h2 :: t2
+//      GenExpr(hlist2)
+//    }
+//  }
+
+//  implicit def InductiveResolver[
+//    E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
+//  ]
+//  (implicit gen1: Generic.Aux[E1,Repr1], resolve: Resolver[Repr1,Repr2],
+//   ev: ReconstructAux[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
+//  Resolver[E1, E2] = new Resolver[E1, E2] {
+//    def apply(v1: E1): E2 = gen2.from(resolve(gen1.to(v1)))
+//  }
+
+//  implicit def InductiveResolver1[
+//  E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
+//  ]
+//  (implicit gen1: Generic.Aux[E1,Repr1], resolve: Resolver[Repr1,Repr2],
+//   ev: ReconstructAux[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
+//  Resolver[E1, E2] = new Resolver[E1, E2] {
+//    def apply(v1: E1): E2 = gen2.from(resolve(gen1.to(v1)))
+//  }
+
+//  implicit def InductiveResolver2[
+//  C[_,_],L1 <: Expr,R1 <: Expr,L2 <: Expr,R2 <: Expr, Repr1 <: HList, Repr2 <: HList
+//  ]
+//  (implicit gen1: Generic.Aux[C[L1,R1],Repr1], genResolve: Resolver[Repr1,Repr2], gen2: Generic.Aux[C[L2,R2], Repr2]):
+//  Resolver[C[L1,R1], C[L2,R2]] = new Resolver[C[L1,R1], C[L2,R2]] {
+//    def apply(v1: C[L1,R1]) = gen2.from(genResolve(gen1.to(v1)))
+//  }
+}
+
+trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
   implicit def PrimitiveExprResolver[E <: PrimitiveExpr[_]]: Resolver[E,E] = Resolver.nonResolver[E]
@@ -146,50 +196,47 @@ trait StandardPriorityResolutionImplicits extends LowPriorityResolutionImplicits
     }
 
   implicit def Tuple3VariableResolver[
-    K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K3 <: VariableExpr[K3],
-    K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B],K3B <: VariableExpr[K3B]
+  K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K3 <: VariableExpr[K3],
+  K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B],K3B <: VariableExpr[K3B]
   ](implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]):
-    Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] =
-      new Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] {
-        def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+  Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] =
+    new Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] {
+      def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
     }
-//
-//  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
-//    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
-//  }
-//
-//  implicit def Project1KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
-//    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
-//  }
-//
-//  implicit def Project2RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
-//    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
-//  }
-//
-//  implicit def Project2KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
-//    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
-//  }
-//
-//  implicit def Project3RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
-//    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
-//  }
-//
-//  implicit def Project3KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
-//  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
-//    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
-//  }
-
-
-
+  //
+  //  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
+  //    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
+  //  }
+  //
+  //  implicit def Project1KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
+  //    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
+  //  }
+  //
+  //  implicit def Project2RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
+  //    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
+  //  }
+  //
+  //  implicit def Project2KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
+  //    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
+  //  }
+  //
+  //  implicit def Project3RingResolver[R1 <: RingExpr,R2 <: RingExpr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
+  //    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
+  //  }
+  //
+  //  implicit def Project3KeyResolver[R1 <: KeyExpr,R2 <: KeyExpr](implicit resolver: Resolver[R1,R2]):
+  //  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
+  //    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
+  //  }
 }
 
 
-trait HighPriorityResolutionImplicits extends StandardPriorityResolutionImplicits {
+trait Priority3ResolutionImplicits extends Priority2ResolutionImplicits {
   //Note that the below doesnt strictly need to be here - as a there is no standalone resolver for an infinite mapping,
   //the standard MultiplyResolver if tried for MultiplyExpr with an InfMapping on the RHS will fail. However, it's logical
   //to aid the compiler by making it try this one first for such expressions.
@@ -217,6 +264,15 @@ trait HighPriorityResolutionImplicits extends StandardPriorityResolutionImplicit
       def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
         MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(bindLeft(v1.c2.key),resolver(bindRight(v1.c2.value))))
     }
+
+//  implicit def HNilResolver: Resolver[HNil,HNil] =
+//    Resolver.instance(identity[HNil])
+//
+//  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+//  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]):
+//  Resolver[H1 :: T1, H2 :: T2] = Resolver.instance[H1 :: T1, H2 :: T2] {
+//    case h1 :: t1 => resolveH(h1) :: resolveT(t1)
+//  }
 }
 
 
@@ -394,4 +450,4 @@ trait HighPriorityBindingImplicits extends StandardPriorityBindingImplicits {
   implicit def TypedNonBinder[V <: VariableExpr[V],V1 <: TypedVariable[_],T]: Binder[V,T,V1,V1] = Binder.nonBinder[V,T,V1]
 }
 
-trait VariableResolutionImplicits extends HighPriorityBindingImplicits with HighPriorityResolutionImplicits
+trait VariableResolutionImplicits extends HighPriorityBindingImplicits with Priority3ResolutionImplicits

@@ -18,5 +18,7 @@ object TestUtils {
     val sc = spark.sparkContext
     (spark,sc)
   }
+
+  def _assert(t: => Boolean): Unit = if (!t) throw new AssertionError("assertion failed.")
 //  def printEval[T, E <: Expr](e: E)(implicit eval: Eval[E,T]): Unit = println(e.eval)
 }
