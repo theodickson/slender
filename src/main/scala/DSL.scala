@@ -2,6 +2,10 @@ package slender
 
 import implicits._
 
+case class VariableRingPredicate[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](k: V, r: R, p: P = NumericExpr(1))
+
+case class KeyRingPair[V <: KeyExpr, R <: RingExpr](k: V, r: R)
+
 trait MakeExpr[X,E <: Expr] extends (X => E)
 
 trait ExtraLowPriorityDSL {
@@ -72,6 +76,64 @@ trait LowPriorityDSL extends ExtraLowPriorityDSL {
       def apply(v1: X): KeyRingPair[K,NumericExpr[Int]] = KeyRingPair(make(v1),NumericExpr(1))
     }
 
+//  case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](vrp: VariableRingPredicate[V,R,P]) {
+//    //todo - get rid of default NumericExpr(1)
+//
+//    val x = vrp.k; val r1 = vrp.r; val p = vrp.p
+//
+//    def _collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]] =
+//      SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, DotExpr(r2,p))))
+//
+//    def Collect[T, R2 <: RingExpr, Out <: Expr]
+//      (r2: T)
+//      (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]],Out]) =
+//        resolver(_collect(make(r2)))
+//
+//    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
+//      (x: T)
+//      (implicit make: MakeKeyRingPair[T,K,R2],
+//       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[SngExpr[K, R2],P]]]], Out]): Out = {
+//        val made = make(x)
+//        resolver(_collect(SngExpr(made.k, made.r)))
+//      }
+//  }
+//
+//  case class NestedForComprehensionBuilder[
+//    V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, P1 <: RingExpr, P2 <: RingExpr
+//  ](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
+//    //todo - this works but takes forever to compile. Perhaps a more elegant and general solution might be quicker,
+//    //otherwise can it.
+//    def Collect[T, R3 <: RingExpr, Out <: Expr]
+//    (r3: T)(implicit make: MakeExpr[T, R3],
+//            resolver: ResolverBase[
+//              SumExpr[
+//                MultiplyExpr[
+//                  R1,
+//                  InfiniteMappingExpr[
+//                    V1,
+//                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[R3, P2]]]], P1]]]],
+//              Out
+//              ]) = {
+//      val made = make(r3)
+//      builder1._collect(builder2._collect(made))
+//    }
+//
+//    def Yield[T, K <: KeyExpr, R3 <: RingExpr, Out <: Expr]
+//    (r3: T)(implicit make: MakeKeyRingPair[T, K, R3],
+//            resolver: ResolverBase[
+//              SumExpr[
+//                MultiplyExpr[
+//                  R1,
+//                  InfiniteMappingExpr[
+//                    V1,
+//                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[SngExpr[K, R3], P2]]]], P1]]]],
+//              Out
+//              ]) = {
+//      val made = make(r3)
+//      builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
+//    }
+//  }
+
   case class ForComprehensionBuilder[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](vrp: VariableRingPredicate[V,R,P]) {
     //todo - get rid of default NumericExpr(1)
 
@@ -80,51 +142,31 @@ trait LowPriorityDSL extends ExtraLowPriorityDSL {
     def _collect[R2 <: RingExpr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]] =
       SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, DotExpr(r2,p))))
 
-    def Collect[T, R2 <: RingExpr, Out <: Expr]
-      (r2: T)
-      (implicit make: MakeExpr[T,R2], resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]],Out]) =
-        resolver(_collect(make(r2)))
+    def Collect[T, R2 <: RingExpr]
+    (r2: T)
+    (implicit make: MakeExpr[T,R2]) = _collect(make(r2))
 
-    def Yield[T, K <: KeyExpr, R2 <: RingExpr, Out <: Expr]
-      (x: T)
-      (implicit make: MakeKeyRingPair[T,K,R2],
-       resolver: ResolverBase[SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[SngExpr[K, R2],P]]]], Out]): Out = {
-        val made = make(x)
-        resolver(_collect(SngExpr(made.k, made.r)))
-      }
+    def Yield[T, K <: KeyExpr, R2 <: RingExpr]
+    (x: T)
+    (implicit make: MakeKeyRingPair[T,K,R2]) = {
+      val made = make(x)
+      _collect(SngExpr(made.k, made.r))
+    }
   }
 
   case class NestedForComprehensionBuilder[
-    V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, P1 <: RingExpr, P2 <: RingExpr
+  V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, P1 <: RingExpr, P2 <: RingExpr
   ](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
     //todo - this works but takes forever to compile. Perhaps a more elegant and general solution might be quicker,
     //otherwise can it.
-    def Collect[T, R3 <: RingExpr, Out <: Expr]
-    (r3: T)(implicit make: MakeExpr[T, R3],
-            resolver: ResolverBase[
-              SumExpr[
-                MultiplyExpr[
-                  R1,
-                  InfiniteMappingExpr[
-                    V1,
-                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[R3, P2]]]], P1]]]],
-              Out
-              ]) = {
+    def Collect[T, R3 <: RingExpr]
+    (r3: T)(implicit make: MakeExpr[T, R3]) = {
       val made = make(r3)
       builder1._collect(builder2._collect(made))
     }
 
-    def Yield[T, K <: KeyExpr, R3 <: RingExpr, Out <: Expr]
-    (r3: T)(implicit make: MakeKeyRingPair[T, K, R3],
-            resolver: ResolverBase[
-              SumExpr[
-                MultiplyExpr[
-                  R1,
-                  InfiniteMappingExpr[
-                    V1,
-                    DotExpr[SumExpr[MultiplyExpr[R2, InfiniteMappingExpr[V2, DotExpr[SngExpr[K, R3], P2]]]], P1]]]],
-              Out
-              ]) = {
+    def Yield[T, K <: KeyExpr, R3 <: RingExpr]
+    (r3: T)(implicit make: MakeKeyRingPair[T, K, R3]) = {
       val made = make(r3)
       builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
     }

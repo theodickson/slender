@@ -1,5 +1,7 @@
 package slender
 
+import scala.reflect.runtime.universe._
+
 sealed trait Expr {
 
   def children: List[Expr]
@@ -58,17 +60,17 @@ sealed trait ProductExpr extends Expr {
 }
 
 sealed trait Project1Expr extends UnaryExpr {
-  def c1: C1Expr
+  def c1: Expr with C1Expr
   override def toString = s"$c1._1"
 }
 
 sealed trait Project2Expr extends UnaryExpr {
-  def c1: C2Expr
+  def c1: Expr with C2Expr
   override def toString = s"$c1._2"
 }
 
 sealed trait Project3Expr extends UnaryExpr {
-  def c1: C3Expr
+  def c1: Expr with C3Expr
   override def toString = s"$c1._3"
 }
 
@@ -395,5 +397,62 @@ trait Variables {
   val K1 = new _K1 {}
   val K2 = new _K2 {}
   val K3 = new _K3 {}
+
+}
+
+
+
+trait ExprImplicits {
+
+  implicit class ExprOps[E <: Expr](e: E) {
+
+    def eval[R <: Expr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
+
+    def evalType[T : TypeTag, R <: Expr](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
+
+    def resolve[T <: Expr](implicit resolver: Resolver[E,T]): T = resolver(e)
+
+    def shred[Shredded <: Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
+
+    def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined
+
+    def isEvaluable[T](implicit canEval: Perhaps[Eval[E,_]]) = canEval.value.isDefined
+
+    def isResolvable[T](implicit canResolve: Perhaps[Resolver[E,_]]): Boolean = canResolve.value.isDefined
+  }
+
+  implicit class KeyExprOps[K <: KeyExpr](k: K) {
+    def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(k, k1)
+    def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(k, k1))
+
+    def >[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ > _, ">")
+    def <[K1 <: KeyExpr](k1: K1) = IntPredicate(k, k1, _ < _, "<")
+
+    def -->[R <: RingExpr](r: R): KeyRingPair[K,R] = KeyRingPair(k,r)
+  }
+
+  implicit class RingExprOps[R <: RingExpr](r: R) {
+    def +[R1 <: RingExpr](expr1: R1) = AddExpr(r,expr1)
+
+    def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(r,expr1)
+
+    def dot[R1 <: RingExpr](expr1: R1) = DotExpr(r,expr1)
+
+    def sum = SumExpr(r)
+
+    def unary_- = NegateExpr(r)
+
+    def unary_! = NotExpr(r)
+
+    def &&[R1 <: RingExpr](expr1: R1) = this.*[R1](expr1)
+
+    def ||[R1 <: RingExpr](expr1: R1) = this.+[R1](expr1)
+  }
+
+  implicit class VariableExprOps[V <: VariableExpr[V]](v: V) {
+    def <--[R <: RingExpr](r: R): VariableRingPredicate[V,R,NumericExpr[Int]] = VariableRingPredicate(v,r)
+    def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(v,r)
+  }
+
 
 }

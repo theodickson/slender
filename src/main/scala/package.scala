@@ -1,4 +1,5 @@
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
+import slender.{Collection, KeyExpr, NumericExpr, PhysicalCollection, RingExpr, VariableExpr}
 
 import scala.reflect.ClassTag
 
@@ -25,23 +26,22 @@ package object slender extends types with Serializable {
   implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
     new PairRDDFunctions(pairRdd.rdd)
 
-  implicit def mapToPhysicalCollection[K,R](map: => Map[K,R])
+  implicit def mapToPhysicalCollection[K,R](map: Map[K,R])
                                            (implicit coll: Collection[Map,K,R]): PhysicalCollection[Map,K,R] =
     PhysicalCollection(map)
 
-  implicit def setToPhysicalBag[K](set: => Set[K])
-                                           (implicit coll: Collection[Map,K,Int]): PhysicalCollection[Map,K,Int] =
+  implicit def setToPhysicalBag[K](set: Set[K])
+                                  (implicit coll: Collection[Map,K,Int]): PhysicalCollection[Map,K,Int] =
     PhysicalCollection(set.map(k => (k,1)).toMap)
 
-  implicit def rddToPhysicalCollection[K,R](rdd: => RDD[(K,R)])
+  implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)])
                                            (implicit coll: Collection[PairRDD,K,R]): PhysicalCollection[PairRDD,K,R] =
     PhysicalCollection(rdd)
 
-  implicit def rddToPhysicalBag[K](rdd: => RDD[K])(implicit coll: Collection[PairRDD,K,Int]): PhysicalCollection[PairRDD,K,Int] =
+  implicit def rddToPhysicalBag[K](rdd: RDD[K])(implicit coll: Collection[PairRDD,K,Int]): PhysicalCollection[PairRDD,K,Int] =
     PhysicalCollection[PairRDD, K, Int](rdd.map(k => (k,1)))
 
-  object implicits extends ExprImplicits with AlgebraImplicits with ShreddingImplicits with EvalImplicits
-    with DSL with Variables with VariableResolutionImplicits with ReconstructionImplicits
+  object implicits extends DSL with ExprImplicits with Variables
 }
 
 

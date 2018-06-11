@@ -38,10 +38,10 @@ class TPCHSparkTest extends FunSuite {
       val partOrders = For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield l_partkey --> sng(l_orderkey)
       //Turn parts into a partkey --> Bag[partname] mapping (each bag will contain just one element, but we need it like this for the join)
       val partNames = For ((p_partkey,p_name) <-- part) Yield p_partkey --> sng(p_name)
-      //Multiply partOrders and partNames, to get a partkey --> Bag[orderkey x partname], then sum, to get just a Bag[orderkey x partname],
-      //which contains every orderkey,partname pair. The outer for comprehension turns this into an orderkey --> Bag[partname] mapping.
+//      //Multiply partOrders and partNames, to get a partkey --> Bag[orderkey x partname], then sum, to get just a Bag[orderkey x partname],
+//      //which contains every orderkey,partname pair. The outer for comprehension turns this into an orderkey --> Bag[partname] mapping.
       val orderParts = For ((orderkey,partname) <-- sum(partOrders * partNames)) Yield orderkey --> sng(partname)
-      //Create an orderkey --> Bag[custkey x orderdate] mapping from the orders table.
+//      //Create an orderkey --> Bag[custkey x orderdate] mapping from the orders table.
       val orderCustomers =
         For ((o_orderkey,o_custkey,o_orderdate) <-- orders) Yield o_orderkey --> sng((o_custkey,o_orderdate))
 //      Using a similar pattern to the above join, multiply the orderParts with the orderCustomers and sum to get a
@@ -56,12 +56,11 @@ class TPCHSparkTest extends FunSuite {
       val customerOrders =
         For ((custname,(orderdate1,partname2)) <-- sum(customerNames * customerKeyOrders)) Yield
           custname --> sng(orderdate1,sng(partname2))
-//      orderCustomers.resolve
-      customerOrders.resolve
+
 //      _assert(customerOrders.isResolved)
 //      _assert(customerOrders.isEvaluable)
 //      println(customerOrders.evalType)
-//      customerOrders.eval.collect.foreach(println)
+      customerOrders.eval.collect.foreach(println)
     }
   //
   //  test("Q2") {
