@@ -33,10 +33,11 @@ class IntegrationTests extends FunSuite {
 //  }
 
   test("") {
-//    val expr = GenBinaryExpr(IntKeyExpr(1), IntKeyExpr(1))
-    val expr = SumExpr(PhysicalCollection(Set(1,2,3)))
-    expr.resolve
-    println(expr.resolve.eval)
+    val expr1 = Tuple2VariableExpr(TypedVariable[Int](""), TypedVariable[Int](""))
+    val expr2 = SumExpr(PhysicalCollection(Set(1,2,3)))
+    expr1.resolve
+    expr2.resolve
+//    println(expr.resolve.eval)
   }
 //  test("Simple query") {
 //    val query = For(X <-- bagOfInts) Yield X --> NumericExpr(1)

@@ -1,43 +1,18 @@
 package slender
 
-import shapeless.ops.hlist.{ToList, ToTraversable}
-import shapeless.{HList, LUBConstraint}
-
-import scala.reflect.runtime.universe.{Type, TypeTag, typeTag}
-
 sealed trait Expr {
 
-  type Self <: Expr
-
-  //todo - figure out if can make Expr F-bound or use the self type pattern somehow.
-  //dont think so - had to make VariablExpr F-bound, which interestingly meant UntypedVariable could not be F-bound,
-  //see that code for details.
-  def self: Self = this.asInstanceOf[Self]
-
   def children: List[Expr]
-
-//  def eval[T](implicit evaluator: Eval[Self,T]): T = evaluator(self,Map.empty)
-//
-//  def evalType[T : TypeTag](implicit evaluator: Eval[Self,T]): Type = typeTag[T].tpe
-//
-//  def resolve[T <: Expr](implicit resolver: Resolver[Self,T]): T = resolver(self)
-//
-//  def shred[Shredded <: Expr](implicit shredder: Shredder[Self,Shredded]): Shredded = shredder(self)
-//
-//  def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[Self,Shredded]]) = canShred.value.isDefined
-//
-//  def isEvaluable[T](implicit canEval: Perhaps[Eval[Self,_]]) = canEval.value.isDefined
 
   def id = hashCode.abs.toString.take(3).toInt
 
   def isResolved: Boolean = children.forall(_.isResolved)
-
 //  def variables: Set[Variable[_]] =
 //    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.variables)
 //  def freeVariables: Set[Variable[_]] =
 //    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.freeVariables)
-  def labels: List[LabelExpr[_]] =
-    children.foldLeft(List.empty[LabelExpr[_]])((acc,v) => acc ++ v.labels)
+//  def labels: List[LabelExpr[_]] =
+//    children.foldLeft(List.empty[LabelExpr[_]])((acc,v) => acc ++ v.labels)
 //  def labelDefinitions: Seq[String] = labels.map(_.definition)
 
 //  def brackets: (String,String) = ("","")
@@ -58,27 +33,6 @@ sealed trait Expr {
 //  }
 }
 
-case class GenExpr[Repr <: HList](repr: Repr)
-
-case class GenBinaryExpr[L <: Expr, R <: Expr](c1: L, c2: R) extends BinaryExpr
-
-trait ExprImplicits {
-
-  implicit class ExprOps[E <: Expr](e: E) {
-    def eval[T](implicit evaluator: Eval[E,T]): T = evaluator(e,Map.empty)
-
-    def evalType[T : TypeTag](implicit evaluator: Eval[E,T]): Type = typeTag[T].tpe
-
-    def resolve[T <: Expr](implicit resolver: Resolver[E,T]): T = resolver(e)
-
-    def shred[Shredded <: Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
-
-    def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined
-
-    def isEvaluable[T](implicit canEval: Perhaps[Eval[E,_]]) = canEval.value.isDefined
-  }
-
-}
 sealed trait C1Expr extends Expr { def c1: Expr }
 sealed trait C2Expr extends Expr { def c2: Expr }
 sealed trait C3Expr extends Expr { def c3: Expr }
@@ -123,30 +77,19 @@ sealed trait PrimitiveExpr[V] extends NullaryExpr {
   override def toString = value.toString
 }
 
-sealed trait KeyExpr extends Expr {
 
-  type Self <: KeyExpr
 
-  def ===[K1 <: KeyExpr](k1: K1) = EqualsPredicate(self, k1)
-  def =!=[K1 <: KeyExpr](k1: K1) = NotExpr(EqualsPredicate(self, k1))
 
-  def >[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ > _, ">")
-  def <[K1 <: KeyExpr](k1: K1) = IntPredicate(self, k1, _ < _, "<")
-
-  def -->[R <: RingExpr](r: R): KeyRingPair[Self,R] = KeyRingPair(self,r)
-}
-
-case class KeyRingPair[V <: KeyExpr, R <: RingExpr](k: V, r: R)
+/**KeyExpr*/
+sealed trait KeyExpr extends Expr
 
 sealed trait NullaryKeyExpr extends KeyExpr with NullaryExpr
 sealed trait UnaryKeyExpr extends KeyExpr with UnaryExpr
 sealed trait BinaryKeyExpr extends KeyExpr with BinaryExpr
 sealed trait TernaryKeyExpr extends KeyExpr with TernaryExpr
 
+case class PrimitiveKeyExpr[T](value: T) extends KeyExpr with PrimitiveExpr[T]
 
-case class PrimitiveKeyExpr[T](value: T) extends KeyExpr with PrimitiveExpr[T] {
-  type Self = PrimitiveKeyExpr[T]
-}
 object IntKeyExpr {
   def apply(i: Int) = PrimitiveKeyExpr(i)
 }
@@ -154,41 +97,23 @@ object StringKeyExpr {
   def apply(s: String) = PrimitiveKeyExpr(s)
 }
 
-
-case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with ProductExpr {
-  type Self = Tuple2KeyExpr[K1,K2]
-}
+case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with ProductExpr
 
 case class Tuple3KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryKeyExpr with ProductExpr {
-  type Self = Tuple3KeyExpr[K1,K2,K3]
-}
+  extends TernaryKeyExpr with ProductExpr
 
+case class Project1KeyExpr[K <: KeyExpr with C1Expr](c1: K) extends UnaryKeyExpr with Project1Expr
 
-case class Project1KeyExpr[K <: KeyExpr with C1Expr](c1: K) extends UnaryKeyExpr with Project1Expr {
-  type Self = Project1KeyExpr[K]
-}
+case class Project2KeyExpr[K <: KeyExpr with C2Expr](c1: K) extends UnaryKeyExpr with Project2Expr
 
-case class Project2KeyExpr[K <: KeyExpr with C2Expr](c1: K) extends UnaryKeyExpr with Project2Expr {
-  type Self = Project2KeyExpr[K]
-}
-
-case class Project3KeyExpr[K <: KeyExpr with C3Expr](c1: K) extends UnaryKeyExpr with Project3Expr {
-  type Self = Project3KeyExpr[K]
-}
-
+case class Project3KeyExpr[K <: KeyExpr with C3Expr](c1: K) extends UnaryKeyExpr with Project3Expr
 
 case class BoxedRingExpr[R <: Expr](c1: R) extends UnaryKeyExpr {
-  type Self = BoxedRingExpr[R]
   override def toString = s"[$c1]"
 }
 
 case class LabelExpr[R <: RingExpr](c1: R) extends UnaryKeyExpr {
-
-  type Self = LabelExpr[R]
-
   override def toString = s"Label($id)"
-
   //  def explainFreeVariables = freeVariables.map(_.explain).mkString("\n\t")
   //
   //  def definition: String = {
@@ -203,56 +128,32 @@ case class LabelExpr[R <: RingExpr](c1: R) extends UnaryKeyExpr {
   //    LabelExpr(c1.replaceTypes(vars, overwrite))
 
   //  def renest = BoxedRingExpr(FromLabel(LabelExpr(c1.renest))) //todo
-
 }
 
-sealed trait RingExpr extends Expr {
 
-  type Self <: RingExpr
 
-  def +[R1 <: RingExpr](expr1: R1) = AddExpr(self,expr1)
 
-  def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(self,expr1)
 
-  def dot[R1 <: RingExpr](expr1: R1) = DotExpr(self,expr1)
-
-  def sum = SumExpr(self)
-
-  def unary_- = NegateExpr(self)
-
-  def unary_! = NotExpr(self)
-
-  def &&[R1 <: RingExpr](expr1: R1) = this.*[R1](expr1)
-
-  def ||[R1 <: RingExpr](expr1: R1) = this.+[R1](expr1)
-
-}
+/**RingExpr*/
+sealed trait RingExpr extends Expr
 
 sealed trait NullaryRingExpr extends RingExpr with NullaryExpr
 sealed trait UnaryRingExpr extends RingExpr with UnaryExpr
 sealed trait BinaryRingExpr extends RingExpr with BinaryExpr
 sealed trait TernaryRingExpr extends RingExpr with TernaryExpr
 
-
-
 /**Primitive ring expressions*/
 sealed trait PrimitiveRingExpr[T] extends RingExpr with PrimitiveExpr[T]
 
-case class NumericExpr[N : Numeric](value: N) extends PrimitiveRingExpr[N] {
-  type Self = NumericExpr[N]
-}
+case class NumericExpr[N : Numeric](value: N) extends PrimitiveRingExpr[N]
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit collection: Collection[C,K,R])
-  extends PrimitiveRingExpr[C[K,R]] {
-  type Self = PhysicalCollection[C,K,R]
-}
+  extends PrimitiveRingExpr[C[K,R]]
 
 object PhysicalCollection {
   def apply[T](value: Set[T])(implicit collection: Collection[Map,T,Int]): PhysicalCollection[Map,T,Int] =
     PhysicalCollection(value.map((_,1)).toMap)
 }
-
-
 
 /**Standard ring operations*/
 sealed trait BinaryRingOpExpr extends BinaryRingExpr {
@@ -263,55 +164,36 @@ sealed trait BinaryRingOpExpr extends BinaryRingExpr {
 
 case class AddExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   extends BinaryRingOpExpr {
-
-  type Self = AddExpr[E1,E2]
   def opString = "+"
 }
 
 case class MultiplyExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   extends BinaryRingOpExpr {
-
-  type Self = MultiplyExpr[E1,E2]
   def opString = "*"
 }
 
 case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   extends BinaryRingOpExpr {
-
-  type Self = DotExpr[E1,E2]
   def opString = "⊙"
 }
 
-case class NotExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
-  type Self = NotExpr[E]
-}
+case class NotExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
-case class NegateExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
-  type Self = NegateExpr[E]
-}
+case class NegateExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
-case class SumExpr[E <: RingExpr](c1: E) extends UnaryRingExpr {
-  type Self = SumExpr[E]
-}
+case class SumExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
 /**Mapping constructs*/
 case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)
   extends BinaryRingExpr {
-
-  type Self = InfiniteMappingExpr[K,R]
   def c1 = key; def c2 = value
-
   override def toString = s"{$key => $value}"
-
 }
 
 case class SngExpr[K <: KeyExpr,R <: RingExpr](key: K, value: R)
   extends BinaryRingExpr {
-  type Self = SngExpr[K,R]
   def c1 = key; def c2 = value
 }
-
-
 
 /**Predicates*/
 sealed trait Predicate extends BinaryRingExpr {
@@ -321,22 +203,17 @@ sealed trait Predicate extends BinaryRingExpr {
 }
 
 case class EqualsPredicate[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends Predicate {
-  type Self = EqualsPredicate[K1,K2]
   def opString = "="
 }
 
 case class IntPredicate[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2, p: (Int,Int) => Boolean, opString: String)
-  extends Predicate {
-  type Self = IntPredicate[K1, K2]
-}
+  extends Predicate
 
 object Predicate {
   def apply[K1 <: KeyExpr, K2 <: KeyExpr](k1: K1, k2: K2) = EqualsPredicate(k1,k2)
 }
 
-
-
-/**Conversions from rings*/
+/**Conversions from keys*/
 ////sealed trait FromK extends RingExpr with UnaryExpr[E[KeyExpr]
 ////
 ////object FromK {
@@ -347,9 +224,7 @@ object Predicate {
 ////  }
 ////}
 ////
-case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
-  type Self = ToRingExpr[E]
-}
+case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr
 //case class FromBoxedRing[R,E <: Expr[R,E]](c1: BoxedRingExpr[R,E]) extends Expr[R,FromBoxedRing[R,E]] with UnaryExpr[R,BoxedRingExpr[R,E]] {
 ////  def replaceTypes(vars: Map[String, KeyType], overwrite: Boolean) =
 ////    FromBoxedRing(c1.replaceTypes(vars, overwrite))
@@ -368,7 +243,6 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
 //}
 
 
-
 /**Tupling and projection*/
 //case class ProductRingExpr[L <: HList, Lub <: LUBConstraint[L, RingExpr]]
 //  (l: L)(implicit lub: Lub, trav: ToTraversable.Aux[L, List, Lub] { type Out <: List[RingExpr] }) extends RingExpr with ProductExpr {
@@ -384,39 +258,23 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr {
 //  def children: List[RingExpr] = l.toList//.asInstanceOf[List[RingExpr]]//l.toList(trav).map(_.asInstanceOf[RingExpr])//l.toList[Lub](trav)
 //}
 
-case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr {
-  type Self = Tuple2RingExpr[K1,K2]
-}
+case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr
 
 case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryRingExpr with ProductExpr {
-  type Self = Tuple3RingExpr[K1,K2,K3]
-}
+  extends TernaryRingExpr with ProductExpr
 
-case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr {
-  type Self = Project1RingExpr[K]
-}
+case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr
 
-case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr {
-  type Self = Project2RingExpr[K]
-}
+case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr
 
-case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr {
-  type Self = Project3RingExpr[K]
-}
+case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr
 
-
-sealed trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr { self: V =>
+sealed trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr {
   type Type
   def bind(t: Type): BoundVars
-  def <--[R <: RingExpr](r: R): VariableRingPredicate[V,R,NumericExpr[Int]] = VariableRingPredicate(this,r)
-  def ==>[R <: RingExpr](r: R): InfiniteMappingExpr[V,R] = InfiniteMappingExpr(this,r)
 }
 
-case class VariableRingPredicate[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](k: V, r: R, p: P = NumericExpr(1))
-
 case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]] with NullaryKeyExpr {
-  type Self = TypedVariable[T]
   type Type = T
   override def toString = name
   def bind(t: T) = Map(this.name -> t)
@@ -424,8 +282,7 @@ case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]]
 }
 
 
-sealed trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with NullaryKeyExpr { self: T =>
-  type Self = T
+sealed trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with NullaryKeyExpr {
   type Type = Untyped
   def name: String
   def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name)
@@ -436,14 +293,12 @@ sealed trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with 
 
 case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
   extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with ProductExpr {
-  type Self = Tuple2VariableExpr[V1,V2]
   type Type = (c1.Type,c2.Type)
   def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
 }
 
 case class Tuple3VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3]](c1: V1, c2: V2, c3: V3)
   extends VariableExpr[Tuple3VariableExpr[V1,V2,V3]] with BinaryExpr with ProductExpr {
-  type Self = Tuple3VariableExpr[V1,V2,V3]
   type Type = (c1.Type,c2.Type,c3.Type)
   def bind(t: (c1.Type,c2.Type,c3.Type)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
 }

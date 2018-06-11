@@ -41,7 +41,7 @@ package object slender extends types with Serializable {
     PhysicalCollection[PairRDD, K, Int](rdd.map(k => (k,1)))
 
   object implicits extends ExprImplicits with AlgebraImplicits with ShreddingImplicits with EvalImplicits
-    with DSL with Variables with VariableResolutionImplicits
+    with DSL with Variables with VariableResolutionImplicits with ReconstructionImplicits
 }
 
 
