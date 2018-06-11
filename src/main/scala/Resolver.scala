@@ -2,7 +2,7 @@ package slender
 
 import shapeless._
 
-trait Resolver[-In,+Out] extends (In => Out) with Serializable//ResolverBase[In,Out]
+trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
 trait HResolver[-In,+Out] extends (In => Out) with Serializable
 
@@ -22,7 +22,7 @@ object HResolver {
   }
 
   implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
-  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]):
+  (implicit resolveH: Resolver[H1, H2], resolveT: HResolver[T1, T2]):
   HResolver[H1 :: T1, H2 :: T2] = new HResolver[H1 :: T1, H2 :: T2] {
     def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
       case h1 :: t1 => resolveH(h1) :: resolveT(t1)
@@ -32,8 +32,17 @@ object HResolver {
 }
 trait Priority0ResolutionImplicits {
 
-  implicit def PrimitiveRingExprResolver[V]: Resolver[PrimitiveRingExpr[V],PrimitiveRingExpr[V]] =
-    Resolver.nonResolver[PrimitiveRingExpr[V]]
+  implicit def NumericExprResolver[V]: Resolver[NumericExpr[V],NumericExpr[V]] =
+    Resolver.nonResolver[NumericExpr[V]]
+
+  implicit def InductiveResolver[
+    E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
+  ]
+  (implicit gen1: Generic.Aux[E1,Repr1], resolve: HResolver[Repr1,Repr2],
+   ev: Reconstruct[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
+  Resolver[E1, E2] = new Resolver[E1, E2] {
+    def apply(v1: E1): E2 = gen2.from(resolve(gen1.to(v1)))
+  }
 }
 
 trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
@@ -47,41 +56,12 @@ trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
 
   implicit def VariableResolver[V <: UntypedVariable[V],T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]
-//  implicit def HNilResolver: Resolver[GenExpr[HNil], GenExpr[HNil]] =
-//    Resolver.instance[GenExpr[HNil], GenExpr[HNil]](identity[GenExpr[HNil]])
-//
-//  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
-//  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[GenExpr[T1], GenExpr[T2]]):
-//    Resolver[GenExpr[H1 :: T1], GenExpr[H2 :: T2]] = Resolver.instance[GenExpr[H1 :: T1], GenExpr[H2 :: T2]] {
-//    case GenExpr(h1 :: t1) => {
-//      val h2 = resolveH(h1)
-//      val t2 = resolveT(GenExpr(t1)).repr
-//      val hlist2 = h2 :: t2
-//      GenExpr(hlist2)
-//    }
-//  }
 
-  implicit def InductiveResolver[
-    E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
-  ]
-  (implicit gen1: Generic.Aux[E1,Repr1], resolve: HResolver[Repr1,Repr2],
-   ev: Reconstruct[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
-  Resolver[E1, E2] = new Resolver[E1, E2] {
-    def apply(v1: E1): E2 = gen2.from(resolve(gen1.to(v1)))
-  }
-
-//  implicit def InductiveResolver2[
-//  C[_,_],L1 <: Expr,R1 <: Expr,L2 <: Expr,R2 <: Expr, Repr1 <: HList, Repr2 <: HList
-//  ]
-//  (implicit gen1: Generic.Aux[C[L1,R1],Repr1], genResolve: Resolver[Repr1,Repr2], gen2: Generic.Aux[C[L2,R2], Repr2]):
-//  Resolver[C[L1,R1], C[L2,R2]] = new Resolver[C[L1,R1], C[L2,R2]] {
-//    def apply(v1: C[L1,R1]) = gen2.from(genResolve(gen1.to(v1)))
-//  }
 }
 
 trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Standard inductive cases*/
-//  //Ring expresssions
+  //Ring expresssions
 //  implicit def AddResolver[L <: RingExpr, R <: RingExpr, L1 <: RingExpr, R1 <: RingExpr]
 //  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =
 //    new Resolver[AddExpr[L,R],AddExpr[L1,R1]] {

@@ -57,10 +57,11 @@ class TPCHSparkTest extends FunSuite {
         For ((custname,(orderdate1,partname2)) <-- sum(customerNames * customerKeyOrders)) Yield
           custname --> sng(orderdate1,sng(partname2))
 
+      customerOrders.resolve
 //      _assert(customerOrders.isResolved)
 //      _assert(customerOrders.isEvaluable)
 //      println(customerOrders.evalType)
-      customerOrders.eval.collect.foreach(println)
+//      customerOrders.eval.collect.foreach(println)
     }
   //
   //  test("Q2") {

@@ -31,8 +31,8 @@ object Eval {
     def apply(v1: PrimitiveKeyExpr[V], v2: BoundVars): V = v1.value
   }
 
-  implicit def PrimitiveRingExprEval[V]: Eval[PrimitiveRingExpr[V],V] = new Eval[PrimitiveRingExpr[V],V] {
-    def apply(v1: PrimitiveRingExpr[V], v2: BoundVars): V = v1.value
+  implicit def NumericExprEval[V]: Eval[NumericExpr[V],V] = new Eval[NumericExpr[V],V] {
+    def apply(v1: NumericExpr[V], v2: BoundVars): V = v1.value
   }
 
   implicit def PhysicalCollectionEval[C[_,_],K,R]: Eval[PhysicalCollection[C,K,R],C[K,R]] =
