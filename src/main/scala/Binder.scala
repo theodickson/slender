@@ -4,7 +4,7 @@ import shapeless.{::, Generic, HList, HNil}
 
 trait Binder[V <: VariableExpr[V],T,-In,+Out] extends (In => Out) with Serializable
 
-trait HBinder[V <: VariableExpr[V],T,-In,+Out] extends (In => Out) with Serializable
+//trait HBinder[V <: VariableExpr[V],T,-In,+Out] extends (In => Out) with Serializable
 
 object Binder extends BindingImplicits {
   def nonBinder[V <: VariableExpr[V], T, E <: Expr]: Binder[V,T,E,E] =
@@ -15,20 +15,20 @@ object Binder extends BindingImplicits {
   }
 }
 
-object HBinder {
-  implicit def HNilBinder[V <: VariableExpr[V], T]: HBinder[V, T, HNil,HNil] =
-    new HBinder[V,T,HNil,HNil] {
-      def apply(v1: HNil) = v1
-    }
-
-  implicit def HListBinder[V <: VariableExpr[V], T, H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
-  (implicit bindH: Binder[V, T, H1, H2], bindT: HBinder[V, T, T1, T2]):
-  HBinder[V,T,H1 :: T1, H2 :: T2] = new HBinder[V,T,H1 :: T1, H2 :: T2] {
-    def apply(v1: H1 :: T1) = v1 match {
-      case h1 :: t1 => bindH(h1) :: bindT(t1)
-    }
-  }
-}
+//object HBinder {
+//  implicit def HNilBinder[V <: VariableExpr[V], T]: HBinder[V, T, HNil,HNil] =
+//    new HBinder[V,T,HNil,HNil] {
+//      def apply(v1: HNil) = v1
+//    }
+//
+//  implicit def HListBinder[V <: VariableExpr[V], T, H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+//  (implicit bindH: Binder[V, T, H1, H2], bindT: HBinder[V, T, T1, T2]):
+//  HBinder[V,T,H1 :: T1, H2 :: T2] = new HBinder[V,T,H1 :: T1, H2 :: T2] {
+//    def apply(v1: H1 :: T1) = v1 match {
+//      case h1 :: t1 => bindH(h1) :: bindT(t1)
+//    }
+//  }
+//}
 
 trait Priority0BindingImplicits {
   //The case that V1 <:< V and so actually binds to T takes precedence, hence this non-binder is here.
@@ -37,10 +37,23 @@ trait Priority0BindingImplicits {
   implicit def InductiveBinder[
   V <: VariableExpr[V], T, E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
   ]
-  (implicit gen1: Generic.Aux[E1,Repr1], bind: HBinder[V, T, Repr1,Repr2],
+  (implicit gen1: Generic.Aux[E1,Repr1], bind: Binder[V, T, Repr1,Repr2],
    ev: Reconstruct[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
   Binder[V, T, E1, E2] = new Binder[V, T, E1, E2] {
     def apply(v1: E1): E2 = gen2.from(bind(gen1.to(v1)))
+  }
+
+  implicit def HNilBinder[V <: VariableExpr[V], T]: Binder[V, T, HNil,HNil] =
+    new Binder[V,T,HNil,HNil] {
+      def apply(v1: HNil) = v1
+    }
+
+  implicit def HListBinder[V <: VariableExpr[V], T, H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+  (implicit bindH: Binder[V, T, H1, H2], bindT: Binder[V, T, T1, T2]):
+  Binder[V,T,H1 :: T1, H2 :: T2] = new Binder[V,T,H1 :: T1, H2 :: T2] {
+    def apply(v1: H1 :: T1) = v1 match {
+      case h1 :: t1 => bindH(h1) :: bindT(t1)
+    }
   }
 
   implicit def PhysicalCollectionBinder[V <: VariableExpr[V],T,C[_,_],K,R]: Binder[V,T,PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] =

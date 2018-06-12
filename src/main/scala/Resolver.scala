@@ -4,7 +4,7 @@ import shapeless._
 
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
-trait HResolver[-In,+Out] extends (In => Out) with Serializable
+//trait HResolver[-In,+Out] extends (In => Out) with Serializable
 
 object Resolver extends ResolutionImplicits {
 
@@ -15,21 +15,21 @@ object Resolver extends ResolutionImplicits {
   def nonResolver[E <: Expr]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
 }
 
-object HResolver {
-
-  implicit def HNilResolver: HResolver[HNil,HNil] = new HResolver[HNil,HNil] {
-    def apply(v1: HNil): HNil = v1
-  }
-
-  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
-  (implicit resolveH: Resolver[H1, H2], resolveT: HResolver[T1, T2]):
-  HResolver[H1 :: T1, H2 :: T2] = new HResolver[H1 :: T1, H2 :: T2] {
-    def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
-      case h1 :: t1 => resolveH(h1) :: resolveT(t1)
-    }
-  }
-
-}
+//object HResolver {
+//
+//  implicit def HNilResolver: HResolver[HNil,HNil] = new HResolver[HNil,HNil] {
+//    def apply(v1: HNil): HNil = v1
+//  }
+//
+//  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+//  (implicit resolveH: Resolver[H1, H2], resolveT: HResolver[T1, T2]):
+//  HResolver[H1 :: T1, H2 :: T2] = new HResolver[H1 :: T1, H2 :: T2] {
+//    def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
+//      case h1 :: t1 => resolveH(h1) :: resolveT(t1)
+//    }
+//  }
+//
+//}
 trait Priority0ResolutionImplicits {
 
   implicit def NumericExprResolver[V]: Resolver[NumericExpr[V],NumericExpr[V]] =
@@ -38,10 +38,22 @@ trait Priority0ResolutionImplicits {
   implicit def InductiveResolver[
     E1 <: Expr,E2 <: Expr, Repr1 <: HList, Repr2 <: HList
   ]
-  (implicit gen1: Generic.Aux[E1,Repr1], resolve: HResolver[Repr1,Repr2],
+  (implicit gen1: Generic.Aux[E1,Repr1], resolve: Resolver[Repr1,Repr2],
    ev: Reconstruct[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
   Resolver[E1, E2] = new Resolver[E1, E2] {
     def apply(v1: E1): E2 = gen2.from(resolve(gen1.to(v1)))
+  }
+
+  implicit def HNilResolver: Resolver[HNil,HNil] = new Resolver[HNil,HNil] {
+    def apply(v1: HNil): HNil = v1
+  }
+
+  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]):
+  Resolver[H1 :: T1, H2 :: T2] = new Resolver[H1 :: T1, H2 :: T2] {
+    def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
+      case h1 :: t1 => resolveH(h1) :: resolveT(t1)
+    }
   }
 }
 

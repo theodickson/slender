@@ -1,5 +1,7 @@
 package slender
 
+import shapeless.HNil
+
 trait Eval[E <: Expr,T] extends ((E,BoundVars) => T) with Serializable
 
 case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) extends Serializable {
@@ -9,6 +11,16 @@ case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) ext
 }
 
 object Eval {
+
+  def instance[E <: Expr,T](f: (E,BoundVars) => T): Eval[E,T] = new Eval[E,T] {
+    def apply(v1: E, v2: BoundVars): T = f(v1,v2)
+  }
+
+  implicit def Product2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2]
+    (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]): Eval[ProductKeyExpr[K1 :: K2 :: HNil], (T1,T2)] =
+      instance { case (ProductKeyExpr(k1 :: k2),bvs) => (eval1(k1,bvs),eval2(k2,bvs)) }
+
+  implicit def Project1KeyEval[K <: KeyExpr]
 
   implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
     def apply(v1: TypedVariable[T], v2: BoundVars): T = v2(v1.name).asInstanceOf[T]

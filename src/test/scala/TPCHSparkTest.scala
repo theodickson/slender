@@ -5,7 +5,7 @@ import org.scalatest.FunSuite
 
 class TPCHSparkTest extends FunSuite {
 
-  import implicits._
+  import dsl._
   import TestUtils._
 
   implicit val (spark,sc) = TestUtils.getSparkSession
