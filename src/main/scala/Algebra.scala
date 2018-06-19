@@ -15,7 +15,7 @@ trait Ring[R] extends Serializable {
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
   def innerRing: Ring[R]
-  def sum[S](c: C[K,R])(implicit ev: Sum[C[K,R],S]): S
+//  def sum[S](c: C[K,R])(implicit ev: Sum[C[K,R],S]): S
   def map[R1](c: C[K,R], f: (K,R) => (K,R1)): C[K,R1]
   def filter(c: C[K,R], f: (K,R) => Boolean): C[K,R]
   override def filterZeros(c: C[K,R]): C[K,R] = {
@@ -38,9 +38,13 @@ trait NumericRing[R] extends NonCollectionRing[R] {
 
 trait Sum[T,S] extends (T => S) with Serializable
 
+trait Group[T,S] extends (T => S) with Serializable
+
 trait Dot[T1,T2,O] extends ((T1,T2) => O) with Serializable
 
 trait Multiply[T1,T2,O] extends ((T1,T2) => O) with Serializable
+
+trait Join[T1,T2,O] extends ((T1,T2) => O) with Serializable
 
 
 //
@@ -82,7 +86,7 @@ object Ring {
 
       def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
 
-      def sum[S](c: PairRDD[K, R])(implicit ev: Sum[PairRDD[K,R],S]): S = ev(c) //
+//      def sum[S](c: PairRDD[K, R])(implicit ev: Sum[PairRDD[K,R],S]): S = ev(c) //
 
       def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
 
@@ -103,7 +107,7 @@ object Ring {
 
       def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) } //Values(ring.negate)
 
-      def sum[S](c: Map[K, R])(implicit ev: Sum[Map[K,R],S]): S = ev(c)
+//      def sum[S](c: Map[K, R])(implicit ev: Sum[Map[K,R],S]): S = ev(c)
 
       def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
 
@@ -131,6 +135,44 @@ object Sum {
       }
     }
 }
+
+
+object Group {
+
+  implicit def MapGroup2[K1,K2,R](implicit ring: Ring[R]): Group[Map[(K1,K2),R],Map[(K1,Map[K2,R]),Int]] =
+    new Group[Map[(K1,K2),R],Map[(K1,Map[K2,R]),Int]] {
+      def apply(v1: Map[(K1,K2),R]): Map[(K1,Map[K2,R]),Int] = {
+        val grouped = v1.groupBy(_._1._1).mapValues(_.toList.map { case ((k1,k2),v) => (k2,v) }.toMap)
+        grouped.toList.zip(Stream.from(1,0)).toMap
+      }
+    }
+
+  implicit def MapGroup3[K1,K2,K3,R](implicit ring: Ring[R]): Group[Map[(K1,K2,K3),R],Map[(K1,Map[(K2,K3),R]),Int]] =
+    new Group[Map[(K1,K2,K3),R],Map[(K1,Map[(K2,K3),R]),Int]] {
+      def apply(v1: Map[(K1,K2,K3),R]): Map[(K1,Map[(K2,K3),R]),Int] = {
+        val grouped = v1.groupBy(_._1._1).mapValues(_.toList.map { case ((k1,k2,k3),v) => ((k2,k3),v) }.toMap)
+        grouped.toList.zip(Stream.from(1,0)).toMap
+      }
+    }
+
+  implicit def RddGroup2[K1:ClassTag,K2,R](implicit ring: Ring[R]): Group[PairRDD[(K1,K2),R],PairRDD[(K1,Map[K2,R]),Int]] =
+    new Group[PairRDD[(K1,K2),R],PairRDD[(K1,Map[K2,R]),Int]] {
+      def apply(v1: PairRDD[(K1,K2),R]): PairRDD[(K1,Map[K2,R]),Int] = {
+        val grouped = v1.groupBy(_._1._1).mapValues[Map[K2,R]](_.map { case ((_,k2),v) => (k2,v) }.toMap)
+        grouped.map { case (k,v) => ((k,v),1) }
+      }
+    }
+
+  implicit def RddGroup3[K1:ClassTag,K2,K3,R](implicit ring: Ring[R]):
+  Group[PairRDD[(K1,K2,K3),R],PairRDD[(K1,Map[(K2,K3),R]),Int]] =
+    new Group[PairRDD[(K1,K2,K3),R],PairRDD[(K1,Map[(K2,K3),R]),Int]] {
+      def apply(v1: PairRDD[(K1,K2,K3),R]): PairRDD[(K1,Map[(K2,K3),R]),Int] = {
+        val grouped = v1.groupBy(_._1._1).mapValues[Map[(K2,K3),R]](_.map { case ((_,k2,k3),v) => ((k2,k3),v) }.toMap)
+        grouped.map { case (k,v) => ((k,v),1) }
+      }
+    }
+}
+
 
 object Dot {
 
@@ -228,4 +270,49 @@ object Multiply {
 
   //todo - enable any kind of tuple multiplication?
 
+}
+
+object Join {
+
+  implicit def rdd2Rdd2Join[K: ClassTag, K1: ClassTag, K2: ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
+    Join[PairRDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] =
+      new Join[PairRDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] {
+        def apply(v1: PairRDD[(K,K1),R1], v2: PairRDD[(K,K2),R2]): PairRDD[(K,(K1,K2)),O] = {
+          val left = v1.map { case ((k,k1),r1) => (k,(k1,r1)) }
+          val right = v2.map { case ((k,k2),r2) => (k,(k2,r2)) }
+          left.join(right).map { case (k,((k1,r1),(k2,r2))) => ((k,(k1,k2)),dot(r1,r2)) }
+        }
+      }
+
+  implicit def rdd2Rdd3Join[K: ClassTag, K11: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
+  Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] =
+    new Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] {
+      def apply(v1: PairRDD[(K,K11),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,(K11,(K21,K22))),O] = {
+        val left = v1.map { case ((k,k11),r1) => (k,(k11,r1)) }
+        val right = v2.map { case ((k,k21,k22),r2) => (k,(k21,k22,r2)) }
+        left.join(right).map { case (k,((k11,r1),(k21,k22,r2))) => ((k,(k11,(k21,k22))),dot(r1,r2)) }
+      }
+    }
+
+  implicit def rdd3Rdd2Join[
+  K: ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, R1, R2, O
+  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] =
+    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] {
+      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21),R2]): PairRDD[(K,((K11,K12),K21)),O] = {
+        val left = v1.map { case ((k,k11,k12),r1) => (k,(k11,k12,r1)) }
+        val right = v2.map { case ((k,k21),r2) => (k,(k21,r2)) }
+        left.join(right).map { case (k,((k11,k12,r1),(k21,r2))) => ((k,((k11,k12),k21)),dot(r1,r2)) }
+      }
+    }
+
+  implicit def rdd3Rdd3Join[
+    K: ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O
+  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] =
+    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] {
+      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,((K11,K12),(K21,K22))),O] = {
+        val left = v1.map { case ((k,k11,k12),r1) => (k,(k11,k12,r1)) }
+        val right = v2.map { case ((k,k21,k22),r2) => (k,(k21,k22,r2)) }
+        left.join(right).map { case (k,((k11,k12,r1),(k21,k22,r2))) => ((k,((k11,k12),(k21,k22))),dot(r1,r2)) }
+      }
+    }
 }

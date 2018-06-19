@@ -1,8 +1,10 @@
 package slender
 
+import org.apache.spark.SparkContext
 import shapeless.{HList, LUBConstraint}
 import shapeless.ops.hlist.ToTraversable
 import shapeless.Nat
+
 import scala.reflect.runtime.universe._
 
 trait Expr {
@@ -102,12 +104,12 @@ object StringKeyExpr {
   def apply(s: String) = PrimitiveKeyExpr(s)
 }
 
-case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
-                                          (implicit val trav: ToTraversable.Aux[Exprs, List, Expr]) extends Expr {
-  def children = exprs.toList
-}
-
-case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
+//case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
+//                                          (implicit val trav: ToTraversable.Aux[Exprs, List, Expr]) extends Expr {
+//  def children = exprs.toList
+//}
+//
+//case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
 
 //case class HProject1KeyExpr[H <: Expr, T <: HList](c1: ProductKeyExpr[H :: T])
 //                                                  (implicit lub: LUBConstraint[T, Expr])
@@ -166,7 +168,15 @@ trait PrimitiveRingExpr[T] extends RingExpr with PrimitiveExpr[T]
 case class NumericExpr[N : Numeric](value: N) extends PrimitiveRingExpr[N]
 
 case class PhysicalCollection[C[_,_],K,R](value: C[K,R])(implicit collection: Collection[C,K,R])
-  extends PrimitiveRingExpr[C[K,R]]
+  extends PrimitiveRingExpr[C[K,R]] {
+  def distribute(implicit sc: SparkContext, coll: Collection[PairRDD,K,R]): PhysicalCollection[PairRDD,K,R] = {
+    val rdd: PairRDD[K,R] = value match {
+      case p : PairRDD[K,R] => p
+      case m : Map[K,R] => sc.parallelize(m.toSeq)
+    }
+    PhysicalCollection(rdd)
+  }
+}
 
 object PhysicalCollection {
   def apply[T](value: Set[T])(implicit collection: Collection[Map,T,Int]): PhysicalCollection[Map,T,Int] =
@@ -195,11 +205,17 @@ case class DotExpr[E1 <: RingExpr,E2 <: RingExpr](c1: E1, c2: E2)
   def opString = "⊙"
 }
 
+case class JoinExpr[E1 <: RingExpr, E2 <: RingExpr](c1: E1, c2: E2) extends BinaryRingOpExpr {
+  def opString = "⨝"
+}
+
 case class NotExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
 case class NegateExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
 case class SumExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
+
+case class GroupExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
 /**Mapping constructs*/
 case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)
@@ -287,6 +303,7 @@ case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingE
 
 case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr
 
+/**VariableExpr*/
 trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr {
   type Type
   def bind(t: Type): BoundVars

@@ -1,5 +1,7 @@
 package slender
 
+import org.apache.spark.rdd.RDD
+
 import scala.reflect.runtime.universe._
 
 case class VariableRingPredicate[V <: VariableExpr[V], R <: RingExpr, P <: RingExpr](k: V, r: R, p: P = NumericExpr(1))
@@ -27,6 +29,7 @@ case class RingExprOps[R <: RingExpr](r: R) {
   def +[R1 <: RingExpr](expr1: R1) = AddExpr(r,expr1)
   def *[R1 <: RingExpr](expr1: R1) = MultiplyExpr(r,expr1)
   def dot[R1 <: RingExpr](expr1: R1) = DotExpr(r,expr1)
+  def join[R1 <: RingExpr](expr1: R1) = JoinExpr(r,expr1)
   def sum = SumExpr(r)
   def unary_- = NegateExpr(r)
   def unary_! = NotExpr(r)
@@ -79,9 +82,14 @@ V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, 
 
 trait MakeExpr[X,E <: Expr] extends (X => E)
 
-object MakeExpr extends Priority2MakeExprImplicits
+object MakeExpr extends Priority2MakeExprImplicits {
+  def instance[X,E <: Expr](f: X => E): MakeExpr[X,E] = new MakeExpr[X,E] {
+    def apply(v1: X): E = f(v1)
+  }
+}
 
 trait Priority0MakeExprImplicits {
+
   implicit def toKMakeExpr[T,R <: RingExpr](implicit recur: MakeExpr[T,R]): MakeExpr[T,BoxedRingExpr[R]] =
     new MakeExpr[T,BoxedRingExpr[R]] {
       def apply(v1: T) = BoxedRingExpr(recur(v1))
@@ -89,10 +97,13 @@ trait Priority0MakeExprImplicits {
 }
 
 trait Priority1MakeExprImplicits extends Priority0MakeExprImplicits {
-  implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] =
-    new MakeExpr[N,NumericExpr[N]] { def apply(v1: N) = NumericExpr(v1) }
 
   implicit def idMakeExpr[E <: Expr]: MakeExpr[E,E] = new MakeExpr[E,E] { def apply(v1: E) = v1 }
+
+  implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] = MakeExpr.instance { v1: N => NumericExpr(v1) }
+
+//  implicit def collectionMakeRing[C[_,_],K,R](implicit coll: Collection[C,K,R]): MakeExpr[C[K,R],PhysicalCollection[C,K,R]] =
+//      MakeExpr.instance { mp: C[K,R] => PhysicalCollection(mp) }
 
   implicit def tuple2MakeRingExpr[X1,X2,R1 <: RingExpr, R2 <: RingExpr]
   (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2RingExpr[R1,R2]] =
@@ -153,17 +164,21 @@ object MakeKeyRingPair {
 
 trait Syntax {
 
+//  implicit def toExpr[X, E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
+
   implicit def toExprOps[X, E <: Expr](x: X)(implicit make: MakeExpr[X, E]): ExprOps[E] = ExprOps(make(x))
   implicit def toKeyExprOps[X, E <: KeyExpr](x: X)(implicit make: MakeExpr[X, E]): KeyExprOps[E] = KeyExprOps(make(x))
   implicit def toRingExprOps[X, E <: RingExpr](x: X)(implicit make: MakeExpr[X, E]): RingExprOps[E] = RingExprOps(make(x))
   implicit def toVariableExprOps[X, E <: VariableExpr[E]](x: X)(implicit make: MakeExpr[X, E]): VariableExprOps[E] = VariableExprOps(make(x))
 
-  def sum[R <: RingExpr](r: R): SumExpr[R] = SumExpr(r)
+  def Sum[R <: RingExpr](r: R): SumExpr[R] = SumExpr(r)
 
-  def sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
+  def Sng[K <: KeyExpr, R <: RingExpr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
-  def sng[T, K <: KeyExpr](t: T)(implicit make: MakeExpr[T, K]): SngExpr[K, NumericExpr[Int]] =
+  def Sng[T, K <: KeyExpr](t: T)(implicit make: MakeExpr[T, K]): SngExpr[K, NumericExpr[Int]] =
     SngExpr(make(t), NumericExpr(1))
+
+  def Group[T, R <: RingExpr](t: T)(implicit make: MakeExpr[T,R]): GroupExpr[R] = GroupExpr(make(t))
 
   def toK[E <: RingExpr](e: E): BoxedRingExpr[E] = BoxedRingExpr(e)
 

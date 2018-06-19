@@ -16,11 +16,11 @@ object Eval {
     def apply(v1: E, v2: BoundVars): T = f(v1,v2)
   }
 
-  implicit def Product2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2]
-    (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]): Eval[ProductKeyExpr[K1 :: K2 :: HNil], (T1,T2)] =
-      instance { case (ProductKeyExpr(k1 :: k2),bvs) => (eval1(k1,bvs),eval2(k2,bvs)) }
-
-  implicit def Project1KeyEval[K <: KeyExpr]
+//  implicit def Product2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2]
+//    (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]): Eval[ProductKeyExpr[K1 :: K2 :: HNil], (T1,T2)] =
+//      instance { case (ProductKeyExpr(k1 :: k2),bvs) => (eval1(k1,bvs),eval2(k2,bvs)) }
+//
+//  implicit def Project1KeyEval[K <: KeyExpr]
 
   implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
     def apply(v1: TypedVariable[T], v2: BoundVars): T = v2(v1.name).asInstanceOf[T]
@@ -74,6 +74,13 @@ object Eval {
       def apply(v1: DotExpr[E1,E2], v2: BoundVars): O = dot(eval1(v1.c1,v2),eval2(v1.c2,v2))
     }
 
+  implicit def JoinEval[E1 <: RingExpr,E2 <: RingExpr,T1,T2,O](implicit eval1: Eval[E1,T1],
+                                                              eval2: Eval[E2,T2],
+                                                               join: Join[T1,T2,O]): Eval[JoinExpr[E1,E2],O] =
+    new Eval[JoinExpr[E1,E2],O] {
+      def apply(v1: JoinExpr[E1,E2], v2: BoundVars): O = join(eval1(v1.c1,v2),eval2(v1.c2,v2))
+    }
+
   implicit def AddEval[E1 <: RingExpr,E2 <: RingExpr,T](implicit eval1: Eval[E1,T],
                                                         eval2: Eval[E2,T],
                                                         ring: Ring[T]): Eval[AddExpr[E1,E2],T] =
@@ -81,9 +88,14 @@ object Eval {
       def apply(v1: AddExpr[E1,E2], v2: BoundVars): T = ring.add(eval1(v1.c1,v2),eval2(v1.c2,v2))
     }
 
-  implicit def SumEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], coll: Collection[C,K,R], sum: Sum[C[K,R],O]):
+  implicit def SumEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], sum: Sum[C[K,R],O]):
   Eval[SumExpr[E],O] = new Eval[SumExpr[E],O] {
-    def apply(v1: SumExpr[E], v2: BoundVars): O = coll.sum(eval(v1.c1,v2))
+    def apply(v1: SumExpr[E], v2: BoundVars): O = sum(eval(v1.c1,v2))
+  }
+
+  implicit def GroupEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], group: Group[C[K,R],O]):
+  Eval[GroupExpr[E],O] = new Eval[GroupExpr[E],O] {
+    def apply(v1: GroupExpr[E], v2: BoundVars): O = group(eval(v1.c1,v2))
   }
 
   implicit def NotEval[E <: RingExpr,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NotExpr[E],T] = new Eval[NotExpr[E],T] {
