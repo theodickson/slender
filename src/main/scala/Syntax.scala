@@ -1,6 +1,9 @@
 package slender
 
 import org.apache.spark.rdd.RDD
+import shapeless.ops.hlist.ToTraversable
+import shapeless._
+import shapeless.syntax._
 
 import scala.reflect.runtime.universe._
 
@@ -81,11 +84,27 @@ V1 <: VariableExpr[V1], V2 <: VariableExpr[V2], R1 <: RingExpr, R2 <: RingExpr, 
 }
 
 trait MakeExpr[X,E <: Expr] extends (X => E)
+trait HMakeExpr[X,E] extends (X => E)
 
 object MakeExpr extends Priority2MakeExprImplicits {
   def instance[X,E <: Expr](f: X => E): MakeExpr[X,E] = new MakeExpr[X,E] {
     def apply(v1: X): E = f(v1)
   }
+}
+
+object HMakeExpr {
+
+  implicit def hnilMakeExpr: HMakeExpr[HNil, HNil] = new HMakeExpr[HNil,HNil] {
+    def apply(v1: HNil): HNil = v1
+  }
+
+  implicit def hconsMakeExpr[H, HE <: Expr, T <: HList, TE <: HList](implicit makeH: MakeExpr[H,HE], makeT: HMakeExpr[T,TE]):
+  HMakeExpr[H::T,HE::TE] = new HMakeExpr[H::T,HE::TE] {
+    def apply(v1: H::T) = v1 match {
+      case h :: t => makeH(h) :: makeT(t)
+    }
+  }
+
 }
 
 trait Priority0MakeExprImplicits {
@@ -105,31 +124,49 @@ trait Priority1MakeExprImplicits extends Priority0MakeExprImplicits {
 //  implicit def collectionMakeRing[C[_,_],K,R](implicit coll: Collection[C,K,R]): MakeExpr[C[K,R],PhysicalCollection[C,K,R]] =
 //      MakeExpr.instance { mp: C[K,R] => PhysicalCollection(mp) }
 
-  implicit def tuple2MakeRingExpr[X1,X2,R1 <: RingExpr, R2 <: RingExpr]
-  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2RingExpr[R1,R2]] =
-    new MakeExpr[(X1,X2),Tuple2RingExpr[R1,R2]] {
-      def apply(v1: (X1,X2)) = Tuple2RingExpr(recur1(v1._1),recur2(v1._2))
+//  implicit def tuple2MakeRingExpr[X1,X2,R1 <: RingExpr, R2 <: RingExpr]
+//  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2RingExpr[R1,R2]] =
+//    new MakeExpr[(X1,X2),Tuple2RingExpr[R1,R2]] {
+//      def apply(v1: (X1,X2)) = Tuple2RingExpr(recur1(v1._1),recur2(v1._2))
+//    }
+//
+//  implicit def tuple3MakeRingExpr[X1,X2,X3,R1 <: RingExpr, R2 <: RingExpr, R3 <: RingExpr]
+//  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2], recur3: MakeExpr[X3,R3]):
+//  MakeExpr[(X1,X2,X3),Tuple3RingExpr[R1,R2,R3]] =
+//    new MakeExpr[(X1,X2,X3),Tuple3RingExpr[R1,R2,R3]] {
+//      def apply(v1: (X1,X2,X3)) = Tuple3RingExpr(recur1(v1._1),recur2(v1._2),recur3(v1._3))
+//    }
+
+//  implicit def tuple2MakeKeyExpr[X1,X2,R1 <: KeyExpr, R2 <: KeyExpr]
+//  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2KeyExpr[R1,R2]] =
+//    new MakeExpr[(X1,X2),Tuple2KeyExpr[R1,R2]] {
+//      def apply(v1: (X1,X2)) = Tuple2KeyExpr(recur1(v1._1),recur2(v1._2))
+//    }
+//
+//  implicit def tuple3MakeKeyExpr[X1,X2,X3,R1 <: KeyExpr, R2 <: KeyExpr, R3 <: KeyExpr]
+//  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2], recur3: MakeExpr[X3,R3]):
+//  MakeExpr[(X1,X2,X3),Tuple3KeyExpr[R1,R2,R3]] =
+//    new MakeExpr[(X1,X2,X3),Tuple3KeyExpr[R1,R2,R3]] {
+//      def apply(v1: (X1,X2,X3)) = Tuple3KeyExpr(recur1(v1._1),recur2(v1._2),recur3(v1._3))
+//    }
+
+  implicit def productMakeRingExpr[P <: Product,PRepr <: HList, KRepr <: HList]
+  (implicit gen: Generic.Aux[P,PRepr],
+   make: HMakeExpr[PRepr,KRepr],
+   trav: ToTraversable.Aux[KRepr,List,RingExpr]): MakeExpr[P,ProductRingExpr[KRepr]] =
+    new MakeExpr[P,ProductRingExpr[KRepr]] {
+      def apply(v1: P): ProductRingExpr[KRepr] = ProductRingExpr(make(gen.to(v1)))
     }
 
-  implicit def tuple3MakeRingExpr[X1,X2,X3,R1 <: RingExpr, R2 <: RingExpr, R3 <: RingExpr]
-  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2], recur3: MakeExpr[X3,R3]):
-  MakeExpr[(X1,X2,X3),Tuple3RingExpr[R1,R2,R3]] =
-    new MakeExpr[(X1,X2,X3),Tuple3RingExpr[R1,R2,R3]] {
-      def apply(v1: (X1,X2,X3)) = Tuple3RingExpr(recur1(v1._1),recur2(v1._2),recur3(v1._3))
+  implicit def productMakeKeyExpr[P <: Product,PRepr <: HList, KRepr <: HList]
+    (implicit gen: Generic.Aux[P,PRepr],
+              make: HMakeExpr[PRepr,KRepr],
+              trav: ToTraversable.Aux[KRepr,List,KeyExpr]): MakeExpr[P,ProductKeyExpr[KRepr]] =
+    new MakeExpr[P,ProductKeyExpr[KRepr]] {
+      def apply(v1: P): ProductKeyExpr[KRepr] = ProductKeyExpr(make(gen.to(v1)))
     }
 
-  implicit def tuple2MakeKeyExpr[X1,X2,R1 <: KeyExpr, R2 <: KeyExpr]
-  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2]): MakeExpr[(X1,X2),Tuple2KeyExpr[R1,R2]] =
-    new MakeExpr[(X1,X2),Tuple2KeyExpr[R1,R2]] {
-      def apply(v1: (X1,X2)) = Tuple2KeyExpr(recur1(v1._1),recur2(v1._2))
-    }
 
-  implicit def tuple3MakeKeyExpr[X1,X2,X3,R1 <: KeyExpr, R2 <: KeyExpr, R3 <: KeyExpr]
-  (implicit recur1: MakeExpr[X1,R1], recur2: MakeExpr[X2,R2], recur3: MakeExpr[X3,R3]):
-  MakeExpr[(X1,X2,X3),Tuple3KeyExpr[R1,R2,R3]] =
-    new MakeExpr[(X1,X2,X3),Tuple3KeyExpr[R1,R2,R3]] {
-      def apply(v1: (X1,X2,X3)) = Tuple3KeyExpr(recur1(v1._1),recur2(v1._2),recur3(v1._3))
-    }
 }
 
 trait Priority2MakeExprImplicits extends Priority1MakeExprImplicits {
@@ -164,7 +201,7 @@ object MakeKeyRingPair {
 
 trait Syntax {
 
-//  implicit def toExpr[X, E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
+  def toExpr[X, E <: Expr](x: X)(implicit make: MakeExpr[X,E]): E = make(x)
 
   implicit def toExprOps[X, E <: Expr](x: X)(implicit make: MakeExpr[X, E]): ExprOps[E] = ExprOps(make(x))
   implicit def toKeyExprOps[X, E <: KeyExpr](x: X)(implicit make: MakeExpr[X, E]): KeyExprOps[E] = KeyExprOps(make(x))

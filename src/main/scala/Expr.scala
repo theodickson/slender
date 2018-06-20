@@ -1,9 +1,8 @@
 package slender
 
 import org.apache.spark.SparkContext
-import shapeless.{HList, LUBConstraint}
+import shapeless.{Generic, HList, LUBConstraint, Nat}
 import shapeless.ops.hlist.ToTraversable
-import shapeless.Nat
 
 import scala.reflect.runtime.universe._
 
@@ -116,17 +115,24 @@ object StringKeyExpr {
 }
 
 case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
-                                          (implicit val trav: ToTraversable.Aux[Exprs, List, Expr]) extends Expr {
+                                         (implicit val trav: ToTraversable.Aux[Exprs, List, KeyExpr]) extends Expr {
   def children = exprs.toList
 }
 
-case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
+object ProductKeyExpr {
+  def apply[T,Repr <: HList](t: T)
+                            (implicit gen: Generic.Aux[T,Repr],
+                             trav: ToTraversable.Aux[Repr, List, KeyExpr]): ProductKeyExpr[Repr] =
+    ProductKeyExpr(gen.to(t))
+}
 
-
-case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with Product2Expr[K1,K2]
-
-case class Tuple3KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryKeyExpr with Product3Expr[K1,K2,K3]
+//case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
+//
+//
+//case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with Product2Expr[K1,K2]
+//
+//case class Tuple3KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr](c1: K1, c2: K2, c3: K3)
+//  extends TernaryKeyExpr with Product3Expr[K1,K2,K3]
 
 //case class Project1KeyExpr[K <: KeyExpr with C1Expr](c1: K) extends UnaryKeyExpr with Project1Expr
 //
@@ -285,10 +291,22 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr
 
 /**Tupling and projection*/
 
-case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with Product2Expr[K1,K2]
+case class ProductRingExpr[Exprs <: HList](exprs: Exprs)
+                                         (implicit val trav: ToTraversable.Aux[Exprs, List, RingExpr]) extends Expr {
+  def children = exprs.toList
+}
 
-case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryRingExpr with Product3Expr[K1,K2,K3]
+object ProductRingExpr {
+  def apply[T,Repr <: HList](t: T)
+                            (implicit gen: Generic.Aux[T,Repr],
+                             trav: ToTraversable.Aux[Repr, List, RingExpr]): ProductRingExpr[Repr] =
+    ProductRingExpr(gen.to(t))
+}
+
+//case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with Product2Expr[K1,K2]
+//
+//case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
+//  extends TernaryRingExpr with Product3Expr[K1,K2,K3]
 
 //case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr
 //
@@ -318,6 +336,19 @@ trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with Nullary
   override def toString = s""""$this:?""""
   override def isResolved = false
 }
+
+
+//case class ProductVariableExpr[Exprs <: HList](exprs: Exprs)
+//                                         (implicit val trav: ToTraversable.Aux[Exprs, List, VariableExpr]) extends Expr {
+//  def children = exprs.toList
+//}
+//
+//object ProductVariableExpr {
+//  def apply[T,Repr <: HList](t: T)
+//                            (implicit gen: Generic.Aux[T,Repr],
+//                             trav: ToTraversable.Aux[Repr, List, VariableExpr]): ProductVariableExpr[Repr] =
+//    ProductVariableExpr(gen.to(t))
+//}
 
 case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
   extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with Product2Expr[V1,V2] {

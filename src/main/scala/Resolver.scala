@@ -1,6 +1,7 @@
 package slender
 
 import shapeless._
+import shapeless.ops.hlist.ToTraversable
 
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
@@ -12,7 +13,7 @@ object Resolver extends ResolutionImplicits {
     def apply(v1: In): Out = f(v1)
   }
 
-  def nonResolver[E <: Expr]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
+  def nonResolver[E]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
 }
 
 //object HResolver {
@@ -149,17 +150,17 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
 
 
   //Tupling and projection
-  implicit def Tuple2RingResolver[K1 <: RingExpr,K2 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2RingExpr[K1,K2],Tuple2RingExpr[K1B,K2B]] =
-    new Resolver[Tuple2RingExpr[K1,K2],Tuple2RingExpr[K1B,K2B]] {
-      def apply(v1: Tuple2RingExpr[K1,K2]) = Tuple2RingExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
-
-  implicit def Tuple2KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] =
-    new Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] {
-      def apply(v1: Tuple2KeyExpr[K1,K2]) = Tuple2KeyExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
+//  implicit def Tuple2RingResolver[K1 <: RingExpr,K2 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr]
+//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2RingExpr[K1,K2],Tuple2RingExpr[K1B,K2B]] =
+//    new Resolver[Tuple2RingExpr[K1,K2],Tuple2RingExpr[K1B,K2B]] {
+//      def apply(v1: Tuple2RingExpr[K1,K2]) = Tuple2RingExpr(resolve1(v1.c1),resolve2(v1.c2))
+//    }
+//
+//  implicit def Tuple2KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr]
+//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] =
+//    new Resolver[Tuple2KeyExpr[K1,K2],Tuple2KeyExpr[K1B,K2B]] {
+//      def apply(v1: Tuple2KeyExpr[K1,K2]) = Tuple2KeyExpr(resolve1(v1.c1),resolve2(v1.c2))
+//    }
 
   implicit def Tuple2VariableResolver[K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B]]
   (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] =
@@ -167,17 +168,17 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
       def apply(v1: Tuple2VariableExpr[K1,K2]) = Tuple2VariableExpr(resolve1(v1.c1),resolve2(v1.c2))
     }
 
-  implicit def Tuple3RingResolver[K1 <: RingExpr,K2 <: RingExpr,K3 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr,K3B <: RingExpr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] =
-    new Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] {
-      def apply(v1: Tuple3RingExpr[K1,K2,K3]) = Tuple3RingExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
-    }
-
-  implicit def Tuple3KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K3 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr,K3B <: KeyExpr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] =
-    new Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] {
-      def apply(v1: Tuple3KeyExpr[K1,K2,K3]) = Tuple3KeyExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
-    }
+//  implicit def Tuple3RingResolver[K1 <: RingExpr,K2 <: RingExpr,K3 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr,K3B <: RingExpr]
+//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] =
+//    new Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] {
+//      def apply(v1: Tuple3RingExpr[K1,K2,K3]) = Tuple3RingExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+//    }
+//
+//  implicit def Tuple3KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K3 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr,K3B <: KeyExpr]
+//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] =
+//    new Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] {
+//      def apply(v1: Tuple3KeyExpr[K1,K2,K3]) = Tuple3KeyExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+//    }
 
   implicit def Tuple3VariableResolver[
   K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K3 <: VariableExpr[K3],
@@ -188,7 +189,30 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
       def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
     }
 
-//  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
+  implicit def ProductKeyResolver[C <: HList, CR <: HList]
+  (implicit resolve: Resolver[C,CR], trav: ToTraversable.Aux[CR,List,KeyExpr]): Resolver[ProductKeyExpr[C],ProductKeyExpr[CR]] =
+    new Resolver[ProductKeyExpr[C],ProductKeyExpr[CR]] {
+      def apply(v1: ProductKeyExpr[C]) = ProductKeyExpr(resolve(v1.exprs))
+    }
+
+  implicit def ProductRingResolver[C <: HList, CR <: HList]
+  (implicit resolve: Resolver[C,CR], trav: ToTraversable.Aux[CR,List,RingExpr]): Resolver[ProductRingExpr[C],ProductRingExpr[CR]] =
+    new Resolver[ProductRingExpr[C],ProductRingExpr[CR]] {
+      def apply(v1: ProductRingExpr[C]) = ProductRingExpr(resolve(v1.exprs))
+    }
+
+  implicit def HNilResolver: Resolver[HNil,HNil] = Resolver.nonResolver[HNil]
+
+  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]):
+  Resolver[H1 :: T1, H2 :: T2] = new Resolver[H1 :: T1, H2 :: T2] {
+    def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
+      case h1 :: t1 => resolveH(h1) :: resolveT(t1)
+    }
+  }
+
+
+  //  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
 //  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
 //    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
 //  }

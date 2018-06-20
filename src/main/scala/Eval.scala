@@ -1,9 +1,11 @@
 package slender
 
+import shapeless.ops.hlist.Tupler
 import shapeless.ops.tuple.At
-import shapeless.{::, Generic, HNil, Nat, Select}
+import shapeless.{::, Generic, HList, HNil, Nat, Select}
+import shapeless.syntax.HListOps
 
-trait Eval[-E <: Expr,T] extends ((E,BoundVars) => T) with Serializable
+trait Eval[-E,T] extends ((E,BoundVars) => T) with Serializable
 
 case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) extends Serializable {
   def get: T = eval(expr,vars)
@@ -13,7 +15,7 @@ case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) ext
 
 object Eval {
 
-  def instance[E <: Expr,T](f: (E,BoundVars) => T): Eval[E,T] = new Eval[E,T] {
+  def instance[E,T](f: (E,BoundVars) => T): Eval[E,T] = new Eval[E,T] {
     def apply(v1: E, v2: BoundVars): T = f(v1,v2)
   }
 
@@ -121,10 +123,17 @@ object Eval {
       def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c2,v2))) 1 else 0
     }
 
-//  implicit def Product2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2]
-//  (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]): Eval[ProductKeyExpr[K1 :: K2 :: HNil], (T1,T2)] =
-//    instance { case (ProductKeyExpr(k1 :: k2),bvs) => (eval1(k1,bvs),eval2(k2,bvs)) }
-//
+  implicit def ProductEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
+    Eval[ProductKeyExpr[Exprs], T] =
+      instance { case (ProductKeyExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
+
+  implicit def HNilEval: Eval[HNil,HNil] = instance[HNil,HNil] { case (HNil,_) => HNil }
+
+  implicit def HConsEval[H <: Expr,T <: HList,HO,TO <: HList]
+    (implicit evalH: Eval[H,HO], evalT: Eval[T,TO]): Eval[H :: T, HO :: TO] = instance[H::T,HO::TO] {
+      case (h :: t,bvs) => evalH(h, bvs) :: evalT(t, bvs)
+    }
+
 //  implicit def ProjectKeyEval[K <: KeyExpr,N <: Nat,T,O](implicit eval: Eval[K,T], at: At.Aux[T,N,O]):
 //  Eval[ProjectKeyExpr[K,N],O] = instance { (e,bvs) => at(eval(e,bvs)) }
 
@@ -211,5 +220,7 @@ object Eval {
 
 
 }
+
+object HEval
 
 

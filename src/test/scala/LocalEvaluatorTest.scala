@@ -1,10 +1,8 @@
 package slender
 
-//import org.scalatest.FunSuite
+class LocalEvaluatorTest extends SlenderTest {
+  import dsl._
 
-//class LocalEvaluatorTest extends SlenderTest {
-//  import dsl._
-//
 //  test("Group test") {
 //    val data = PhysicalCollection(
 //      Map(
@@ -20,5 +18,11 @@ package slender
 //      (2,Map(1 -> 1)) -> 1
 //    ))
 //  }
-//
-//}
+
+  test("Product eval test") {
+    val query = toExpr((IntKeyExpr(1),IntKeyExpr(1)))
+    println(query)
+    println(query.eval)
+  }
+
+}
