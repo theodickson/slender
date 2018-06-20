@@ -1,4 +1,6 @@
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
+import org.apache.spark.sql.{Encoder, SparkSession}
+import slender.{Collection, KeyExpr, NumericExpr, PhysicalCollection, RingExpr, VariableExpr}
 
 import scala.reflect.ClassTag
 
@@ -16,7 +18,12 @@ package object slender extends types with Serializable {
 
   implicit def perhaps[T](implicit ev: T = null): Perhaps[T] = Perhaps(Option(ev))
 
-  case class PairRDD[K,R](rdd: RDD[(K,R)])
+  case class PairRDD[K,R](rdd: RDD[(K,R)]) {
+    def show(implicit ss: SparkSession, enc: Encoder[(K,R)]): Unit = {
+      import ss.implicits._
+      rdd.toDF.show
+    }
+  }
 
   implicit def toPairRDD[K, R](rdd: RDD[(K, R)]): PairRDD[K, R] = PairRDD(rdd)
 
@@ -25,16 +32,22 @@ package object slender extends types with Serializable {
   implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
     new PairRDDFunctions(pairRdd.rdd)
 
-  implicit def mapToPhysicalCollection[K,R](map: Map[K,R])
+  def mapToPhysicalCollection[K,R](map: Map[K,R])
                                            (implicit coll: Collection[Map,K,R]): PhysicalCollection[Map,K,R] =
     PhysicalCollection(map)
 
-  implicit def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)])
+  def setToPhysicalBag[K](set: Set[K])
+                                  (implicit coll: Collection[Map,K,Int]): PhysicalCollection[Map,K,Int] =
+    PhysicalCollection(set.map(k => (k,1)).toMap)
+
+  def rddToPhysicalCollection[K,R](rdd: RDD[(K,R)])
                                            (implicit coll: Collection[PairRDD,K,R]): PhysicalCollection[PairRDD,K,R] =
     PhysicalCollection(rdd)
 
-  object implicits extends AlgebraImplicits with ShreddingImplicits with EvalImplicits
-    with DSL with Variables with VariableResolutionImplicits
+  def rddToPhysicalBag[K](rdd: RDD[K])(implicit coll: Collection[PairRDD,K,Int]): PhysicalCollection[PairRDD,K,Int] =
+    PhysicalCollection[PairRDD, K, Int](rdd.map(k => (k,1)))
+
+  object dsl extends Syntax with Variables
 }
 
 
