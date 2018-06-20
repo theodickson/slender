@@ -215,41 +215,41 @@ trait Priority1BindingImplicits extends Priority0BindingImplicits {
       def apply(v1: Tuple3RingExpr[K1, K2, K3]) = Tuple3RingExpr(bind1(v1.c1), bind2(v1.c2), bind3(v1.c3))
     }
 
-  implicit def Project1RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C1Expr, R1 <: RingExpr with C1Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project1RingExpr[R], Project1RingExpr[R1]] =
-    new Binder[V, T, Project1RingExpr[R], Project1RingExpr[R1]] {
-      def apply(v1: Project1RingExpr[R]) = Project1RingExpr(recur(v1.c1))
-    }
-
-  implicit def Project2RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C2Expr, R1 <: RingExpr with C2Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project2RingExpr[R], Project2RingExpr[R1]] =
-    new Binder[V, T, Project2RingExpr[R], Project2RingExpr[R1]] {
-      def apply(v1: Project2RingExpr[R]) = Project2RingExpr(recur(v1.c1))
-    }
-
-  implicit def Project3RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C3Expr, R1 <: RingExpr with C3Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project3RingExpr[R], Project3RingExpr[R1]] =
-    new Binder[V, T, Project3RingExpr[R], Project3RingExpr[R1]] {
-      def apply(v1: Project3RingExpr[R]) = Project3RingExpr(recur(v1.c1))
-    }
-
-  implicit def Project1KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C1Expr, R1 <: KeyExpr with C1Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project1KeyExpr[R], Project1KeyExpr[R1]] =
-    new Binder[V, T, Project1KeyExpr[R], Project1KeyExpr[R1]] {
-      def apply(v1: Project1KeyExpr[R]) = Project1KeyExpr(recur(v1.c1))
-    }
-
-  implicit def Project2KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C2Expr, R1 <: KeyExpr with C2Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project2KeyExpr[R], Project2KeyExpr[R1]] =
-    new Binder[V, T, Project2KeyExpr[R], Project2KeyExpr[R1]] {
-      def apply(v1: Project2KeyExpr[R]) = Project2KeyExpr(recur(v1.c1))
-    }
-
-  implicit def Project3KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C3Expr, R1 <: KeyExpr with C3Expr]
-  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project3KeyExpr[R], Project3KeyExpr[R1]] =
-    new Binder[V, T, Project3KeyExpr[R], Project3KeyExpr[R1]] {
-      def apply(v1: Project3KeyExpr[R]) = Project3KeyExpr(recur(v1.c1))
-    }
+//  implicit def Project1RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C1Expr, R1 <: RingExpr with C1Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project1RingExpr[R], Project1RingExpr[R1]] =
+//    new Binder[V, T, Project1RingExpr[R], Project1RingExpr[R1]] {
+//      def apply(v1: Project1RingExpr[R]) = Project1RingExpr(recur(v1.c1))
+//    }
+//
+//  implicit def Project2RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C2Expr, R1 <: RingExpr with C2Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project2RingExpr[R], Project2RingExpr[R1]] =
+//    new Binder[V, T, Project2RingExpr[R], Project2RingExpr[R1]] {
+//      def apply(v1: Project2RingExpr[R]) = Project2RingExpr(recur(v1.c1))
+//    }
+//
+//  implicit def Project3RingBinder[V <: VariableExpr[V], T, R <: RingExpr with C3Expr, R1 <: RingExpr with C3Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project3RingExpr[R], Project3RingExpr[R1]] =
+//    new Binder[V, T, Project3RingExpr[R], Project3RingExpr[R1]] {
+//      def apply(v1: Project3RingExpr[R]) = Project3RingExpr(recur(v1.c1))
+//    }
+//
+//  implicit def Project1KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C1Expr, R1 <: KeyExpr with C1Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project1KeyExpr[R], Project1KeyExpr[R1]] =
+//    new Binder[V, T, Project1KeyExpr[R], Project1KeyExpr[R1]] {
+//      def apply(v1: Project1KeyExpr[R]) = Project1KeyExpr(recur(v1.c1))
+//    }
+//
+//  implicit def Project2KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C2Expr, R1 <: KeyExpr with C2Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project2KeyExpr[R], Project2KeyExpr[R1]] =
+//    new Binder[V, T, Project2KeyExpr[R], Project2KeyExpr[R1]] {
+//      def apply(v1: Project2KeyExpr[R]) = Project2KeyExpr(recur(v1.c1))
+//    }
+//
+//  implicit def Project3KeyBinder[V <: VariableExpr[V], T, R <: KeyExpr with C3Expr, R1 <: KeyExpr with C3Expr]
+//  (implicit recur: Binder[V, T, R, R1]): Binder[V, T, Project3KeyExpr[R], Project3KeyExpr[R1]] =
+//    new Binder[V, T, Project3KeyExpr[R], Project3KeyExpr[R1]] {
+//      def apply(v1: Project3KeyExpr[R]) = Project3KeyExpr(recur(v1.c1))
+//    }
 }
 
 trait BindingImplicits extends Priority1BindingImplicits {

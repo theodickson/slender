@@ -64,20 +64,31 @@ trait ProductExpr extends Expr {
   override def toString = s"⟨${children.mkString(",")}⟩"
 }
 
-trait Project1Expr extends UnaryExpr {
-  def c1: Expr with C1Expr
-  override def toString = s"$c1._1"
+trait Product2Expr[C1 <: Expr, C2 <: Expr] extends Expr with ProductExpr {
+  def c1: C1
+  def c2: C2
 }
 
-trait Project2Expr extends UnaryExpr {
-  def c1: Expr with C2Expr
-  override def toString = s"$c1._2"
+trait Product3Expr[C1 <: Expr, C2 <: Expr, C3 <: Expr] extends Expr with ProductExpr {
+  def c1: C1
+  def c2: C2
+  def c3: C3
 }
 
-trait Project3Expr extends UnaryExpr {
-  def c1: Expr with C3Expr
-  override def toString = s"$c1._3"
-}
+//trait Project1Expr extends UnaryExpr {
+//  def c1: Expr with C1Expr
+//  override def toString = s"$c1._1"
+//}
+//
+//trait Project2Expr extends UnaryExpr {
+//  def c1: Expr with C2Expr
+//  override def toString = s"$c1._2"
+//}
+//
+//trait Project3Expr extends UnaryExpr {
+//  def c1: Expr with C3Expr
+//  override def toString = s"$c1._3"
+//}
 
 trait PrimitiveExpr[V] extends NullaryExpr {
   def value: V
@@ -104,29 +115,24 @@ object StringKeyExpr {
   def apply(s: String) = PrimitiveKeyExpr(s)
 }
 
-//case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
-//                                          (implicit val trav: ToTraversable.Aux[Exprs, List, Expr]) extends Expr {
-//  def children = exprs.toList
-//}
-//
-//case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
+case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
+                                          (implicit val trav: ToTraversable.Aux[Exprs, List, Expr]) extends Expr {
+  def children = exprs.toList
+}
 
-//case class HProject1KeyExpr[H <: Expr, T <: HList](c1: ProductKeyExpr[H :: T])
-//                                                  (implicit lub: LUBConstraint[T, Expr])
-//
-//case class HProject2KeyExpr[H1 <: Expr, H2 <: Expr, T <: HList](c1: ProductKeyExpr[H1 :: H2 :: T])
-//                                                               (implicit lub: LUBConstraint[T, Expr])
+case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
 
-case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with ProductExpr
+
+case class Tuple2KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr](c1: K1, c2: K2) extends BinaryKeyExpr with Product2Expr[K1,K2]
 
 case class Tuple3KeyExpr[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryKeyExpr with ProductExpr
+  extends TernaryKeyExpr with Product3Expr[K1,K2,K3]
 
-case class Project1KeyExpr[K <: KeyExpr with C1Expr](c1: K) extends UnaryKeyExpr with Project1Expr
-
-case class Project2KeyExpr[K <: KeyExpr with C2Expr](c1: K) extends UnaryKeyExpr with Project2Expr
-
-case class Project3KeyExpr[K <: KeyExpr with C3Expr](c1: K) extends UnaryKeyExpr with Project3Expr
+//case class Project1KeyExpr[K <: KeyExpr with C1Expr](c1: K) extends UnaryKeyExpr with Project1Expr
+//
+//case class Project2KeyExpr[K <: KeyExpr with C2Expr](c1: K) extends UnaryKeyExpr with Project2Expr
+//
+//case class Project3KeyExpr[K <: KeyExpr with C3Expr](c1: K) extends UnaryKeyExpr with Project3Expr
 
 case class BoxedRingExpr[R <: Expr](c1: R) extends UnaryKeyExpr {
   override def toString = s"[$c1]"
@@ -278,30 +284,17 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr
 
 
 /**Tupling and projection*/
-//case class ProductRingExpr[L <: HList, Lub <: LUBConstraint[L, RingExpr]]
-//  (l: L)(implicit lub: Lub, trav: ToTraversable.Aux[L, List, Lub] { type Out <: List[RingExpr] }) extends RingExpr with ProductExpr {
-//  type Self = ProductRingExpr[L, Lub]
-//  def children: List[RingExpr] = l.toList[Lub](trav)
-//}
 
-//case class ProductRingExpr[L <: HList](l: L)
-//                                      (implicit lub: LUBConstraint[L,RingExpr],
-//                                                toList: ToList[L, RingExpr])
-//  extends RingExpr with ProductExpr {
-//  type Self = ProductRingExpr[L]
-//  def children: List[RingExpr] = l.toList//.asInstanceOf[List[RingExpr]]//l.toList(trav).map(_.asInstanceOf[RingExpr])//l.toList[Lub](trav)
-//}
-
-case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with ProductExpr
+case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with Product2Expr[K1,K2]
 
 case class Tuple3RingExpr[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr](c1: K1, c2: K2, c3: K3)
-  extends TernaryRingExpr with ProductExpr
+  extends TernaryRingExpr with Product3Expr[K1,K2,K3]
 
-case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr
-
-case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr
-
-case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr
+//case class Project1RingExpr[K <: RingExpr with C1Expr](c1: K) extends UnaryRingExpr with Project1Expr
+//
+//case class Project2RingExpr[K <: RingExpr with C2Expr](c1: K) extends UnaryRingExpr with Project2Expr
+//
+//case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr
 
 /**VariableExpr*/
 trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr {
@@ -327,13 +320,13 @@ trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with Nullary
 }
 
 case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
-  extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with ProductExpr {
+  extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with Product2Expr[V1,V2] {
   type Type = (c1.Type,c2.Type)
   def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
 }
 
 case class Tuple3VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3]](c1: V1, c2: V2, c3: V3)
-  extends VariableExpr[Tuple3VariableExpr[V1,V2,V3]] with BinaryExpr with ProductExpr {
+  extends VariableExpr[Tuple3VariableExpr[V1,V2,V3]] with BinaryExpr with Product3Expr[V1,V2,V3] {
   type Type = (c1.Type,c2.Type,c3.Type)
   def bind(t: (c1.Type,c2.Type,c3.Type)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
 }

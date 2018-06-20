@@ -93,23 +93,23 @@ class TPCHSparkTest extends SlenderSparkTest {
 ////      println(customerOrders.evalType)
 ////      customerOrders.eval.collect.foreach(println)
 //    }
-  //
-  //  test("Q2") {
-  //    /**For each supplier, return the name and the names of all customers who have used them*/
-  //    val q =
-  //      For ((s_suppkey,s_name,s_nationkey) <-- supplier) Yield
-  //        (s_name,
-  //          For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem iff (s_suppkey === l_suppkey)) Collect
-  //            (
-  //              For ((o_orderkey,o_custkey,o_orderdate) <-- orders iff (l_orderkey === o_orderkey)) Collect (
-  //                For ((c_custkey,c_name,c_nationkey) <-- customer iff (o_custkey === c_custkey)) Yield c_name
-  //              )
-  //            )
-  //        )
-  //    assert(q.isResolved)
-  //    assert(q.isEvaluable)
-  //    println(q.evalType)
-  ////    println(q.eval)
-  //  }
+
+//  test("Q2") {
+//    /**For each supplier, return the name and the names of all customers who have used them*/
+//    val q =
+//      For ((s_suppkey,s_name,s_nationkey) <-- supplier) Yield
+//        (s_name,
+//          For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem Iff (s_suppkey === l_suppkey)) Collect
+//            (
+//              For ((o_orderkey,o_custkey,o_orderdate) <-- orders Iff (l_orderkey === o_orderkey)) Collect (
+//                For ((c_custkey,c_name,c_nationkey) <-- customer Iff (o_custkey === c_custkey)) Yield c_name
+//              )
+//            )
+//        )
+//    assert(q.isResolved)
+//    assert(q.isEvaluable)
+//    println(q.evalType)
+//    println(q.eval)
+//  }
 
 }

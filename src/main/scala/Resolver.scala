@@ -188,35 +188,35 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
       def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
     }
 
-  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
-    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project1KeyResolver[R1 <: KeyExpr with C1Expr,R2 <: KeyExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
-    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
-  }
-
-  implicit def Project2RingResolver[R1 <: RingExpr with C2Expr,R2 <: RingExpr with C2Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
-    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project2KeyResolver[R1 <: KeyExpr with C2Expr,R2 <: KeyExpr with C2Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
-    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
-  }
-
-  implicit def Project3RingResolver[R1 <: RingExpr with C3Expr,R2 <: RingExpr with C3Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
-    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
-  }
-
-  implicit def Project3KeyResolver[R1 <: KeyExpr with C3Expr,R2 <: KeyExpr with C3Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
-    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
-  }
+//  implicit def Project1RingResolver[R1 <: RingExpr with C1Expr,R2 <: RingExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] = new Resolver[Project1RingExpr[R1],Project1RingExpr[R2]] {
+//    def apply(v1: Project1RingExpr[R1]): Project1RingExpr[R2] = Project1RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project1KeyResolver[R1 <: KeyExpr with C1Expr,R2 <: KeyExpr with C1Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] = new Resolver[Project1KeyExpr[R1],Project1KeyExpr[R2]] {
+//    def apply(v1: Project1KeyExpr[R1]): Project1KeyExpr[R2] = Project1KeyExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project2RingResolver[R1 <: RingExpr with C2Expr,R2 <: RingExpr with C2Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] = new Resolver[Project2RingExpr[R1],Project2RingExpr[R2]] {
+//    def apply(v1: Project2RingExpr[R1]): Project2RingExpr[R2] = Project2RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project2KeyResolver[R1 <: KeyExpr with C2Expr,R2 <: KeyExpr with C2Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] = new Resolver[Project2KeyExpr[R1],Project2KeyExpr[R2]] {
+//    def apply(v1: Project2KeyExpr[R1]): Project2KeyExpr[R2] = Project2KeyExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project3RingResolver[R1 <: RingExpr with C3Expr,R2 <: RingExpr with C3Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] = new Resolver[Project3RingExpr[R1],Project3RingExpr[R2]] {
+//    def apply(v1: Project3RingExpr[R1]): Project3RingExpr[R2] = Project3RingExpr(resolver(v1.c1))
+//  }
+//
+//  implicit def Project3KeyResolver[R1 <: KeyExpr with C3Expr,R2 <: KeyExpr with C3Expr](implicit resolver: Resolver[R1,R2]):
+//  Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] = new Resolver[Project3KeyExpr[R1],Project3KeyExpr[R2]] {
+//    def apply(v1: Project3KeyExpr[R1]): Project3KeyExpr[R2] = Project3KeyExpr(resolver(v1.c1))
+//  }
 }
 
 
