@@ -1,6 +1,5 @@
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 import org.apache.spark.sql.{Encoder, SparkSession}
-import slender.{Collection, KeyExpr, NumericExpr, PhysicalCollection, RingExpr, VariableExpr}
 
 import scala.reflect.ClassTag
 

@@ -19,11 +19,11 @@ class LocalEvaluatorTest extends SlenderTest {
 //    ))
 //  }
 
-  test("Var product test") {
-    val queryRaw = (X1,(X2,X3))
-    def getQuery[T, V <: VariableExpr](t: T)(implicit make: MakeExpr[T,V]): V = make(t)
-    val query = getQuery(queryRaw)
-    printType(query)
-  }
+//  test("Var product test") {
+//    val queryRaw = (X1,(X2,X3))
+//    def getQuery[T, V <: VarExpr](t: T)(implicit make: MakeExpr[T,V]): V = make(t)
+//    val query = getQuery(queryRaw)
+//    printType(query)
+//  }
 
 }
