@@ -15,7 +15,6 @@ trait Ring[R] extends Serializable {
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
   def innerRing: Ring[R]
-//  def sum[S](c: C[K,R])(implicit ev: Sum[C[K,R],S]): S
   def map[R1](c: C[K,R], f: (K,R) => (K,R1)): C[K,R1]
   def filter(c: C[K,R], f: (K,R) => Boolean): C[K,R]
   override def filterZeros(c: C[K,R]): C[K,R] = {
@@ -45,14 +44,6 @@ trait Dot[T1,T2,O] extends ((T1,T2) => O) with Serializable
 trait Multiply[T1,T2,O] extends ((T1,T2) => O) with Serializable
 
 trait Join[T1,T2,O] extends ((T1,T2) => O) with Serializable
-
-
-//
-//trait OpImplicits {
-//  implicit class CollectionImplicits[C[_,_],K,R](c: C[K,R])(implicit coll: Collection[C,K,R]) {
-//    def filterZeros: C[K,R] = coll.filterZeros(c)
-//  }
-//}
 
 
 object Ring {
@@ -86,8 +77,6 @@ object Ring {
 
       def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
 
-//      def sum[S](c: PairRDD[K, R])(implicit ev: Sum[PairRDD[K,R],S]): S = ev(c) //
-
       def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
 
       def filter(c: PairRDD[K,R], f: (K,R) => Boolean): PairRDD[K,R] = c.filter { case (k, v) => f(k, v) }
@@ -103,11 +92,9 @@ object Ring {
       def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
         t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
 
-      def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }//t1.mapValues(ring.not)
+      def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }
 
-      def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) } //Values(ring.negate)
-
-//      def sum[S](c: Map[K, R])(implicit ev: Sum[Map[K,R],S]): S = ev(c)
+      def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) }
 
       def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
 
@@ -263,9 +250,14 @@ object Multiply {
         t2.map { case (k, v) => k -> dot(t1.getOrElse(k, ring.zero),v) }
     }
 
-  implicit def infMultiply[C[_, _], K, R1, R2, O](implicit dot: Dot[R1, R2, O], coll: Collection[C, K, R1]): Multiply[C[K, R1], K => R2, C[K, O]] =
-    new Multiply[C[K, R1], K => R2, C[K, O]] {
-      def apply(t1: C[K, R1], t2: K => R2): C[K, O] = coll.map(t1, (k: K, v: R1) => k -> dot(v, t2(k)))
+//  implicit def infMultiply[C[_, _], K, R1, R2, O](implicit dot: Dot[R1, R2, O], coll: Collection[C, K, R1]): Multiply[C[K, R1], K => R2, C[K, O]] =
+//    new Multiply[C[K, R1], K => R2, C[K, O]] {
+//      def apply(t1: C[K, R1], t2: K => R2): C[K, O] = coll.map(t1, (k: K, v: R1) => k -> dot(v, t2(k)))
+//    }
+
+  implicit def infMultiply[C[_, _], K, K1 >: K, R1, R2, O](implicit dot: Dot[R1, R2, O], coll: Collection[C, K, R1]): Multiply[C[K, R1], K1 => R2, C[K, O]] =
+    new Multiply[C[K, R1], K1 => R2, C[K, O]] {
+      def apply(t1: C[K, R1], t2: K1 => R2): C[K, O] = coll.map(t1, (k: K, v: R1) => k -> dot(v, t2(k)))
     }
 
   //todo - enable any kind of tuple multiplication?

@@ -67,7 +67,7 @@ trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
   implicit def PhysicalCollectionResolver[C[_,_],K,R]: Resolver[PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] =
     Resolver.nonResolver[PhysicalCollection[C,K,R]]
 
-  implicit def VariableResolver[V <: UntypedVariable[V],T]: Resolver[TypedVariable[T],TypedVariable[T]] =
+  implicit def VariableResolver[V <: UntypedVariable,T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]
 
 }
@@ -162,43 +162,49 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
 //      def apply(v1: Tuple2KeyExpr[K1,K2]) = Tuple2KeyExpr(resolve1(v1.c1),resolve2(v1.c2))
 //    }
 
-  implicit def Tuple2VariableResolver[K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B]]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] =
-    new Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] {
-      def apply(v1: Tuple2VariableExpr[K1,K2]) = Tuple2VariableExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
-
-//  implicit def Tuple3RingResolver[K1 <: RingExpr,K2 <: RingExpr,K3 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr,K3B <: RingExpr]
-//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] =
-//    new Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] {
-//      def apply(v1: Tuple3RingExpr[K1,K2,K3]) = Tuple3RingExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+//  implicit def Tuple2VariableResolver[K1 <: VariableExpr,K2 <: VariableExpr,K1B <: VariableExpr,K2B <: VariableExpr]
+//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] =
+//    new Resolver[Tuple2VariableExpr[K1,K2],Tuple2VariableExpr[K1B,K2B]] {
+//      def apply(v1: Tuple2VariableExpr[K1,K2]) = Tuple2VariableExpr(resolve1(v1.c1),resolve2(v1.c2))
 //    }
 //
-//  implicit def Tuple3KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K3 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr,K3B <: KeyExpr]
-//  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] =
-//    new Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] {
-//      def apply(v1: Tuple3KeyExpr[K1,K2,K3]) = Tuple3KeyExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+////  implicit def Tuple3RingResolver[K1 <: RingExpr,K2 <: RingExpr,K3 <: RingExpr,K1B <: RingExpr,K2B <: RingExpr,K3B <: RingExpr]
+////  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] =
+////    new Resolver[Tuple3RingExpr[K1,K2,K3],Tuple3RingExpr[K1B,K2B,K3B]] {
+////      def apply(v1: Tuple3RingExpr[K1,K2,K3]) = Tuple3RingExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+////    }
+////
+////  implicit def Tuple3KeyResolver[K1 <: KeyExpr,K2 <: KeyExpr,K3 <: KeyExpr,K1B <: KeyExpr,K2B <: KeyExpr,K3B <: KeyExpr]
+////  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]): Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] =
+////    new Resolver[Tuple3KeyExpr[K1,K2,K3],Tuple3KeyExpr[K1B,K2B,K3B]] {
+////      def apply(v1: Tuple3KeyExpr[K1,K2,K3]) = Tuple3KeyExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
+////    }
+//
+//  implicit def Tuple3VariableResolver[
+//  K1 <: VariableExpr,K2 <: VariableExpr,K3 <: VariableExpr,
+//  K1B <: VariableExpr,K2B <: VariableExpr,K3B <: VariableExpr
+//  ](implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]):
+//  Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] =
+//    new Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] {
+//      def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
 //    }
 
-  implicit def Tuple3VariableResolver[
-  K1 <: VariableExpr[K1],K2 <: VariableExpr[K2],K3 <: VariableExpr[K3],
-  K1B <: VariableExpr[K1B],K2B <: VariableExpr[K2B],K3B <: VariableExpr[K3B]
-  ](implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B], resolve3: Resolver[K3,K3B]):
-  Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] =
-    new Resolver[Tuple3VariableExpr[K1,K2,K3],Tuple3VariableExpr[K1B,K2B,K3B]] {
-      def apply(v1: Tuple3VariableExpr[K1,K2,K3]) = Tuple3VariableExpr(resolve1(v1.c1),resolve2(v1.c2),resolve3(v1.c3))
-    }
-
   implicit def ProductKeyResolver[C <: HList, CR <: HList]
-  (implicit resolve: Resolver[C,CR], trav: ToTraversable.Aux[CR,List,KeyExpr]): Resolver[ProductKeyExpr[C],ProductKeyExpr[CR]] =
+  (implicit resolve: Resolver[C,CR], lub: LUBConstraint[CR,KeyExpr]): Resolver[ProductKeyExpr[C],ProductKeyExpr[CR]] =
     new Resolver[ProductKeyExpr[C],ProductKeyExpr[CR]] {
       def apply(v1: ProductKeyExpr[C]) = ProductKeyExpr(resolve(v1.exprs))
     }
 
   implicit def ProductRingResolver[C <: HList, CR <: HList]
-  (implicit resolve: Resolver[C,CR], trav: ToTraversable.Aux[CR,List,RingExpr]): Resolver[ProductRingExpr[C],ProductRingExpr[CR]] =
+  (implicit resolve: Resolver[C,CR], lub: LUBConstraint[CR,RingExpr]): Resolver[ProductRingExpr[C],ProductRingExpr[CR]] =
     new Resolver[ProductRingExpr[C],ProductRingExpr[CR]] {
       def apply(v1: ProductRingExpr[C]) = ProductRingExpr(resolve(v1.exprs))
+    }
+
+  implicit def ProductVariableResolver[C <: HList, CR <: HList]
+  (implicit resolve: Resolver[C,CR], lub: LUBConstraint[CR,VariableExpr]): Resolver[ProductVariableExpr[C],ProductVariableExpr[CR]] =
+    new Resolver[ProductVariableExpr[C],ProductVariableExpr[CR]] {
+      def apply(v1: ProductVariableExpr[C]) = ProductVariableExpr(resolve(v1.exprs))
     }
 
   implicit def HNilResolver: Resolver[HNil,HNil] = Resolver.nonResolver[HNil]
@@ -257,7 +263,7 @@ trait ResolutionImplicits extends Priority2ResolutionImplicits {
     * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
     * 5 - Recursively resolve the value of the infinite mapping.*/
   implicit def MultiplyInfResolver[
-  LHS <: RingExpr, LHS1 <: RingExpr, V <: VariableExpr[V], C[_,_], KT, VB <: VariableExpr[VB],
+  LHS <: RingExpr, LHS1 <: RingExpr, V <: VariableExpr, C[_,_], KT, VB <: VariableExpr,
   RT, R1 <: RingExpr, R2 <: RingExpr, R3 <: RingExpr
   ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
     bindLeft: Binder[V,KT,V,VB], bindRight: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):

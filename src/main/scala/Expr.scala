@@ -1,18 +1,16 @@
 package slender
 
 import org.apache.spark.SparkContext
-import shapeless.{Generic, HList, LUBConstraint, Nat}
-import shapeless.ops.hlist.ToTraversable
+import shapeless.{Generic, HList, HNil, LUBConstraint, Nat, ::}
 
-import scala.reflect.runtime.universe._
 
 trait Expr {
 
-  def children: List[Expr]
+  //def children: List[Expr]
 
-  def id = hashCode.abs.toString.take(3).toInt
-
-  def isResolved: Boolean = children.forall(_.isResolved)
+//  def id = hashCode.abs.toString.take(3).toInt
+//
+//  def isResolved: Boolean = children.forall(_.isResolved)
 //  def variables: Set[Variable[_]] =
 //    children.foldRight(Set.empty[Variable[_]])((v, acc) => acc ++ v.variables)
 //  def freeVariables: Set[Variable[_]] =
@@ -60,7 +58,7 @@ trait TernaryExpr extends Expr with C1Expr with C2Expr with C3Expr {
 }
 
 trait ProductExpr extends Expr {
-  override def toString = s"⟨${children.mkString(",")}⟩"
+  //override def toString = s"⟨${children.mkString(",")}⟩"
 }
 
 trait Product2Expr[C1 <: Expr, C2 <: Expr] extends Expr with ProductExpr {
@@ -115,15 +113,8 @@ object StringKeyExpr {
 }
 
 case class ProductKeyExpr[Exprs <: HList](exprs: Exprs)
-                                         (implicit val trav: ToTraversable.Aux[Exprs, List, KeyExpr]) extends Expr {
-  def children = exprs.toList
-}
-
-object ProductKeyExpr {
-  def apply[T,Repr <: HList](t: T)
-                            (implicit gen: Generic.Aux[T,Repr],
-                             trav: ToTraversable.Aux[Repr, List, KeyExpr]): ProductKeyExpr[Repr] =
-    ProductKeyExpr(gen.to(t))
+                                         (implicit val lub: LUBConstraint[Exprs, KeyExpr]) extends KeyExpr with ProductExpr {
+  //def children = exprs.toList
 }
 
 //case class ProjectKeyExpr[K <: KeyExpr, N <: Nat](c1: K)(n: N) extends UnaryKeyExpr
@@ -145,7 +136,7 @@ case class BoxedRingExpr[R <: Expr](c1: R) extends UnaryKeyExpr {
 }
 
 case class LabelExpr[R <: RingExpr](c1: R) extends UnaryKeyExpr {
-  override def toString = s"Label($id)"
+  //override def toString = s"Label($id)"
   //  def explainFreeVariables = freeVariables.map(_.explain).mkString("\n\t")
   //
   //  def definition: String = {
@@ -161,8 +152,6 @@ case class LabelExpr[R <: RingExpr](c1: R) extends UnaryKeyExpr {
 
   //  def renest = BoxedRingExpr(FromLabel(LabelExpr(c1.renest))) //todo
 }
-
-
 
 
 
@@ -230,7 +219,7 @@ case class SumExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 case class GroupExpr[E <: RingExpr](c1: E) extends UnaryRingExpr
 
 /**Mapping constructs*/
-case class InfiniteMappingExpr[K <: VariableExpr[K],R <: RingExpr](key: K, value: R)
+case class InfiniteMappingExpr[K <: VariableExpr,R <: RingExpr](key: K, value: R)
   extends BinaryRingExpr {
   def c1 = key; def c2 = value
   override def toString = s"{$key => $value}"
@@ -292,15 +281,8 @@ case class ToRingExpr[E <: Expr](c1: E) extends UnaryRingExpr
 /**Tupling and projection*/
 
 case class ProductRingExpr[Exprs <: HList](exprs: Exprs)
-                                         (implicit val trav: ToTraversable.Aux[Exprs, List, RingExpr]) extends Expr {
-  def children = exprs.toList
-}
-
-object ProductRingExpr {
-  def apply[T,Repr <: HList](t: T)
-                            (implicit gen: Generic.Aux[T,Repr],
-                             trav: ToTraversable.Aux[Repr, List, RingExpr]): ProductRingExpr[Repr] =
-    ProductRingExpr(gen.to(t))
+                                          (implicit val lub: LUBConstraint[Exprs, RingExpr]) extends RingExpr with ProductExpr {
+  //def children = exprs.toList
 }
 
 //case class Tuple2RingExpr[K1 <: RingExpr, K2 <: RingExpr](c1: K1, c2: K2) extends BinaryRingExpr with Product2Expr[K1,K2]
@@ -315,49 +297,98 @@ object ProductRingExpr {
 //case class Project3RingExpr[K <: RingExpr with C3Expr](c1: K) extends UnaryRingExpr with Project3Expr
 
 /**VariableExpr*/
-trait VariableExpr[V <: VariableExpr[V]] extends KeyExpr {
-  type Type
-  def bind(t: Type): BoundVars
+trait VariableExpr extends KeyExpr {
+  //type Type
+  //def bind(t: Type): BoundVars
 }
 
-case class TypedVariable[T](name: String) extends VariableExpr[TypedVariable[T]] with NullaryKeyExpr {
-  type Type = T
+
+case class UnusedVariable() extends VariableExpr with NullaryKeyExpr {
+  def name = "_"
+}
+
+case class TypedVariable[T](name: String) extends VariableExpr with NullaryKeyExpr {
+  //type Type = T
   override def toString = name
-  def bind(t: T) = Map(this.name -> t)
-  override def isResolved = true
+  //def bind(t: T) = Map(this.name -> t)
+  //override def isResolved = true
 }
 
 
-trait UntypedVariable[T <: VariableExpr[T]] extends VariableExpr[T] with NullaryKeyExpr {
-  type Type = Untyped
+trait UntypedVariable extends VariableExpr with NullaryKeyExpr {
+  //type Type = Untyped
   def name: String
   def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name)
-  def bind(t: Untyped) = ???
-  override def toString = s""""$this:?""""
-  override def isResolved = false
+  //def bind(t: Untyped) = ???
+  override def toString = s"""$name:?""""
+  //override def isResolved = false
 }
 
-
-//case class ProductVariableExpr[Exprs <: HList](exprs: Exprs)
-//                                         (implicit val trav: ToTraversable.Aux[Exprs, List, VariableExpr]) extends Expr {
+//case class ProductVariableExpr[Exprs <: HList, Types <: HList](exprs: Exprs)
+//                                              (implicit val trav: ToTraversable.Aux[Exprs, List, VariableExpr],
+//                                               aux: ProductVariableAux[Exprs, Types]) extends VariableExpr with ProductExpr {
+//  type Type = Types
+//  //hard to do this because of the whole types thing, in fact they have to match the eval type to tuples.
 //  def children = exprs.toList
+//  def bind(t: Type): BoundVars = exprs.toList.foldRight(Map.empty[String,Any])((v,acc) => acc ++ v.bind(t))
 //}
 //
-//object ProductVariableExpr {
-//  def apply[T,Repr <: HList](t: T)
-//                            (implicit gen: Generic.Aux[T,Repr],
-//                             trav: ToTraversable.Aux[Repr, List, VariableExpr]): ProductVariableExpr[Repr] =
-//    ProductVariableExpr(gen.to(t))
+//trait ProductVariableAux[Exprs <: HList, Type]
+//
+//object ProductVariableAux {
+//  implicit def HNilAux: ProductVariableAux[HNil, HNil] = new ProductVariableAux[HNil, HNil] {}
+//  implicit def HConsAux[H <: VariableExpr, T <: HList, Type]
+//  (implicit aux: ProductVariableAux[T, Type]): ProductVariableAux[H :: T, H#Type] = new ProductVariableAux[H :: T, H#Type] {}
 //}
 
-case class Tuple2VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2]](c1: V1, c2: V2)
-  extends VariableExpr[Tuple2VariableExpr[V1,V2]] with BinaryExpr with Product2Expr[V1,V2] {
-  type Type = (c1.Type,c2.Type)
-  def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
-}
 
-case class Tuple3VariableExpr[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3]](c1: V1, c2: V2, c3: V3)
-  extends VariableExpr[Tuple3VariableExpr[V1,V2,V3]] with BinaryExpr with Product3Expr[V1,V2,V3] {
-  type Type = (c1.Type,c2.Type,c3.Type)
-  def bind(t: (c1.Type,c2.Type,c3.Type)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
+//sealed trait ProductVariableExpr[Exprs <: HList] extends VariableExpr with ProductExpr {
+//  def hChildren: Exprs
+//}
+//
+//case object ProductVariableExprNil extends ProductVariableExpr[HNil] {
+//  type Type = HNil
+//  def children = List.empty[VariableExpr]
+//  def hChildren = HNil
+//  def bind(t: HNil): BoundVars = Map.empty
+//}
+//
+//case class ProductVariableExprCons[H <: VariableExpr, T <: HList]
+//  (head: H, tail: ProductVariableExpr[T])(implicit val trav: ToTraversable.Aux[H :: T, List, Expr]) extends ProductVariableExpr[H :: T] {
+//  type Type = head.Type :: tail.Type
+//  def hChildren: H :: T = head :: tail.hChildren
+//  def children = hChildren.toList
+//  def bind(t: Type): BoundVars = head.bind(t.head) ++ tail.bind(t.tail)
+//}
+
+//object ProductVariableExpr {
+////  def apply[H <: VariableExpr, T <: HList](r: H :: T)
+////                          (implicit trav: ToTraversable.Aux[H :: T, List, VariableExpr]): ProductVariableExpr[H :: T] = r match {
+////    //todo - dirty hacks
+////    case h :: HNil => ProductVariableExprCons[H,T](h, ProductVariableExprNil.asInstanceOf[ProductVariableExpr[T]])
+////    case h :: (h1 :: t1) => ProductVariableExprCons(h, ProductVariableExpr(h1 :: t1).asInstanceOf[ProductVariableExpr[T]])
+////  }
+//  def apply[T <: HList](r: T)(implicit trav: ToTraversable.Aux[T, List, VariableExpr]): ProductVariableExpr[T] = r match {
+//    //todo - dirty hacks
+//    case HNil => ProductVariableExprNil.asInstanceOf[ProductVariableExpr[T]]
+//    case h :: t => ProductVariableExprCons(h, ProductVariableExpr(t)).asInstanceOf[ProductVariableExpr[T]]
+//    //case h :: (h1 :: t1) => ProductVariableExprCons(h, ProductVariableExpr(h1 :: t1)).asInstanceOf[ProductVariableExpr[T]]
+//  }
+//}
+
+case class ProductVariableExpr[Exprs <: HList](exprs: Exprs)
+                                              (implicit val lub: LUBConstraint[Exprs, VariableExpr]) extends VariableExpr with ProductExpr {
+  //def children = exprs.toList
 }
+//
+//case class Tuple2VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr](c1: V1, c2: V2)
+//  extends VariableExpr with BinaryExpr with Product2Expr[V1,V2] {
+//  //type Type = (c1.Type,c2.Type)
+//  //def bind(t: (c1.Type,c2.Type)) = c1.bind(t._1) ++ c2.bind(t._2)
+//}
+//
+//case class Tuple3VariableExpr[V1 <: VariableExpr,V2 <: VariableExpr,V3 <: VariableExpr](c1: V1, c2: V2, c3: V3)
+//  extends VariableExpr with BinaryExpr with Product3Expr[V1,V2,V3] {
+//  //type Type = (c1.Type,c2.Type,c3.Type)
+//  //def bind(t: (c1.Type,c2.Type,c3.Type)) = c1.bind(t._1) ++ c2.bind(t._2) ++ c3.bind(t._3)
+//}

@@ -5,7 +5,7 @@ import shapeless.ops.tuple.At
 import shapeless.{::, Generic, HList, HNil, Nat, Select}
 import shapeless.syntax.HListOps
 
-trait Eval[-E,T] extends ((E,BoundVars) => T) with Serializable
+trait Eval[-E,+T] extends ((E,BoundVars) => T) with Serializable
 
 case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) extends Serializable {
   def get: T = eval(expr,vars)
@@ -19,8 +19,12 @@ object Eval {
     def apply(v1: E, v2: BoundVars): T = f(v1,v2)
   }
 
-  implicit def VariableEval[V <: UntypedVariable[V],T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
+  implicit def VariableEval[T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
     def apply(v1: TypedVariable[T], v2: BoundVars): T = v2(v1.name).asInstanceOf[T]
+  }
+
+  implicit def UnusedVariableEval: Eval[UnusedVariable,Any] = new Eval[UnusedVariable,Any] {
+    def apply(v1: UnusedVariable, v2: BoundVars): Any = null
   }
 
 
@@ -37,11 +41,18 @@ object Eval {
       def apply(v1: PhysicalCollection[C,K,R], v2: BoundVars): C[K,R] = v1.value
   }
 
-  implicit def InfiniteMappingEval[V <: VariableExpr[V] { type Type = KT },R <: RingExpr,KT,RT]
-  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
+//  implicit def InfiniteMappingEval[V <: VariableExpr { type Type = KT },R <: RingExpr,KT,RT]
+//  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
+//    new Eval[InfiniteMappingExpr[V,R],KT => RT] {
+//      def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT =
+//        (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
+//    }
+
+  implicit def InfiniteMappingEval[V <: VariableExpr,R <: RingExpr,KT,RT]
+  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: VarBinder[V, KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
     new Eval[InfiniteMappingExpr[V,R],KT => RT] {
       def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT =
-        (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
+        (k: KT) => evalR(v1.value,v2 ++ varBinder(v1.key, k))
     }
 
 
@@ -123,9 +134,17 @@ object Eval {
       def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c2,v2))) 1 else 0
     }
 
-  implicit def ProductEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
+  implicit def ProductKeyEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
     Eval[ProductKeyExpr[Exprs], T] =
       instance { case (ProductKeyExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
+
+  implicit def ProductRingEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
+  Eval[ProductRingExpr[Exprs], T] =
+    instance { case (ProductRingExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
+
+  implicit def ProductVariableEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
+  Eval[ProductVariableExpr[Exprs], T] =
+    instance { case (ProductVariableExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
 
   implicit def HNilEval: Eval[HNil,HNil] = instance[HNil,HNil] { case (HNil,_) => HNil }
 
@@ -220,7 +239,5 @@ object Eval {
 
 
 }
-
-object HEval
 
 
