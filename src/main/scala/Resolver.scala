@@ -1,18 +1,59 @@
 package slender
 
 import shapeless._
-import shapeless.ops.hlist.ToTraversable
 
+/** Resolve an expression containing untyped variables to one in which all variables are typed,
+  * so that it can be evaluated.
+  *
+  * Untyped variables may be introduced in an infinite mapping. When this infinite mapping is multiplied by
+  * a finite collection, we can infer the types of these untyped variables using
+  * the key type of the finite collection. E.g. if we have the expression X * ((x,y) => 1) and X is a Bag[(Int,String)],
+  * we can infer that the variable x must have type Int and y must have type String.
+  *
+  * Thus, we can resolve such any expression by:
+  *   A. If it's a multiplication between a finite collection and an infinite mapping:
+  *     1. Recursively resolve the finite collection.
+  *     2. Traversing the infinite mapping (key and value) and appropriately
+  *        tagging each untyped variable. (i.e. tag with the matching type if it's an untyped variable introduced in
+  *        the key, otherwise ignore).
+  *     3. Recursively resolving the value of the infinite mapping.
+  *
+  *   B. If it's any other expression, simply recursively resolve its children and rebuild.
+  */
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
-
-object Resolver extends ResolutionImplicits {
+object Resolver {
 
   def instance[In, Out](f: In => Out): Resolver[In,Out] = new Resolver[In,Out] {
     def apply(v1: In): Out = f(v1)
   }
 
-  def nonResolver[E]: Resolver[E,E] = new Resolver[E,E] { def apply(v1: E) = v1 }
+  def nonResolver[E]: Resolver[E,E] = Resolver.instance { v1 => v1 }
+
+  /**Resolve a multiplication of a finite collection on the LHS with an inf mapping on the RHS.
+    * This is the 'main event' of variable resolution, and works as follows:
+    * 1 - Resolve the left hand side to get an expres
+    * 2 - Require that the LHS evaluates to a finite collection.
+    * 3 - Bind the key of the infinite mapping on the RHS (which may be a nested product of variables)
+    *     to the discovered key type of the finite collection.
+    * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
+    * 5 - Recursively resolve the value of the infinite mapping.*/
+  implicit def MultiplyInfResolver[
+    LHS <: Expr, LHS1 <: Expr, V <: Expr, C[_,_], KT, VB <: Expr,
+    RT, R1 <: Expr, R2 <: Expr, R3 <: Expr
+  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
+    tagLeft: Tagger[V,KT,V,VB], tagRight: Tagger[V,KT,R1,R2], resolver: Resolver[R2,R3]):
+  Resolver[
+    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
+    ] =
+    new Resolver[
+      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+      MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
+      ] {
+      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
+        MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(tagLeft(v1.c2.key),resolver(tagRight(v1.c2.value))))
+    }
 }
 
 trait Priority0ResolutionImplicits {
@@ -38,7 +79,6 @@ trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
 
 trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Standard inductive cases*/
-  //Ring expresssions
   implicit def AddResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
   (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =
     new Resolver[AddExpr[L,R],AddExpr[L1,R1]] {
@@ -114,35 +154,4 @@ trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
       case h1 :: t1 => resolveH(h1) :: resolveT(t1)
     }
   }
-}
-
-
-trait ResolutionImplicits extends Priority2ResolutionImplicits {
-  //Note that the below doesnt strictly need to be here - as a there is no standalone resolver for an infinite mapping,
-  //the standard MultiplyResolver if tried for MultiplyExpr with an InfMapping on the RHS will fail. However, it's logical
-  //to aid the compiler by making it try this one first for such expressions.
-  /**Resolve a multiplication of a finite collection on the LHS with an inf mapping on the RHS.
-    * This is the 'main event' of variable resolution, and works as follows:
-    * 1 - Resolve the LHS
-    * 2 - Require that the LHS evaluates to a finite collection.
-    * 3 - Bind the key of the infinite mapping on the RHS (which may be a nested product of variables)
-    *     to the discovered key type of the finite collection.
-    * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
-    * 5 - Recursively resolve the value of the infinite mapping.*/
-  implicit def MultiplyInfResolver[
-  LHS <: Expr, LHS1 <: Expr, V <: Expr, C[_,_], KT, VB <: Expr,
-  RT, R1 <: Expr, R2 <: Expr, R3 <: Expr
-  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
-    bindLeft: Binder[V,KT,V,VB], bindRight: Binder[V,KT,R1,R2], resolver: Resolver[R2,R3]):
-  Resolver[
-    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-    ] =
-    new Resolver[
-      MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-      MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-      ] {
-      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
-        MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(bindLeft(v1.c2.key),resolver(bindRight(v1.c2.value))))
-    }
 }

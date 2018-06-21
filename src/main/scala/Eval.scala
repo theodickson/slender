@@ -103,9 +103,13 @@ object Eval {
       def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c2,v2))) 1 else 0
     }
 
-  implicit def ProductEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
-    Eval[ProductExpr[Exprs], T] =
-      instance { case (ProductExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
+//  implicit def ProductEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
+//    Eval[ProductExpr[Exprs], T] =
+//      instance { case (ProductExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
+
+  implicit def ProductEval[Exprs <: HList,O <: HList](implicit eval: Eval[Exprs,O]):
+  Eval[ProductExpr[Exprs], O] =
+    instance { case (ProductExpr(exprs),bvs) => eval(exprs,bvs) }
 
   implicit def HNilEval: Eval[HNil,HNil] = instance[HNil,HNil] { case (HNil,_) => HNil }
 

@@ -27,13 +27,8 @@ class TPCHSparkTest extends SlenderSparkTest {
 
 //  test("New product test") {
 //    val (partKey0,(orderKey0,partName0)) = (X1,(X2,X3))
-////    println(part.evalType)
-////    println(part.join(part).evalType)
-//    val query = For ((partKey0,(orderKey0,partName0)) <-- part.join(part)) Yield (orderKey0,partName0)
-////    printType(query)
-////    println(query.resolve)
-//    query.resolve
-////    println(query.eval)
+//    val query = For ((p_partkey,p_name) <-- part) Yield p_partkey
+//    //val query = For ((partKey0,orderKey0,partName0) <-- part.join(part)) Yield (orderKey0,partName0)
 //    query.eval
 //  }
 
@@ -42,35 +37,65 @@ class TPCHSparkTest extends SlenderSparkTest {
 //    partOrders.eval
 //  }
 
-    test("Q1 key-nested") {
-      val (_,(orderKey0,partName0)) = (X1,(X2,X3))
-      val (_,(partNames0,custKey0,orderDate0)) = (Y1,(Y2,Y3,Y4))
-      val (_,(orderDate1,partNames1,custName0,_)) = (Z1,(Z2,Z3,Z4,Z5))
+//    test("Q1 key-nested") {
+//      val (_,(orderKey0,partName0)) = (X1,(X2,X3))
+//      val (_,(partNames0,custKey0,orderDate0)) = (Y1,(Y2,Y3,Y4))
+//      val (_,(orderDate1,partNames1,custName0,_)) = (Z1,(Z2,Z3,Z4,Z5))
+//
+//      //Drop the suppkeys to get a Bag[(partkey,orderkey)]
+//      val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitem) Yield (l_partkey,l_orderkey)
+//      //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
+//      //a Bag[(orderKey,Bag[partName])]
+//      val orderPartNames = Group(
+//        For ((__,(orderKey0,partName0)) <-- partOrders.join(part)) Yield (orderKey0,partName0)
+//      )
+//      //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
+//      val customerOrders =
+//        For ((__,(partNames0,(custKey0,orderDate0))) <-- orderPartNames.join(orders)) Yield (custKey0,orderDate0,partNames0)
+//
+//      //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
+//      val customerNameOrders =
+//        For ((__,((orderDate1,partNames1),(custName0,__))) <-- customerOrders.join(customer)) Yield
+//          (custName0,orderDate1,partNames1)
+//
+//      //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
+//      val query = Group(customerNameOrders)
+//
+//      //println(query.resolve)
+//  //    orderPartNames.resolve
+//      query.eval.take(10).foreach(println)
+//  //
+//    }
 
-      //Drop the suppkeys to get a Bag[(partkey,orderkey)]
-      val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitem) Yield (l_partkey,l_orderkey)
-      //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
-      //a Bag[(orderKey,Bag[partName])]
-      val orderPartNames = Group(
-        For ((__,(orderKey0,partName0)) <-- partOrders.join(part)) Yield (orderKey0,partName0)
-      )
-      //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
-      val customerOrders =
-        For ((__,(partNames0,(custKey0,orderDate0))) <-- orderPartNames.join(orders)) Yield (custKey0,orderDate0,partNames0)
+  test("Q1 key-nested") {
+    val (orderKey0,partName0) = (X1,X2)
+    val (partNames0,custKey0,orderDate0) = (Y1,Y2,Y3)
+    val (orderDate1,partNames1,custName0) = (Z1,Z2,Z3)
 
-      //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
-      val customerNameOrders =
-        For ((__,((orderDate1,partNames1),(custName0,__))) <-- customerOrders.join(customer)) Yield
-          (custName0,orderDate1,partNames1)
+    //Drop the suppkeys to get a Bag[(partkey,orderkey)]
+    val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitem) Yield (l_partkey,l_orderkey)
+    //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
+    //a Bag[(orderKey,Bag[partName])]
+    val orderPartNames = Group(
+      For ((__,orderKey0,partName0) <-- partOrders.join(part)) Yield (orderKey0,partName0)
+    )
+    //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
+    val customerOrders =
+      For ((__,partNames0,custKey0,orderDate0) <-- orderPartNames.join(orders)) Yield (custKey0,orderDate0,partNames0)
 
-      //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
-      val query = Group(customerNameOrders)
+    //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
+    val customerNameOrders =
+      For ((__,orderDate1,partNames1,custName0,__) <-- customerOrders.join(customer)) Yield
+        (custName0,orderDate1,partNames1)
 
-      //println(query.resolve)
-  //    orderPartNames.resolve
-      query.eval.take(10).foreach(println)
-  //
-    }
+    //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
+    val query = Group(customerNameOrders)
+
+    //println(query.resolve)
+    //    orderPartNames.resolve
+    query.eval.take(10).foreach(println)
+    //
+  }
 
 //    test("Q1 value-nested") {
 //      /** For each customer, return their name, and for each date on which they've ordered,

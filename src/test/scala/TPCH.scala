@@ -4,6 +4,7 @@ import java.sql.Timestamp
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import shapeless.syntax.std.tuple._
 
 class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession) {
 
@@ -20,18 +21,39 @@ class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession
   lazy val customer = loadTable("customer")
     .select("c_custkey", "c_name", "c_nationkey")
     .as[(Int,String,Int)].rdd
+    //.map(new TupleOps(_))
+    .map(_.productElements)
 
   lazy val orders = loadTable("orders")
     .select("o_orderkey", "o_custkey", "o_orderdate")
     .as[(Int,Int,Timestamp)].rdd
+    .map(_.productElements)
 
   lazy val lineitem = loadTable("lineitem")
     .select("l_orderkey","l_partkey","l_suppkey")
     .as[(Int,Int,Int)].rdd
+    .map(_.productElements)
 
   lazy val part = loadTable("part")
     .select("p_partkey","p_name")
     .as[(Int,String)].rdd
+    .map(_.productElements)
+
+//  lazy val customer = loadTable("customer")
+//    .select("c_custkey", "c_name", "c_nationkey")
+//    .as[(Int,String,Int)].rdd
+//
+//  lazy val orders = loadTable("orders")
+//    .select("o_orderkey", "o_custkey", "o_orderdate")
+//    .as[(Int,Int,Timestamp)].rdd
+//
+//  lazy val lineitem = loadTable("lineitem")
+//    .select("l_orderkey","l_partkey","l_suppkey")
+//    .as[(Int,Int,Int)].rdd
+//
+//  lazy val part = loadTable("part")
+//    .select("p_partkey","p_name")
+//    .as[(Int,String)].rdd
 
   lazy val partSupp = loadTable("partsupp")
     .select("ps_partkey", "ps_suppkey")
