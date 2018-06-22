@@ -4,109 +4,98 @@ import shapeless._
 
 import scala.reflect.runtime.universe.{Type,TypeTag,typeTag}
 
-case class VariableRingPredicate[V <: Expr, R <: Expr, P <: Expr](k: V, r: R, p: P = LiteralExpr(1))
-case class KeyRingPair[K <: Expr, R <: Expr](k: K, r: R)
+case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr(1))
+case class KeyRingPair[K:Expr, R:Expr](k: K, r: R)
 
-case class ExprOps[E <: Expr](e: E) {
+case class ExprOps[E:Expr](e: E) {
 
-  def eval[R <: Expr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
-  def evalType[T : TypeTag, R <: Expr](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
-  def resolve[T <: Expr](implicit resolver: Resolver[E,T]): T = resolver(e)
-  def shred[Shredded <: Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
-  def shreddable[Shredded <: Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined
+  def eval[R,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
+  def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
+  def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
+//  def shred[Shredded:Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
+//  def shreddable[Shredded:Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined
   def isEvaluable[T](implicit canEval: Perhaps[Eval[E,_]]) = canEval.value.isDefined
   def isResolvable[T](implicit canResolve: Perhaps[Resolver[E,_]]): Boolean = canResolve.value.isDefined
 
-  def ===[K1 <: Expr](k1: K1) = EqualsPredicate(e, k1)
-  def =!=[K1 <: Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
-//  def >[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ > _, ">")
-//  def <[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ < _, "<")
-  def -->[R <: Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
+  def ===[K1:Expr](k1: K1) = EqualsPredicate(e, k1)
+  def =!=[K1:Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
+//  def >[K1:Expr](k1: K1) = IntPredicate(e, k1, _ > _, ">")
+//  def <[K1:Expr](k1: K1) = IntPredicate(e, k1, _ < _, "<")
+  def -->[R:Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
 
-  def +[R1 <: Expr](expr1: R1) = AddExpr(e,expr1)
-  def *[R1 <: Expr](expr1: R1) = MultiplyExpr(e,expr1)
-  def dot[R1 <: Expr](expr1: R1) = DotExpr(e,expr1)
-  def join[R1 <: Expr](expr1: R1) = JoinExpr(e,expr1)
+  def +[R1:Expr](expr1: R1) = AddExpr(e,expr1)
+  def *[R1:Expr](expr1: R1) = MultiplyExpr(e,expr1)
+  def dot[R1:Expr](expr1: R1) = DotExpr(e,expr1)
+  def join[R1:Expr](expr1: R1) = JoinExpr(e,expr1)
   def sum = SumExpr(e)
   def unary_- = NegateExpr(e)
   def unary_! = NotExpr(e)
-  def &&[R1 <: Expr](expr1: R1) = this.*[R1](expr1)
-  def ||[R1 <: Expr](expr1: R1) = this.+[R1](expr1)
+  def &&[R1:Expr](expr1: R1) = this.*[R1](expr1)
+  def ||[R1:Expr](expr1: R1) = this.+[R1](expr1)
 
-  def <--[R <: Expr](r: R): VariableRingPredicate[E,R,LiteralExpr[Int]] = VariableRingPredicate(e,r)
-  def ==>[R <: Expr](r: R): InfiniteMappingExpr[E,R] = InfiniteMappingExpr(e,r)
+  def <--[R:Expr](r: R): VariableRingPredicate[E,R,LiteralExpr[Int]] = VariableRingPredicate(e,r)
+  def ==>[R:Expr](r: R): InfiniteMappingExpr[E,R] = InfiniteMappingExpr(e,r)
 }
 
-case class ForComprehensionBuilder[V <: Expr, R <: Expr, P <: Expr](vrp: VariableRingPredicate[V,R,P]) {
+case class ForComprehensionBuilder[V:Expr, R:Expr, P:Expr](vrp: VariableRingPredicate[V,R,P]) {
   //todo - get rid of default NumericExpr(1)
 
   val x = vrp.k; val r1 = vrp.r; val p = vrp.p
 
-  def _collect[R2 <: Expr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]] =
+  def _collect[R2:Expr](r2: R2): SumExpr[MultiplyExpr[R, InfiniteMappingExpr[V, DotExpr[R2,P]]]] =
     SumExpr(MultiplyExpr(r1, InfiniteMappingExpr(x, DotExpr(r2,p))))
 
-  def Collect[T, R2 <: Expr]
+  def Collect[T, R2]
   (r2: T)
-  (implicit make: MakeExpr[T,R2]) = _collect(make(r2))
+  (implicit make: MakeExpr[T,R2], expr: Expr[R2]) = _collect(make(r2))
 
-  def Yield[T, K <: Expr, R2 <: Expr]
+  def Yield[T,K,R2]
   (x: T)
-  (implicit make: MakeKeyRingPair[T,K,R2]) = {
+  (implicit make: MakeKeyRingPair[T,K,R2], kExpr: Expr[K], rExpr: Expr[R2]) = {
     val made = make(x)
     _collect(SngExpr(made.k, made.r))
   }
 }
 
-trait MakeExpr[X,E <: Expr] extends (X => E)
-trait HMakeExpr[X,E] extends (X => E)
+trait MakeExpr[X,E] extends (X => E)
 
-object MakeExpr extends Priority2MakeExprImplicits {
-  def instance[X,E <: Expr](f: X => E): MakeExpr[X,E] = new MakeExpr[X,E] {
+object MakeExpr extends Priority1MakeExprImplicits {
+
+  def instance[X,E](f: X => E): MakeExpr[X,E] = new MakeExpr[X,E] {
     def apply(v1: X): E = f(v1)
   }
-}
 
-object HMakeExpr {
-
-  implicit def hnilMakeExpr: HMakeExpr[HNil, HNil] = new HMakeExpr[HNil,HNil] {
-    def apply(v1: HNil): HNil = v1
-  }
-
-  implicit def hconsMakeExpr[H, HE <: Expr, T <: HList, TE <: HList](implicit makeH: MakeExpr[H,HE], makeT: HMakeExpr[T,TE]):
-  HMakeExpr[H::T,HE::TE] = new HMakeExpr[H::T,HE::TE] {
+  implicit def hconsMakeExpr[H, HE, T <: HList, TE <: HList](implicit makeH: MakeExpr[H,HE], makeT: MakeExpr[T,TE]):
+  MakeExpr[H::T,HE::TE] = new MakeExpr[H::T,HE::TE] {
     def apply(v1: H::T) = v1 match {
       case h :: t => makeH(h) :: makeT(t)
     }
   }
 
+  implicit def hnilMakeExpr: MakeExpr[HNil, HNil] = new MakeExpr[HNil,HNil] {
+    def apply(v1: HNil): HNil = v1
+  }
+
 }
 
-trait Priority1MakeExprImplicits {
-
-  //implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] = MakeExpr.instance { v1: N => NumericExpr(v1) }
-
-  implicit def productMakeExpr[P <: Product,PRepr <: HList, KRepr <: HList]
-  (implicit gen: Generic.Aux[P,PRepr],
-   make: HMakeExpr[PRepr,KRepr],
-   lub: LUBConstraint[KRepr,Expr]): MakeExpr[P,ProductExpr[KRepr]] =
-    new MakeExpr[P,ProductExpr[KRepr]] {
-      def apply(v1: P): ProductExpr[KRepr] = ProductExpr(make(gen.to(v1)))
-    }
+trait Priority0MakeExprImplicits {
+  implicit def productMakeExpr[P<:Product,Repr,E]
+  (implicit gen: Generic.Aux[P,Repr], make: MakeExpr[Repr,E]): MakeExpr[P,E] =
+    MakeExpr.instance { p => make(gen.to(p)) }
 }
 
-
-trait Priority2MakeExprImplicits extends Priority1MakeExprImplicits {
-  implicit def idMakeExpr[E <: Expr]: MakeExpr[E,E] = new MakeExpr[E,E] { def apply(v1: E) = v1 }
+trait Priority1MakeExprImplicits extends Priority0MakeExprImplicits {
+  implicit def idMakeExpr[E:Expr]: MakeExpr[E,E] = new MakeExpr[E,E] { def apply(v1: E) = v1 }
 }
 
-trait MakeKeyRingPair[X,K <: Expr,R <: Expr] extends (X => KeyRingPair[K,R])
+trait MakeKeyRingPair[X,K,R] extends (X => KeyRingPair[K,R])
 
 object MakeKeyRingPair {
 
-  implicit def IdMakeKeyRingPair[K <: Expr, R <: Expr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
+  implicit def IdMakeKeyRingPair[K:Expr,R:Expr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
     new MakeKeyRingPair[KeyRingPair[K,R],K,R] { def apply(v1: KeyRingPair[K,R]): KeyRingPair[K,R] = v1 }
 
-  implicit def ImplicitOne[X, K <: Expr](implicit make: MakeExpr[X,K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
+  implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
     new MakeKeyRingPair[X,K,LiteralExpr[Int]] {
       def apply(v1: X): KeyRingPair[K,LiteralExpr[Int]] = KeyRingPair(make(v1),LiteralExpr(1))
     }
@@ -114,24 +103,24 @@ object MakeKeyRingPair {
 
 trait Syntax {
 
-  implicit def toExprOps[X, E <: Expr](x: X)(implicit make: MakeExpr[X, E]): ExprOps[E] = ExprOps(make(x))
+  implicit def toExprOps[X,E](x: X)(implicit make: MakeExpr[X,E], expr: Expr[E]): ExprOps[E] = ExprOps(make(x))
 
-  def Sum[R <: Expr](r: R): SumExpr[R] = SumExpr(r)
+  def Sum[R:Expr](r: R): SumExpr[R] = SumExpr(r)
 
-  def Sng[K <: Expr, R <: Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
+  def Sng[K:Expr, R:Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
-  def Sng[T, K <: Expr](t: T)(implicit make: MakeExpr[T, K]): SngExpr[K, LiteralExpr[Int]] =
+  def Sng[T,K](t: T)(implicit make: MakeExpr[T, K], expr: Expr[K]): SngExpr[K, LiteralExpr[Int]] =
     SngExpr(make(t), LiteralExpr(1))
 
-  def Group[T, R <: Expr](t: T)(implicit make: MakeExpr[T,R]): GroupExpr[R] = GroupExpr(make(t))
+  def Group[T,R](t: T)(implicit make: MakeExpr[T,R], expr: Expr[R]): GroupExpr[R] = GroupExpr(make(t))
 
   object For {
-    def apply[V <: Expr, R <: Expr, P <: Expr](vrp: VariableRingPredicate[V,R,P]):
+    def apply[V:Expr, R:Expr, P:Expr](vrp: VariableRingPredicate[V,R,P]):
       ForComprehensionBuilder[V, R, P] = ForComprehensionBuilder(vrp)
   }
 
-  implicit class IfImplicit[V <: Expr, R <: Expr, P <: Expr](pair: VariableRingPredicate[V,R,P]) {
-    def If[P2 <: Expr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
+  implicit class IfImplicit[V:Expr, R:Expr, P:Expr](pair: VariableRingPredicate[V,R,P]) {
+    def If[P2:Expr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
   }
 
 }

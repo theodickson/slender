@@ -1,6 +1,6 @@
 package slender
 
-import org.apache.spark.rdd.PairRDDFunctions
+import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 
 import scala.collection.immutable.Map
 import scala.reflect.ClassTag
@@ -13,6 +13,14 @@ trait Ring[R] extends Serializable {
   def not(x1: R): R
   def negate(x1: R): R
   //def filterZeros(x1: R): R = x1
+}
+
+trait Collection2[C,K,R] extends Ring[C] {
+  def innerRing: Ring[R]
+  def mapValues[R1,C1](f: R => R1, c: C): C1 = {
+    val mapper = implicitly[Mapper[R,R1,C,C1]]
+    mapper(f,c)
+  }
 }
 
 trait Collection[C[_,_],K,R] extends Ring[C[K,R]] {
@@ -46,6 +54,17 @@ trait Sum[T,S] extends (T => S) with Serializable
 
 trait Group[T,S] extends (T => S) with Serializable
 
+trait Mapper[R,R1,C,C1] extends (((R => R1),C) => C1) with Serializable
+
+object Mapper {
+  implicit def mapMapper[K,R,R1]: Mapper[R,R1,Map[K,R],Map[K,R1]] = new Mapper[R,R1,Map[K,R],Map[K,R1]] {
+    def apply(v1: R => R1, v2: Map[K,R]): Map[K,R1] = v2.mapValues(v1)
+  }
+
+  implicit def rddMapper[K,R,R1]: Mapper[R,R1,RDD[(K,R)],RDD[(K,R1)]] = new Mapper[R,R1,RDD[(K,R)],RDD[(K,R1)]] {
+    def apply(v1: R => R1, v2: RDD[(K,R)]): RDD[(K,R1)] = v2.mapValues(v1)
+  }
+}
 
 object Ring {
 
@@ -59,28 +78,50 @@ object Ring {
       def negate(t1: H::T): H::T = rH.negate(t1.head) :: rT.negate(t1.tail)
     }
 
-  implicit def RDDCollection[K : ClassTag, R : ClassTag](implicit ring: Ring[R]): Collection[PairRDD, K, R] =
-    new Collection[PairRDD, K, R] {
+//  implicit def RDDCollection[K:ClassTag, R:ClassTag](implicit ring: Ring[R]): Collection[PairRDD, K, R] =
+//    new Collection[PairRDD, K, R] {
+//      val innerRing = ring
+//      def zero = ??? // todo - need Spark context do initialize empty RDD but then cant serialize. however shouldnt ever need emptyRDD in practice.
+//      def add(x1: PairRDD[K, R], x2: PairRDD[K, R]) =
+//        x1.union(x2.rdd).groupByKey.mapValues(_.reduce(ring.add))
+//      def not(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
+//      def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
+//      def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
+//      def filter(c: PairRDD[K,R], f: (K,R) => Boolean): PairRDD[K,R] = c.filter { case (k, v) => f(k, v) }
+//    }
+
+  implicit def RDDCollection2[K:ClassTag, R:ClassTag](implicit ring: Ring[R]): Collection2[RDD[(K,R)],K,R] =
+    new Collection2[RDD[(K,R)],K,R] {
       val innerRing = ring
       def zero = ??? // todo - need Spark context do initialize empty RDD but then cant serialize. however shouldnt ever need emptyRDD in practice.
-      def add(x1: PairRDD[K, R], x2: PairRDD[K, R]) =
+      def add(x1: RDD[(K,R)], x2: RDD[(K,R)]) =
         x1.union(x2.rdd).groupByKey.mapValues(_.reduce(ring.add))
-      def not(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
-      def negate(x1: PairRDD[K,R]) = x1.mapValues(ring.negate)
-      def map[R1](c: PairRDD[K, R], f: (K, R) => (K, R1)): PairRDD[K, R1] = c.map { case (k, v) => f(k, v) }
-      def filter(c: PairRDD[K,R], f: (K,R) => Boolean): PairRDD[K,R] = c.filter { case (k, v) => f(k, v) }
+      def not(x1: RDD[(K,R)]) = x1.mapValues(ring.negate)
+      def negate(x1: RDD[(K,R)]) = x1.mapValues(ring.negate)
+//      def filter(c: RDD[(K,R)], f: (K,R) => Boolean): RDD[(K,R)] = c.filter { case (k, v) => f(k, v) }
     }
 
-  implicit def MapCollection[K, R](implicit ring: Ring[R]): Collection[Map, K, R] =
-    new Collection[Map, K, R] {
+//  implicit def MapCollection[K, R](implicit ring: Ring[R]): Collection[Map, K, R] =
+//    new Collection[Map, K, R] {
+//      val innerRing = ring
+//      def zero: Map[K, R] = Map.empty[K,R]
+//      def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
+//        t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
+//      def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }
+//      def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) }
+//      def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
+//      def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
+//    }
+
+  implicit def MapCollection2[K, R](implicit ring: Ring[R]): Collection2[Map[K,R], K, R] =
+    new Collection2[Map[K,R], K, R] {
       val innerRing = ring
       def zero: Map[K, R] = Map.empty[K,R]
       def add(t1: Map[K, R], t2: Map[K, R]): Map[K, R] =
         t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
       def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }
       def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) }
-      def map[R1](c: Map[K, R], f: (K, R) => (K, R1)): Map[K, R1] = c.map { case (k, v) => f(k, v) }
-      def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
+//      def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
     }
 }
 

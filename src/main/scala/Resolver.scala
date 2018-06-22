@@ -39,8 +39,8 @@ object Resolver extends Priority2ResolutionImplicits {
     * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
     * 5 - Recursively resolve the value of the infinite mapping.*/
   implicit def MultiplyInfResolver[
-    LHS <: Expr, LHS1 <: Expr, V <: Expr, C[_,_], KT, VB <: Expr,
-    RT, R1 <: Expr, R2 <: Expr, R3 <: Expr
+    LHS, LHS1, V, C[_,_], KT, VB,
+    RT, R1, R2, R3
   ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
              tagKey: Tagger[V,KT,V,VB], tagValue: Tagger[V,KT,R1,R2], resolveRight: Resolver[R2,R3]):
     Resolver[
@@ -56,22 +56,13 @@ object Resolver extends Priority2ResolutionImplicits {
     }
 
 }
-//
-//trait Priority0ResolutionImplicits {
-//
-//  implicit def NumericExprResolver[V]: Resolver[NumericExpr[V],NumericExpr[V]] =
-//    Resolver.nonResolver[NumericExpr[V]]
-//
-//}
+
 
 trait Priority1ResolutionImplicits  {
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
   implicit def LiteralResolver[V]: Resolver[LiteralExpr[V],LiteralExpr[V]] =
     Resolver.nonResolver[LiteralExpr[V]]
-
-//  implicit def PhysicalCollectionResolver[C[_,_],K,R]: Resolver[PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] =
-//    Resolver.nonResolver[PhysicalCollection[C,K,R]]
 
   implicit def VariableResolver[V <: UntypedVariable,T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]
@@ -80,53 +71,49 @@ trait Priority1ResolutionImplicits  {
 
 trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Standard inductive cases*/
-  implicit def AddResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
+  implicit def AddResolver[L, R, L1, R1]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =
     Resolver.instance { case AddExpr(l,r) => AddExpr(resolveL(l),resolveR(r)) }
 
-  implicit def MultiplyResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
+  implicit def MultiplyResolver[L, R, L1, R1]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
     Resolver.instance { case MultiplyExpr(l,r) => MultiplyExpr(resolveL(l),resolveR(r)) }
 
-  implicit def JoinResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
+  implicit def JoinResolver[L, R, L1, R1]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
     Resolver.instance { case JoinExpr(l,r) => JoinExpr(resolveL(l),resolveR(r)) }
 
-  implicit def DotResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
+  implicit def DotResolver[L, R, L1, R1]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[DotExpr[L,R],DotExpr[L1,R1]] =
     Resolver.instance { case DotExpr(l,r) => DotExpr(resolveL(l),resolveR(r)) }
 
-  implicit def NotResolver[R1 <: Expr,R2 <: Expr]
+  implicit def NotResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[NotExpr[R1],NotExpr[R2]] =
     Resolver.instance { case NotExpr(c) => NotExpr(resolve(c)) }
 
-  implicit def NegateResolver[R1 <: Expr,R2 <: Expr]
+  implicit def NegateResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[NegateExpr[R1],NegateExpr[R2]] =
     Resolver.instance { case NegateExpr(c) => NegateExpr(resolve(c)) }
 
-  implicit def SumResolver[R1 <: Expr,R2 <: Expr]
+  implicit def SumResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[SumExpr[R1],SumExpr[R2]] =
     Resolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
 
-  implicit def GroupResolver[R1 <: Expr,R2 <: Expr]
+  implicit def GroupResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[GroupExpr[R1],GroupExpr[R2]] =
     Resolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
 
-  implicit def SngResolver[K <: Expr,R <: Expr,K1 <: Expr,R1 <: Expr]
+  implicit def SngResolver[K,R,K1,R1]
   (implicit resolveK: Resolver[K,K1], resolveR: Resolver[R,R1]): Resolver[SngExpr[K,R],SngExpr[K1,R1]] =
     Resolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
 
-  implicit def PredicateResolver[L <: Expr,R <: Expr,L1 <: Expr,R1 <: Expr,T1,T2]
+  implicit def PredicateResolver[L,R,L1,R1,T1,T2]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
     Resolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
 
-  implicit def ProductResolver[C <: HList, CR <: HList]
-  (implicit resolve: Resolver[C,CR], lub: LUBConstraint[CR,Expr]): Resolver[ProductExpr[C],ProductExpr[CR]] =
-    Resolver.instance { case ProductExpr(exprs) => ProductExpr(resolve(exprs)) }
-
   implicit def HNilResolver: Resolver[HNil,HNil] = Resolver.nonResolver[HNil]
 
-  implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
+  implicit def HListResolver[H1, T1 <: HList, H2, T2 <: HList]
   (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]): Resolver[H1 :: T1, H2 :: T2] =
     Resolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
 }

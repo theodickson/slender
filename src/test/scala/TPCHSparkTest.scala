@@ -71,6 +71,7 @@ class TPCHSparkTest extends SlenderSparkTest {
 
     //Drop the suppkeys to get a Bag[(partkey,orderkey)]
     val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitem) Yield (l_partkey,l_orderkey)
+
     //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
     //a Bag[(orderKey,Bag[partName])]
     val orderPartNames = Group(
@@ -88,10 +89,7 @@ class TPCHSparkTest extends SlenderSparkTest {
     //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
     val query = Group(customerNameOrders)
 
-    //println(query.resolve)
-    //    orderPartNames.resolve
     query.eval.take(10).foreach(println)
-    //
   }
 
 //    test("Q1 value-nested") {
