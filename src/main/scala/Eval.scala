@@ -16,16 +16,7 @@ object Eval {
 
   implicit def UnusedVariableEval: Eval[UnusedVariable,Any] = instance { (_,_) => null }
 
-  implicit def PrimitiveExprEval[V]: Eval[PrimitiveExpr[V],V] = instance { (v1,_) => v1.value }
-
-//  implicit def NumericExprEval[V]: Eval[NumericExpr[V],V] = new Eval[NumericExpr[V],V] {
-//    def apply(v1: NumericExpr[V], v2: BoundVars): V = v1.value
-//  }
-//
-//  implicit def PhysicalCollectionEval[C[_,_],K,R]: Eval[PhysicalCollection[C,K,R],C[K,R]] =
-//    new Eval[PhysicalCollection[C, K, R],C[K,R]] {
-//      def apply(v1: PhysicalCollection[C,K,R], v2: BoundVars): C[K,R] = v1.value
-//  }
+  implicit def LiteralEval[V]: Eval[LiteralExpr[V],V] = instance { (v1, _) => v1.value }
 
   implicit def InfiniteMappingEval[V <: Expr,R <: Expr,KT,RT]
   (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: Binder[V, KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =

@@ -15,9 +15,9 @@ trait Priority0TaggingImplicits {
   //The case that V1 <:< V and so actually tags to T takes precedence, hence this non-tager is here.
   implicit def VariableNonTagger[V <: UntypedVariable,V1 <: UntypedVariable,T]: Tagger[V,T,V1,V1] =
     Tagger.nonTagger[V,T,V1]
-
-  implicit def PhysicalCollectionTagger[V <: Expr,T,C[_,_],K,R]:
-    Tagger[V,T,PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] = Tagger.nonTagger[V,T,PhysicalCollection[C,K,R]]
+//
+//  implicit def PhysicalCollectionTagger[V <: Expr,T,C[_,_],K,R]:
+//    Tagger[V,T,PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] = Tagger.nonTagger[V,T,PhysicalCollection[C,K,R]]
 
   implicit def BindProduct[V <: HList, T, E1 <: Expr, E2 <: Expr]
   (implicit tag: Tagger[V,T,E1,E2]): Tagger[ProductExpr[V],T,E1,E2] =
@@ -101,11 +101,11 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   /** Binding base cases - primitive expressions don't need to tag anything, variables tag iff they are untyped variables
     * matching the type in the tager. (otherwise they use the low priority non-taging case)
     */
-  implicit def PrimitiveKeyExprTagger[V, T, V1]: Tagger[V, T, PrimitiveKeyExpr[V1], PrimitiveKeyExpr[V1]] =
-    Tagger.nonTagger[V, T, PrimitiveKeyExpr[V1]]
-
-  implicit def NumericExprTagger[V, T, V1]: Tagger[V, T, NumericExpr[V1],NumericExpr[V1]] =
-    Tagger.nonTagger[V, T, NumericExpr[V1]]
+  implicit def LiteralTagger[V, T, V1]: Tagger[V, T, LiteralExpr[V1], LiteralExpr[V1]] =
+    Tagger.nonTagger[V, T, LiteralExpr[V1]]
+//
+//  implicit def NumericExprTagger[V, T, V1]: Tagger[V, T, NumericExpr[V1],NumericExpr[V1]] =
+//    Tagger.nonTagger[V, T, NumericExpr[V1]]
 
   implicit def VariableTagger[V <: UntypedVariable, T]: Tagger[V, T, V, TypedVariable[T]] =
     Tagger.instance { v1 => v1.tag[T] }

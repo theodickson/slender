@@ -56,22 +56,22 @@ object Resolver extends Priority2ResolutionImplicits {
     }
 
 }
+//
+//trait Priority0ResolutionImplicits {
+//
+//  implicit def NumericExprResolver[V]: Resolver[NumericExpr[V],NumericExpr[V]] =
+//    Resolver.nonResolver[NumericExpr[V]]
+//
+//}
 
-trait Priority0ResolutionImplicits {
-
-  implicit def NumericExprResolver[V]: Resolver[NumericExpr[V],NumericExpr[V]] =
-    Resolver.nonResolver[NumericExpr[V]]
-
-}
-
-trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
+trait Priority1ResolutionImplicits  {
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
-  implicit def PrimitiveKeyExprResolver[V]: Resolver[PrimitiveKeyExpr[V],PrimitiveKeyExpr[V]] =
-    Resolver.nonResolver[PrimitiveKeyExpr[V]]
+  implicit def LiteralResolver[V]: Resolver[LiteralExpr[V],LiteralExpr[V]] =
+    Resolver.nonResolver[LiteralExpr[V]]
 
-  implicit def PhysicalCollectionResolver[C[_,_],K,R]: Resolver[PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] =
-    Resolver.nonResolver[PhysicalCollection[C,K,R]]
+//  implicit def PhysicalCollectionResolver[C[_,_],K,R]: Resolver[PhysicalCollection[C,K,R],PhysicalCollection[C,K,R]] =
+//    Resolver.nonResolver[PhysicalCollection[C,K,R]]
 
   implicit def VariableResolver[V <: UntypedVariable,T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]

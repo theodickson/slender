@@ -4,7 +4,7 @@ import shapeless._
 
 import scala.reflect.runtime.universe.{Type,TypeTag,typeTag}
 
-case class VariableRingPredicate[V <: Expr, R <: Expr, P <: Expr](k: V, r: R, p: P = NumericExpr(1))
+case class VariableRingPredicate[V <: Expr, R <: Expr, P <: Expr](k: V, r: R, p: P = LiteralExpr(1))
 case class KeyRingPair[K <: Expr, R <: Expr](k: K, r: R)
 
 case class ExprOps[E <: Expr](e: E) {
@@ -33,7 +33,7 @@ case class ExprOps[E <: Expr](e: E) {
   def &&[R1 <: Expr](expr1: R1) = this.*[R1](expr1)
   def ||[R1 <: Expr](expr1: R1) = this.+[R1](expr1)
 
-  def <--[R <: Expr](r: R): VariableRingPredicate[E,R,NumericExpr[Int]] = VariableRingPredicate(e,r)
+  def <--[R <: Expr](r: R): VariableRingPredicate[E,R,LiteralExpr[Int]] = VariableRingPredicate(e,r)
   def ==>[R <: Expr](r: R): InfiniteMappingExpr[E,R] = InfiniteMappingExpr(e,r)
 }
 
@@ -54,24 +54,6 @@ case class ForComprehensionBuilder[V <: Expr, R <: Expr, P <: Expr](vrp: Variabl
   (implicit make: MakeKeyRingPair[T,K,R2]) = {
     val made = make(x)
     _collect(SngExpr(made.k, made.r))
-  }
-}
-
-case class NestedForComprehensionBuilder[
-V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
-](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
-  //todo - this works but takes forever to compile. Perhaps a more elegant and general solution might be quicker,
-  //otherwise can it.
-  def Collect[T, R3 <: Expr]
-  (r3: T)(implicit make: MakeExpr[T, R3]) = {
-    val made = make(r3)
-    builder1._collect(builder2._collect(made))
-  }
-
-  def Yield[T, K <: Expr, R3 <: Expr]
-  (r3: T)(implicit make: MakeKeyRingPair[T, K, R3]) = {
-    val made = make(r3)
-    builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
   }
 }
 
@@ -101,7 +83,7 @@ object HMakeExpr {
 
 trait Priority1MakeExprImplicits {
 
-  implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] = MakeExpr.instance { v1: N => NumericExpr(v1) }
+  //implicit def numericMakeRing[N : Numeric]: MakeExpr[N,NumericExpr[N]] = MakeExpr.instance { v1: N => NumericExpr(v1) }
 
   implicit def productMakeExpr[P <: Product,PRepr <: HList, KRepr <: HList]
   (implicit gen: Generic.Aux[P,PRepr],
@@ -124,9 +106,9 @@ object MakeKeyRingPair {
   implicit def IdMakeKeyRingPair[K <: Expr, R <: Expr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
     new MakeKeyRingPair[KeyRingPair[K,R],K,R] { def apply(v1: KeyRingPair[K,R]): KeyRingPair[K,R] = v1 }
 
-  implicit def ImplicitOne[X, K <: Expr](implicit make: MakeExpr[X,K]): MakeKeyRingPair[X,K,NumericExpr[Int]] =
-    new MakeKeyRingPair[X,K,NumericExpr[Int]] {
-      def apply(v1: X): KeyRingPair[K,NumericExpr[Int]] = KeyRingPair(make(v1),NumericExpr(1))
+  implicit def ImplicitOne[X, K <: Expr](implicit make: MakeExpr[X,K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
+    new MakeKeyRingPair[X,K,LiteralExpr[Int]] {
+      def apply(v1: X): KeyRingPair[K,LiteralExpr[Int]] = KeyRingPair(make(v1),LiteralExpr(1))
     }
 }
 
@@ -138,21 +120,14 @@ trait Syntax {
 
   def Sng[K <: Expr, R <: Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
-  def Sng[T, K <: Expr](t: T)(implicit make: MakeExpr[T, K]): SngExpr[K, NumericExpr[Int]] =
-    SngExpr(make(t), NumericExpr(1))
+  def Sng[T, K <: Expr](t: T)(implicit make: MakeExpr[T, K]): SngExpr[K, LiteralExpr[Int]] =
+    SngExpr(make(t), LiteralExpr(1))
 
   def Group[T, R <: Expr](t: T)(implicit make: MakeExpr[T,R]): GroupExpr[R] = GroupExpr(make(t))
 
   object For {
     def apply[V <: Expr, R <: Expr, P <: Expr](vrp: VariableRingPredicate[V,R,P]):
       ForComprehensionBuilder[V, R, P] = ForComprehensionBuilder(vrp)
-
-    def apply[
-      V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
-    ](vrp1: VariableRingPredicate[V1,R1,P1],
-      vrp2: VariableRingPredicate[V2,R2,P2]): NestedForComprehensionBuilder[V1, V2, R1, R2, P1, P2] = {
-      NestedForComprehensionBuilder(ForComprehensionBuilder(vrp1), ForComprehensionBuilder(vrp2))
-    }
   }
 
   implicit class IfImplicit[V <: Expr, R <: Expr, P <: Expr](pair: VariableRingPredicate[V,R,P]) {
@@ -160,3 +135,29 @@ trait Syntax {
   }
 
 }
+
+//case class NestedForComprehensionBuilder[
+//V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
+//](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
+//  //todo - this works but takes forever to compile. Perhaps a more elegant and general solution might be quicker,
+//  //otherwise can it.
+//  def Collect[T, R3 <: Expr]
+//  (r3: T)(implicit make: MakeExpr[T, R3]) = {
+//    val made = make(r3)
+//    builder1._collect(builder2._collect(made))
+//  }
+//
+//  def Yield[T, K <: Expr, R3 <: Expr]
+//  (r3: T)(implicit make: MakeKeyRingPair[T, K, R3]) = {
+//    val made = make(r3)
+//    builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
+//  }
+//}
+
+
+//def apply[
+//V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
+//](vrp1: VariableRingPredicate[V1,R1,P1],
+//vrp2: VariableRingPredicate[V2,R2,P2]): NestedForComprehensionBuilder[V1, V2, R1, R2, P1, P2] = {
+//  NestedForComprehensionBuilder(ForComprehensionBuilder(vrp1), ForComprehensionBuilder(vrp2))
+//}

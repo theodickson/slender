@@ -1,22 +1,19 @@
 package slender
 
-import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
-
 class TPCHSparkTest extends SlenderSparkTest {
 
   import dsl._
 
   val rdds = new TpchRdds("10_customers")
 
-  lazy val customer = rddToPhysicalBag(rdds.customer)
-  lazy val orders = rddToPhysicalBag(rdds.orders)
-  lazy val lineitem = rddToPhysicalBag(rdds.lineitem)
-  lazy val part = rddToPhysicalBag(rdds.part)
-  lazy val partSupp = rddToPhysicalBag(rdds.partSupp)
-  lazy val supplier = rddToPhysicalBag(rdds.supplier)
-  lazy val nation = rddToPhysicalBag(rdds.nation)
-  lazy val region = rddToPhysicalBag(rdds.region)
+  lazy val customer = rddToPhysicalBag2(rdds.customer)
+  lazy val orders = rddToPhysicalBag2(rdds.orders)
+  lazy val lineitem = rddToPhysicalBag2(rdds.lineitem)
+  lazy val part = rddToPhysicalBag2(rdds.part)
+  lazy val partSupp = rddToPhysicalBag2(rdds.partSupp)
+  lazy val supplier = rddToPhysicalBag2(rdds.supplier)
+  lazy val nation = rddToPhysicalBag2(rdds.nation)
+  lazy val region = rddToPhysicalBag2(rdds.region)
 
   val (c_custkey,c_name,c_nationkey) = (C1,C2,C3)
   val (o_orderkey,o_custkey,o_orderdate) = (O1,O2,O3)
