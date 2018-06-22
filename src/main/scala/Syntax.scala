@@ -1,11 +1,8 @@
 package slender
 
-import org.apache.spark.rdd.RDD
-import shapeless.ops.hlist.ToTraversable
 import shapeless._
-import shapeless.syntax._
 
-import scala.reflect.runtime.universe._
+import scala.reflect.runtime.universe.{Type,TypeTag,typeTag}
 
 case class VariableRingPredicate[V <: Expr, R <: Expr, P <: Expr](k: V, r: R, p: P = NumericExpr(1))
 case class KeyRingPair[K <: Expr, R <: Expr](k: K, r: R)
@@ -22,8 +19,8 @@ case class ExprOps[E <: Expr](e: E) {
 
   def ===[K1 <: Expr](k1: K1) = EqualsPredicate(e, k1)
   def =!=[K1 <: Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
-  def >[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ > _, ">")
-  def <[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ < _, "<")
+//  def >[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ > _, ">")
+//  def <[K1 <: Expr](k1: K1) = IntPredicate(e, k1, _ < _, "<")
   def -->[R <: Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
 
   def +[R1 <: Expr](expr1: R1) = AddExpr(e,expr1)

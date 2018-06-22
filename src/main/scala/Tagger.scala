@@ -4,7 +4,7 @@ import shapeless.{::, HList, HNil, LUBConstraint}
 
 trait Tagger[V,T,-In,+Out] extends (In => Out) with Serializable
 
-object Tagger extends TaggingImplicits {
+object Tagger extends Priority2TaggingImplicits {
   def instance[V,T,In,Out](f: In => Out): Tagger[V,T,In,Out] = new Tagger[V,T,In,Out] {
     def apply(v1: In): Out = f(v1)
   }
@@ -69,13 +69,9 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
   (implicit tagK: Tagger[V, T, K, K1], tagR: Tagger[V, T, R, R1]): Tagger[V, T, SngExpr[K, R], SngExpr[K1, R1]] =
     Tagger.instance { case SngExpr(k,r) => SngExpr(tagK(k), tagR(r)) }
 
-  implicit def EqualsPredicateTagger[V <: Expr, T, K1 <: Expr, K2 <: Expr, K1B <: Expr, K2B <: Expr]
-  (implicit tag1: Tagger[V,T,K1,K1B], tag2: Tagger[V,T,K2,K2B]): Tagger[V,T,EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
-    Tagger.instance { case EqualsPredicate(k1,k2) => EqualsPredicate(tag1(k1),tag2(k2)) }
-
-  implicit def IntPredicateTagger[V <: Expr, T, K1 <: Expr, K2 <: Expr, K1B <: Expr, K2B <: Expr]
-  (implicit tag1: Tagger[V, T, K1, K1B], tag2: Tagger[V, T, K2, K2B]): Tagger[V, T, IntPredicate[K1, K2], IntPredicate[K1B, K2B]] =
-    Tagger.instance { case IntPredicate(k1,k2,f,s) => IntPredicate(tag1(k1),tag2(k2),f,s) }
+  implicit def PredicateTagger[V <: Expr, T, K1 <: Expr, K2 <: Expr, K1B <: Expr, K2B <: Expr,T1,T2]
+  (implicit tag1: Tagger[V,T,K1,K1B], tag2: Tagger[V,T,K2,K2B]): Tagger[V,T,Predicate[K1,K2,T1,T2],Predicate[K1B,K2B,T1,T2]] =
+    Tagger.instance { case Predicate(k1,k2,f,s) => Predicate(tag1(k1),tag2(k2),f,s) }
 
   implicit def ProductTagger[V <: Expr,T,C <: HList, CR <: HList]
   (implicit tag: Tagger[V,T,C,CR], lub: LUBConstraint[CR,Expr]): Tagger[V,T,ProductExpr[C],ProductExpr[CR]] =
@@ -89,7 +85,7 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
 
 }
 
-trait TaggingImplicits extends Priority1TaggingImplicits {
+trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   //Never try to tag typed variables.
   implicit def TypedNonTagger[V, T, T1]: Tagger[V, T, TypedVariable[T1], TypedVariable[T1]] =
     Tagger.nonTagger[V, T, TypedVariable[T1]]

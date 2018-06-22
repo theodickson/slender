@@ -115,21 +115,22 @@ case class SngExpr[K <: Expr,R <: Expr](key: K, value: R)
 }
 
 /**Predicates*/
-trait Predicate extends BinaryExpr {
-  def opString: String
-  //  override def brackets = ("(",")")
-  override def toString = s"$c1 $opString $c2"
-}
+//trait Predicate extends BinaryExpr {
+//  def opString: String
+//  //  override def brackets = ("(",")")
+//  override def toString = s"$c1 $opString $c2"
+//}
 
-case class EqualsPredicate[K1 <: Expr, K2 <: Expr](c1: K1, c2: K2) extends Predicate {
-  def opString = "="
-}
+//case class EqualsPredicate[K1 <: Expr, K2 <: Expr](c1: K1, c2: K2) extends Predicate {
+//  def opString = "="
+//}
 
-case class IntPredicate[K1 <: Expr, K2 <: Expr](c1: K1, c2: K2, p: (Int,Int) => Boolean, opString: String)
-  extends Predicate
+case class Predicate[K1 <: Expr, K2 <: Expr,T1,T2](c1: K1, c2: K2, p: (T1,T2) => Boolean, opString: String)
+  extends BinaryExpr
 
-object Predicate {
-  def apply[K1 <: Expr, K2 <: Expr](k1: K1, k2: K2) = EqualsPredicate(k1,k2)
+object EqualsPredicate {
+  val anyEq = (x:Any,y:Any) => x == y
+  def apply[K1 <: Expr, K2 <: Expr](k1: K1, k2: K2) = Predicate[K1,K2,Any,Any](k1,k2,anyEq, "==")
 }
 
 

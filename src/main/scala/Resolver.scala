@@ -22,13 +22,13 @@ import shapeless._
   */
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
-object Resolver {
+object Resolver extends Priority2ResolutionImplicits {
 
   def instance[In, Out](f: In => Out): Resolver[In,Out] = new Resolver[In,Out] {
     def apply(v1: In): Out = f(v1)
   }
 
-  def nonResolver[E]: Resolver[E,E] = Resolver.instance { v1 => v1 }
+  def nonResolver[E]: Resolver[E,E] = instance { v1 => v1 }
 
   /**Resolve a multiplication of a finite collection on the LHS with an inf mapping on the RHS.
     * This is the 'main event' of variable resolution, and works as follows:
@@ -42,18 +42,19 @@ object Resolver {
     LHS <: Expr, LHS1 <: Expr, V <: Expr, C[_,_], KT, VB <: Expr,
     RT, R1 <: Expr, R2 <: Expr, R3 <: Expr
   ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
-    tagLeft: Tagger[V,KT,V,VB], tagRight: Tagger[V,KT,R1,R2], resolver: Resolver[R2,R3]):
-  Resolver[
-    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
-    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-    ] =
-    new Resolver[
+             tagKey: Tagger[V,KT,V,VB], tagValue: Tagger[V,KT,R1,R2], resolveRight: Resolver[R2,R3]):
+    Resolver[
       MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
       MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
-      ] {
-      def apply(v1: MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]]) =
-        MultiplyExpr(resolveLeft(v1.c1),InfiniteMappingExpr(tagLeft(v1.c2.key),resolver(tagRight(v1.c2.value))))
+    ] =
+    instance {
+      case MultiplyExpr(l,InfiniteMappingExpr(k,r)) =>
+        MultiplyExpr(
+          resolveLeft(l),
+          InfiniteMappingExpr(tagKey(k),resolveRight(tagValue(r)))
+        )
     }
+
 }
 
 trait Priority0ResolutionImplicits {
@@ -80,78 +81,52 @@ trait Priority1ResolutionImplicits extends Priority0ResolutionImplicits {
 trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Standard inductive cases*/
   implicit def AddResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
-  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =
-    new Resolver[AddExpr[L,R],AddExpr[L1,R1]] {
-      def apply(v1: AddExpr[L,R]) = AddExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
+  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =
+    Resolver.instance { case AddExpr(l,r) => AddExpr(resolveL(l),resolveR(r)) }
 
   implicit def MultiplyResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
-  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
-    new Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] {
-      def apply(v1: MultiplyExpr[L,R]) = MultiplyExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
+  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
+    Resolver.instance { case MultiplyExpr(l,r) => MultiplyExpr(resolveL(l),resolveR(r)) }
 
   implicit def JoinResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
-  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
-    new Resolver[JoinExpr[L,R],JoinExpr[L1,R1]] {
-      def apply(v1: JoinExpr[L,R]) = JoinExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
+  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
+    Resolver.instance { case JoinExpr(l,r) => JoinExpr(resolveL(l),resolveR(r)) }
 
   implicit def DotResolver[L <: Expr, R <: Expr, L1 <: Expr, R1 <: Expr]
-  (implicit resolve1: Resolver[L,L1], resolve2: Resolver[R,R1]): Resolver[DotExpr[L,R],DotExpr[L1,R1]] =
-    new Resolver[DotExpr[L,R],DotExpr[L1,R1]] {
-      def apply(v1: DotExpr[L,R]) = DotExpr(resolve1(v1.c1),resolve2(v1.c2))
-    }
+  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[DotExpr[L,R],DotExpr[L1,R1]] =
+    Resolver.instance { case DotExpr(l,r) => DotExpr(resolveL(l),resolveR(r)) }
 
-  implicit def NotResolver[R1 <: Expr,R2 <: Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[NotExpr[R1],NotExpr[R2]] = new Resolver[NotExpr[R1],NotExpr[R2]] {
-    def apply(v1: NotExpr[R1]): NotExpr[R2] = NotExpr(resolver(v1.c1))
-  }
+  implicit def NotResolver[R1 <: Expr,R2 <: Expr]
+  (implicit resolve: Resolver[R1,R2]): Resolver[NotExpr[R1],NotExpr[R2]] =
+    Resolver.instance { case NotExpr(c) => NotExpr(resolve(c)) }
 
-  implicit def NegateResolver[R1 <: Expr,R2 <: Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[NegateExpr[R1],NegateExpr[R2]] = new Resolver[NegateExpr[R1],NegateExpr[R2]] {
-    def apply(v1: NegateExpr[R1]): NegateExpr[R2] = NegateExpr(resolver(v1.c1))
-  }
+  implicit def NegateResolver[R1 <: Expr,R2 <: Expr]
+  (implicit resolve: Resolver[R1,R2]): Resolver[NegateExpr[R1],NegateExpr[R2]] =
+    Resolver.instance { case NegateExpr(c) => NegateExpr(resolve(c)) }
 
-  implicit def SumResolver[R1 <: Expr,R2 <: Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[SumExpr[R1],SumExpr[R2]] = new Resolver[SumExpr[R1],SumExpr[R2]] {
-    def apply(v1: SumExpr[R1]): SumExpr[R2] = SumExpr(resolver(v1.c1))
-  }
+  implicit def SumResolver[R1 <: Expr,R2 <: Expr]
+  (implicit resolve: Resolver[R1,R2]): Resolver[SumExpr[R1],SumExpr[R2]] =
+    Resolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
 
-  implicit def GroupResolver[R1 <: Expr,R2 <: Expr](implicit resolver: Resolver[R1,R2]):
-  Resolver[GroupExpr[R1],GroupExpr[R2]] = new Resolver[GroupExpr[R1],GroupExpr[R2]] {
-    def apply(v1: GroupExpr[R1]): GroupExpr[R2] = GroupExpr(resolver(v1.c1))
-  }
+  implicit def GroupResolver[R1 <: Expr,R2 <: Expr]
+  (implicit resolve: Resolver[R1,R2]): Resolver[GroupExpr[R1],GroupExpr[R2]] =
+    Resolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
 
   implicit def SngResolver[K <: Expr,R <: Expr,K1 <: Expr,R1 <: Expr]
   (implicit resolveK: Resolver[K,K1], resolveR: Resolver[R,R1]): Resolver[SngExpr[K,R],SngExpr[K1,R1]] =
-    new Resolver[SngExpr[K,R],SngExpr[K1,R1]] { def apply(v1: SngExpr[K,R]) = SngExpr(resolveK(v1.key),resolveR(v1.value)) }
+    Resolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
 
-  implicit def EqualsPredicateResolver[K1 <: Expr,K2 <: Expr,K1B <: Expr,K2B <: Expr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] =
-    new Resolver[EqualsPredicate[K1,K2],EqualsPredicate[K1B,K2B]] {
-      def apply(v1: EqualsPredicate[K1,K2]) = EqualsPredicate(resolve1(v1.c1),resolve2(v1.c2))
-    }
-
-  implicit def IntPredicateResolver[K1 <: Expr,K2 <: Expr,K1B <: Expr,K2B <: Expr]
-  (implicit resolve1: Resolver[K1,K1B], resolve2: Resolver[K2,K2B]): Resolver[IntPredicate[K1,K2],IntPredicate[K1B,K2B]] =
-    new Resolver[IntPredicate[K1,K2],IntPredicate[K1B,K2B]] {
-      def apply(v1: IntPredicate[K1,K2]) = IntPredicate(resolve1(v1.c1),resolve2(v1.c2), v1.p, v1.opString)
-    }
+  implicit def PredicateResolver[L <: Expr,R <: Expr,L1 <: Expr,R1 <: Expr,T1,T2]
+  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
+    Resolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
 
   implicit def ProductResolver[C <: HList, CR <: HList]
   (implicit resolve: Resolver[C,CR], lub: LUBConstraint[CR,Expr]): Resolver[ProductExpr[C],ProductExpr[CR]] =
-    new Resolver[ProductExpr[C],ProductExpr[CR]] {
-      def apply(v1: ProductExpr[C]) = ProductExpr(resolve(v1.exprs))
-    }
+    Resolver.instance { case ProductExpr(exprs) => ProductExpr(resolve(exprs)) }
 
   implicit def HNilResolver: Resolver[HNil,HNil] = Resolver.nonResolver[HNil]
 
   implicit def HListResolver[H1 <: Expr, T1 <: HList, H2 <: Expr, T2 <: HList]
-  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]):
-  Resolver[H1 :: T1, H2 :: T2] = new Resolver[H1 :: T1, H2 :: T2] {
-    def apply(v1: H1 :: T1): H2 :: T2 = v1 match {
-      case h1 :: t1 => resolveH(h1) :: resolveT(t1)
-    }
-  }
+  (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]): Resolver[H1 :: T1, H2 :: T2] =
+    Resolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
 }
