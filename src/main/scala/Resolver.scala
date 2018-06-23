@@ -22,7 +22,7 @@ import shapeless._
   */
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
-object Resolver extends Priority2ResolutionImplicits {
+object Resolver extends Priority1ResolutionImplicits {
 
   def instance[In, Out](f: In => Out): Resolver[In,Out] = new Resolver[In,Out] {
     def apply(v1: In): Out = f(v1)
@@ -39,9 +39,9 @@ object Resolver extends Priority2ResolutionImplicits {
     * 4 - Recursively bind all instances of those variables in the value of the infinite mapping.
     * 5 - Recursively resolve the value of the infinite mapping.*/
   implicit def MultiplyInfResolver[
-    LHS, LHS1, V, C[_,_], KT, VB,
-    RT, R1, R2, R3
-  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C[KT,RT]], coll: Collection[C,KT,RT],
+    LHS, LHS1, V, C, KT, VB,
+    R1, R2, R3
+  ](implicit resolveLeft: Resolver[LHS,LHS1], eval: Eval[LHS1,C], coll: Collection[C,KT,_],
              tagKey: Tagger[V,KT,V,VB], tagValue: Tagger[V,KT,R1,R2], resolveRight: Resolver[R2,R3]):
     Resolver[
       MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
@@ -67,9 +67,6 @@ trait Priority1ResolutionImplicits  {
   implicit def VariableResolver[V <: UntypedVariable,T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]
 
-}
-
-trait Priority2ResolutionImplicits extends Priority1ResolutionImplicits {
   /**Standard inductive cases*/
   implicit def AddResolver[L, R, L1, R1]
   (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[AddExpr[L,R],AddExpr[L1,R1]] =

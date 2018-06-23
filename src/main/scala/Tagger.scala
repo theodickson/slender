@@ -1,6 +1,10 @@
+/**Todo
+  * Simplify priorities if possible.
+  * Massive VariableNonTagger/VariableTagger appearance in logs
+  */
 package slender
 
-import shapeless.{::, HList, HNil, LUBConstraint}
+import shapeless.{::, HList, HNil}
 
 trait Tagger[V,T,-In,+Out] extends (In => Out) with Serializable
 

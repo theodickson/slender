@@ -1,3 +1,7 @@
+/** Refactor.
+  * MakeKeyRingPair - do I need it?
+  * Pair case classes in general - still needed?
+  */
 package slender
 
 import shapeless._
@@ -19,8 +23,8 @@ case class ExprOps[E:Expr](e: E) {
 
   def ===[K1:Expr](k1: K1) = EqualsPredicate(e, k1)
   def =!=[K1:Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
-//  def >[K1:Expr](k1: K1) = IntPredicate(e, k1, _ > _, ">")
-//  def <[K1:Expr](k1: K1) = IntPredicate(e, k1, _ < _, "<")
+//  def >[K1:Expr](k1: K1) = Predicate(e, k1, _ > _, ">")
+//  def <[K1:Expr](k1: K1) = Predicate(e, k1, _ < _, "<")
   def -->[R:Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
 
   def +[R1:Expr](expr1: R1) = AddExpr(e,expr1)

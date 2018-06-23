@@ -1,11 +1,12 @@
-import org.apache.spark.rdd.{PairRDDFunctions, RDD}
-import org.apache.spark.sql.{Encoder, SparkSession}
+/** TODO
+  * Value / LiteralExpr interface inc product/hlist conversions
+  * 
+  */
 
-import scala.reflect.ClassTag
+import org.apache.spark.rdd.RDD
 
 trait types {
   type BoundVars = Map[String,Any]
-  type Untyped
 }
 
 package object slender extends types with Serializable {
@@ -17,19 +18,19 @@ package object slender extends types with Serializable {
 
   implicit def perhaps[T](implicit ev: T = null): Perhaps[T] = Perhaps(Option(ev))
 
-  case class PairRDD[K,R](rdd: RDD[(K,R)]) {
-    def show(implicit ss: SparkSession, enc: Encoder[(K,R)]): Unit = {
-      import ss.implicits._
-      rdd.toDF.show
-    }
-  }
-
-  implicit def toPairRDD[K, R](rdd: RDD[(K, R)]): PairRDD[K, R] = PairRDD(rdd)
-
-  implicit def fromPairRDD[K,R](pairRdd: PairRDD[K,R]): RDD[(K,R)] = pairRdd.rdd
-
-  implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
-    new PairRDDFunctions(pairRdd.rdd)
+//  case class PairRDD[K,R](rdd: RDD[(K,R)]) {
+//    def show(implicit ss: SparkSession, enc: Encoder[(K,R)]): Unit = {
+//      import ss.implicits._
+//      rdd.toDF.show
+//    }
+//  }
+//
+//  implicit def toPairRDD[K, R](rdd: RDD[(K, R)]): PairRDD[K, R] = PairRDD(rdd)
+//
+//  implicit def fromPairRDD[K,R](pairRdd: PairRDD[K,R]): RDD[(K,R)] = pairRdd.rdd
+//
+//  implicit def pairRDDtoPairRDDFunctions[K : ClassTag, R : ClassTag](pairRdd: PairRDD[K,R]): PairRDDFunctions[K,R] =
+//    new PairRDDFunctions(pairRdd.rdd)
 //
 //  def mapToPhysicalCollection[K,R](map: Map[K,R])
 //                                           (implicit coll: Collection[Map,K,R]): PhysicalCollection[Map,K,R] =
@@ -46,8 +47,8 @@ package object slender extends types with Serializable {
 //  def rddToPhysicalBag[K](rdd: RDD[K])(implicit coll: Collection[PairRDD,K,Int]): PhysicalCollection[PairRDD,K,Int] =
 //    PhysicalCollection[PairRDD, K, Int](rdd.map(k => (k,1)))
 
-  def rddToPhysicalBag2[K](rdd: RDD[K]): LiteralExpr[PairRDD[K,Int]] =
-    LiteralExpr[PairRDD[K,Int]](rdd.map(k => (k,1)))
+  def rddToPhysicalBag2[K](rdd: RDD[K]): LiteralExpr[RDD[(K,Int)]] =
+    LiteralExpr[RDD[(K,Int)]](rdd.map(k => (k,1)))
 
   object dsl extends Syntax with Variables
 }

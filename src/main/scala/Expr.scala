@@ -1,9 +1,12 @@
+/**TODO - reintroduce Expr bound for constructors (for clarity)?*/
 package slender
 
 import shapeless.{::, HList, HNil}
 
+/**Typeclass witnessing that E is an expression*/
 trait Expr[E]
 
+/**Base trait for all explicit ExprNodes*/
 trait ExprNode
 
 case class LiteralExpr[V](value: V) extends ExprNode
@@ -50,7 +53,9 @@ trait UntypedVariable extends ExprNode {
 
 object Expr {
   def instance[E]: Expr[E] = new Expr[E] {}
-  implicit def ExprBase[E <: ExprNode]: Expr[E] = instance[E]
+  /**Expressions are instances of an explicit ExprNode*/
+  implicit def ExprNode[E <: ExprNode]: Expr[E] = instance[E]
+  /**Or arbitrary products of expression*/
   implicit def HListExpr[H:Expr,T <: HList](implicit tailExpr: Expr[T]): Expr[H::T] = instance[H::T]
   implicit def HNilExpr: Expr[HNil] = instance[HNil]
 }

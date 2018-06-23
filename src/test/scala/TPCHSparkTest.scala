@@ -89,7 +89,9 @@ class TPCHSparkTest extends SlenderSparkTest {
     //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
     val query = Group(customerNameOrders)
 
-    query.eval.take(10).foreach(println)
+    query.resolve
+    //(LiteralExpr(Map(1 -> 1))*{X ==> LiteralExpr(1)}).eval
+//    query.eval.take(10).foreach(println)
   }
 
 //    test("Q1 value-nested") {

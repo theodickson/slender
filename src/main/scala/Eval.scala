@@ -40,12 +40,12 @@ object Eval {
   (implicit evalL: Eval[E1,T], evalR: Eval[E2,T], ring: Ring[T]): Eval[AddExpr[E1,E2],T] =
     instance { case (AddExpr(l,r),vars) => ring.add(evalL(l,vars),evalR(r,vars)) }
 
-  implicit def SumEval[E,C[_,_],K,R,O]
-  (implicit eval: Eval[E,C[K,R]], sum: Sum[C[K,R],O]): Eval[SumExpr[E],O] =
+  implicit def SumEval[E,C,O]
+  (implicit eval: Eval[E,C], sum: Sum[C,O]): Eval[SumExpr[E],O] =
     instance { case (SumExpr(c),vars) => sum(eval(c,vars)) }
 
-  implicit def GroupEval[E,C[_,_],K,R,O]
-  (implicit eval: Eval[E,C[K,R]], group: Group[C[K,R],O]): Eval[GroupExpr[E],O] =
+  implicit def GroupEval[E,C,O]
+  (implicit eval: Eval[E,C], group: Group[C,O]): Eval[GroupExpr[E],O] =
     instance { case (GroupExpr(c),vars) => group(eval(c,vars)) }
 
   implicit def NotEval[E,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NotExpr[E],T] =
