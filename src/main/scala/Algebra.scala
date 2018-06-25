@@ -83,10 +83,8 @@ object Ring {
 
 object Collection {
   /**RDDs and Maps are collections*/
-  implicit def RddCollection[K,V]: Collection[RDD[(K,V)],K,V] =
-    new Collection[RDD[(K,V)],K,V] { type Key = K; type Value = V }
-  implicit def MapCollection[K,V]: Collection[Map[K,V],K,V] =
-    new Collection[Map[K,V],K,V] { type Key = K; type Value = V }
+  implicit def RddCollection[K,V]: Collection[RDD[(K,V)],K,V] = new Collection[RDD[(K,V)],K,V] {}
+  implicit def MapCollection[K,V]: Collection[Map[K,V],K,V] = new Collection[Map[K,V],K,V] {}
 }
 
 object NonCollection {

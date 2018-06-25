@@ -6,63 +6,20 @@ class TPCHSparkTest extends SlenderSparkTest {
 
   val rdds = new TpchRdds("10_customers")
 
-  lazy val customer = rddToPhysicalBag2(rdds.customer)
-  lazy val orders = rddToPhysicalBag2(rdds.orders)
-  lazy val lineitem = rddToPhysicalBag2(rdds.lineitem)
-  lazy val part = rddToPhysicalBag2(rdds.part)
-  lazy val partSupp = rddToPhysicalBag2(rdds.partSupp)
-  lazy val supplier = rddToPhysicalBag2(rdds.supplier)
-  lazy val nation = rddToPhysicalBag2(rdds.nation)
-  lazy val region = rddToPhysicalBag2(rdds.region)
+  lazy val customer = Bag(rdds.customer)
+  lazy val orders = Bag(rdds.orders)
+  lazy val lineitem = Bag(rdds.lineitem)
+  lazy val part = Bag(rdds.part)
+  lazy val partSupp = Bag(rdds.partSupp)
+  lazy val supplier = Bag(rdds.supplier)
+  lazy val nation = Bag(rdds.nation)
+  lazy val region = Bag(rdds.region)
 
   val (c_custkey,c_name,c_nationkey) = (C1,C2,C3)
   val (o_orderkey,o_custkey,o_orderdate) = (O1,O2,O3)
   val (s_suppkey,s_name,s_nationkey) = (S1,S2,S3)
   val (l_orderkey,l_partkey,l_suppkey) = (L1,L2,L3)
   val (p_partkey,p_name) = (P1,P2)
-
-
-//  test("New product test") {
-//    val (partKey0,(orderKey0,partName0)) = (X1,(X2,X3))
-//    val query = For ((p_partkey,p_name) <-- part) Yield p_partkey
-//    //val query = For ((partKey0,orderKey0,partName0) <-- part.join(part)) Yield (orderKey0,partName0)
-//    query.eval
-//  }
-
-//  test("Underscore test") {
-//    val partOrders = For ((__,__) <-- part) Yield __
-//    partOrders.eval
-//  }
-
-//    test("Q1 key-nested") {
-//      val (_,(orderKey0,partName0)) = (X1,(X2,X3))
-//      val (_,(partNames0,custKey0,orderDate0)) = (Y1,(Y2,Y3,Y4))
-//      val (_,(orderDate1,partNames1,custName0,_)) = (Z1,(Z2,Z3,Z4,Z5))
-//
-//      //Drop the suppkeys to get a Bag[(partkey,orderkey)]
-//      val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitem) Yield (l_partkey,l_orderkey)
-//      //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
-//      //a Bag[(orderKey,Bag[partName])]
-//      val orderPartNames = Group(
-//        For ((__,(orderKey0,partName0)) <-- partOrders.join(part)) Yield (orderKey0,partName0)
-//      )
-//      //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
-//      val customerOrders =
-//        For ((__,(partNames0,(custKey0,orderDate0))) <-- orderPartNames.join(orders)) Yield (custKey0,orderDate0,partNames0)
-//
-//      //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
-//      val customerNameOrders =
-//        For ((__,((orderDate1,partNames1),(custName0,__))) <-- customerOrders.join(customer)) Yield
-//          (custName0,orderDate1,partNames1)
-//
-//      //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
-//      val query = Group(customerNameOrders)
-//
-//      //println(query.resolve)
-//  //    orderPartNames.resolve
-//      query.eval.take(10).foreach(println)
-//  //
-//    }
 
   test("Q1 key-nested") {
     val (orderKey0,partName0) = (X1,X2)
@@ -89,9 +46,7 @@ class TPCHSparkTest extends SlenderSparkTest {
     //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
     val query = Group(customerNameOrders)
 
-    query.resolve
-    //(LiteralExpr(Map(1 -> 1))*{X ==> LiteralExpr(1)}).eval
-//    query.eval.take(10).foreach(println)
+    query.eval.take(10).foreach(println)
   }
 
 //    test("Q1 value-nested") {

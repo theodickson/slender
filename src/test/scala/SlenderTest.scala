@@ -1,9 +1,6 @@
 package slender
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.SparkSession
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 import org.scalatest.FunSuiteLike
 
 import scala.reflect.runtime.universe._

@@ -1,4 +1,7 @@
-/**TODO - reintroduce Expr bound for constructors (for clarity)?*/
+/**TODO -
+  * reintroduce Expr bound for constructors (for clarity)?
+  * Projection
+  * */
 package slender
 
 import shapeless.{::, HList, HNil}
@@ -33,7 +36,7 @@ case class InfiniteMappingExpr[K,R](key: K, value: R) extends ExprNode
 case class SngExpr[K,R](key: K, value: R) extends ExprNode
 
 /**Predicates*/
-case class Predicate[K1, K2,T1,T2](c1: K1, c2: K2, p: (T1,T2) => Boolean, opString: String) extends ExprNode
+case class Predicate[K1,K2,T1,T2](c1: K1, c2: K2, p: (T1,T2) => Boolean, opString: String) extends ExprNode
 
 object EqualsPredicate {
   val anyEq = (x:Any,y:Any) => x == y
@@ -52,10 +55,13 @@ trait UntypedVariable extends ExprNode {
 }
 
 object Expr {
+
   def instance[E]: Expr[E] = new Expr[E] {}
+
   /**Expressions are instances of an explicit ExprNode*/
   implicit def ExprNode[E <: ExprNode]: Expr[E] = instance[E]
-  /**Or arbitrary products of expression*/
+
+  /**Or arbitrary products of expressions*/
   implicit def HListExpr[H:Expr,T <: HList](implicit tailExpr: Expr[T]): Expr[H::T] = instance[H::T]
   implicit def HNilExpr: Expr[HNil] = instance[HNil]
 }

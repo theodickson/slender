@@ -3,8 +3,7 @@ package slender
 import java.sql.Timestamp
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import shapeless.syntax.std.tuple._
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession) {
 
@@ -20,56 +19,35 @@ class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession
 
   lazy val customer = loadTable("customer")
     .select("c_custkey", "c_name", "c_nationkey")
-    .as[(Int,String,Int)].rdd
-    //.map(new TupleOps(_))
-    .map(_.productElements)
+    .as[(Int,String,Int)].rdd//.productsToHlists
 
   lazy val orders = loadTable("orders")
     .select("o_orderkey", "o_custkey", "o_orderdate")
-    .as[(Int,Int,Timestamp)].rdd
-    .map(_.productElements)
+    .as[(Int,Int,Timestamp)].rdd//.productsToHlists
 
   lazy val lineitem = loadTable("lineitem")
     .select("l_orderkey","l_partkey","l_suppkey")
-    .as[(Int,Int,Int)].rdd
-    .map(_.productElements)
+    .as[(Int,Int,Int)].rdd//.productsToHlists
 
   lazy val part = loadTable("part")
     .select("p_partkey","p_name")
-    .as[(Int,String)].rdd
-    .map(_.productElements)
-
-//  lazy val customer = loadTable("customer")
-//    .select("c_custkey", "c_name", "c_nationkey")
-//    .as[(Int,String,Int)].rdd
-//
-//  lazy val orders = loadTable("orders")
-//    .select("o_orderkey", "o_custkey", "o_orderdate")
-//    .as[(Int,Int,Timestamp)].rdd
-//
-//  lazy val lineitem = loadTable("lineitem")
-//    .select("l_orderkey","l_partkey","l_suppkey")
-//    .as[(Int,Int,Int)].rdd
-//
-//  lazy val part = loadTable("part")
-//    .select("p_partkey","p_name")
-//    .as[(Int,String)].rdd
+    .as[(Int,String)].rdd//.productsToHlists
 
   lazy val partSupp = loadTable("partsupp")
     .select("ps_partkey", "ps_suppkey")
-    .as[(Int,Int)].rdd
+    .as[(Int,Int)].rdd//.productsToHlists
 
   lazy val supplier = loadTable("supplier")
     .select("s_suppkey","s_name","s_nationkey")
-    .as[(Int,String,Int)].rdd
+    .as[(Int,String,Int)].rdd//.productsToHlists
 
   lazy val nation = loadTable("nation")
     .select("n_nationkey", "n_name")
-    .as[(Int,String)].rdd
+    .as[(Int,String)].rdd//.productsToHlists
 
   lazy val region = loadTable("region")
     .select("r_regionkey", "r_name")
-    .as[(Int,String)].rdd
+    .as[(Int,String)].rdd//.productsToHlists
 
 }
 

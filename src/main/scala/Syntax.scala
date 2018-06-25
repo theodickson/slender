@@ -4,16 +4,20 @@
   */
 package slender
 
+import org.apache.spark.rdd.RDD
 import shapeless._
 
-import scala.reflect.runtime.universe.{Type,TypeTag,typeTag}
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe.{Type, TypeTag, typeTag}
 
 case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr(1))
 case class KeyRingPair[K:Expr, R:Expr](k: K, r: R)
 
 case class ExprOps[E:Expr](e: E) {
 
-  def eval[R,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
+//  def eval[R,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
+  def eval[R,Repr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr], tupler: DeepTupler[Repr,T]): T =
+    tupler(evaluator(resolve(e),Map.empty))
   def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
   def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
 //  def shred[Shredded:Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
@@ -125,6 +129,20 @@ trait Syntax {
 
   implicit class IfImplicit[V:Expr, R:Expr, P:Expr](pair: VariableRingPredicate[V,R,P]) {
     def If[P2:Expr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
+  }
+
+  object Bag {
+    def apply[T,U](rdd: RDD[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U,Int)]] =
+      LiteralExpr(rdd.map(t => (gen.to(t),1)))
+    def apply[T,U](set: Set[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[Map[U,Int]] =
+      LiteralExpr(set.toSeq.map(t => (gen.to(t),1)).toMap)
+  }
+
+  object Collection {
+    def apply[T,U:ClassTag](rdd: RDD[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[U]] =
+      LiteralExpr(rdd.map(t => gen.to(t)))
+    def apply[K,V,K1:ClassTag,V1:ClassTag](map: Map[K,V])(implicit gen: DeepGeneric.Aux[(K,V),(K1,V1)]): LiteralExpr[Map[K1,V1]] =
+      LiteralExpr(map.map(gen.to))
   }
 
 }
