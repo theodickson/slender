@@ -69,6 +69,14 @@ object Eval {
       case (h :: t,bvs) => evalH(h, bvs) :: evalT(t, bvs)
     }
 
+//  implicit def ShreddedGroupEval[E,C,O]
+//  (implicit eval: Eval[E,C]): Eval[ShreddedGroupExpr[E],O] = instance {
+//    case ShreddedGroupExpr(e) => {
+//      val preGrouped = eval(e)
+//
+//    }
+//  }
+
 }
 
 

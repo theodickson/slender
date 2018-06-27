@@ -218,6 +218,8 @@ object Group {
         grouped.map[(K1::Map[K2,R]::HNil,Int)] { case (k1,k2s) => (k1::k2s::HNil,1) }
       }
     }
+
+  //todo - map group
 }
 
 object Mapper {

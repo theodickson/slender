@@ -15,10 +15,13 @@ case class KeyRingPair[K:Expr, R:Expr](k: K, r: R)
 
 case class ExprOps[E:Expr](e: E) {
 
-//  def eval[R,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): T = evaluator(resolve(e),Map.empty)
   def eval[R,Repr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr], tupler: DeepTupler[Repr,T]): T =
     tupler(evaluator(resolve(e),Map.empty))
   def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
+
+  def shreddedEval[T,C](implicit eval: ShreddedEval[E,T,C]): (T,C) =
+    eval(e,Map.empty)
+
   def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
 //  def shred[Shredded:Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
 //  def shreddable[Shredded:Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined

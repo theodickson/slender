@@ -30,6 +30,8 @@ case class SumExpr[E](c1: E) extends ExprNode
 
 case class GroupExpr[E](c1: E) extends ExprNode
 
+case class ShreddedGroupExpr[E](c1: E) extends ExprNode
+
 /**Mapping constructs*/
 case class InfiniteMappingExpr[K,R](key: K, value: R) extends ExprNode
 

@@ -21,6 +21,11 @@ class TPCHSparkTest extends SlenderSparkTest {
   val (l_orderkey,l_partkey,l_suppkey) = (L1,L2,L3)
   val (p_partkey,p_name) = (P1,P2)
 
+  test("Shredding test") {
+    val query = Group(lineitem)
+    printType(query.shreddedEval)
+  }
+
   test("Q1 key-nested") {
     val (orderKey0,partName0) = (X1,X2)
     val (partNames0,custKey0,orderDate0) = (Y1,Y2,Y3)
