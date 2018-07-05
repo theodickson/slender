@@ -9,6 +9,7 @@
 package slender
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.dstream.DStream
 import shapeless._
 import shapeless.ops.hlist.Prepend
 
@@ -70,6 +71,16 @@ object Ring {
 //      def filter(c: RDD[(K,R)], f: (K,R) => Boolean): RDD[(K,R)] = c.filter { case (k, v) => f(k, v) }
     }
 
+  implicit def DStreamRing[K:ClassTag, R:ClassTag](implicit ring: Ring[R]): Ring[DStream[(K,R)]] =
+    new Ring[DStream[(K,R)]] {
+      def zero = ??? // todo - need Spark context do initialize empty DStream but then cant serialize. however shouldnt ever need emptyDStream in practice.
+      def add(x1: DStream[(K,R)], x2: DStream[(K,R)]) =
+        x1.union(x2).groupByKey.mapValues(_.reduce(ring.add)) //todo not necessary if consider sharded
+      def not(x1: DStream[(K,R)]) = ???  //x1.mapValues(ring.negate) doesnt work across multiple RDDs..
+      def negate(x1: DStream[(K,R)]) = x1.mapValues(ring.negate)
+      //      def filter(c: RDD[(K,R)], f: (K,R) => Boolean): RDD[(K,R)] = c.filter { case (k, v) => f(k, v) }
+    }
+
   implicit def MapRing[K, R](implicit ring: Ring[R]): Ring[Map[K,R]] =
     new Ring[Map[K,R]] {
       def zero: Map[K, R] = Map.empty[K,R]
@@ -84,6 +95,7 @@ object Ring {
 object Collection {
   /**RDDs and Maps are collections*/
   implicit def RddCollection[K,V]: Collection[RDD[(K,V)],K,V] = new Collection[RDD[(K,V)],K,V] {}
+  implicit def DStreamCollection[K,V]: Collection[DStream[(K,V)],K,V] = new Collection[DStream[(K,V)],K,V] {}
   implicit def MapCollection[K,V]: Collection[Map[K,V],K,V] = new Collection[Map[K,V],K,V] {}
 }
 
@@ -110,10 +122,23 @@ object Multiply {
       }
     }
 
-  implicit def rddRddMultiply[K: ClassTag, R1: ClassTag, R2, O]
+  implicit def rddRddMultiply[K:ClassTag, R1:ClassTag, R2, O]
   (implicit dot: Dot[R1, R2, O]): Multiply[RDD[(K,R1)], RDD[(K,R2)], RDD[(K,O)]] =
     instance { (t1,t2) =>
       t1.join(t2) map { case (k, v) => k -> dot(v._1, v._2) }
+    }
+
+  implicit def rddDStreamMultiply[K:ClassTag, R1:ClassTag, R2, O]
+  (implicit dot: Dot[R1, R2, O]): Multiply[RDD[(K,R1)], DStream[(K,R2)], DStream[(K,O)]] =
+    instance { (t1,t2) =>
+      //for each rdd in t2, join it to t1 and dot the pairs of values.
+      t2.transform { rdd => t1.join(rdd) map { case (k, v) => k -> dot(v._1, v._2) } }
+    }
+
+  implicit def dStreamRDDMultiply[K:ClassTag, R1, R2:ClassTag, O]
+  (implicit dot: Dot[R1,R2,O]): Multiply[DStream[(K,R1)], RDD[(K,R2)], DStream[(K,O)]] =
+    instance { (t1,t2) =>
+      t1.transform { rdd => rdd.join(t2) map { case (k, v) => k -> dot(v._1, v._2) } }
     }
 
   implicit def rddMapMultiply[K, R1, R2, O]
@@ -177,15 +202,73 @@ object Dot {
 object Join {
 
   implicit def rddRddJoin[
-    K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
-  ](implicit dot: Dot[R1,R2,O], prepend: Prepend.Aux[K1,K2,K12]): Join[RDD[(K::K1,R1)],RDD[(K::K2,R2)],RDD[(K::K12,O)]] =
-      new Join[RDD[(K::K1,R1)],RDD[(K::K2,R2)],RDD[(K::K12,O)]] {
-      def apply(v1: RDD[(K::K1,R1)], v2: RDD[(K::K2,R2)]): RDD[(K::K12,O)] = {
-        val left = v1.map { case (k::k1,r1) => (k,(k1,r1)) }
-        val right = v2.map { case (k::k2,r2) => (k,(k2,r2)) }
-        left.join(right).map { case (k,((k1,r1),(k2,r2))) => ((k::(prepend(k1,k2))),dot(r1,r2)) }
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] =
+    new Join[RDD[(K :: K1, R1)], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] {
+      def apply(v1: RDD[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): RDD[(K :: K12, O)] = {
+        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
+        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
+        left.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
       }
     }
+
+  implicit def rddDStreamJoin[
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] =
+    new Join[RDD[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] {
+      def apply(v1: RDD[(K :: K1, R1)], v2: DStream[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
+        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
+        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
+        right.transform { rdd =>
+          left.join(rdd).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
+        }
+      }
+    }
+
+  implicit def dstreamRDDJoin[
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[DStream[(K :: K1, R1)], RDD[(K :: K2, R2)], DStream[(K :: K12, O)]] =
+    new Join[DStream[(K :: K1, R1)], RDD[(K :: K2, R2)], DStream[(K :: K12, O)]] {
+      def apply(v1: DStream[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
+        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
+        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
+        left.transform { rdd =>
+          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
+        }
+      }
+    }
+//
+//  implicit def dstreamDstreamJoin[
+//  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+//  ](implicit ring1: Ring[R1], ring2: Ring[R2], dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[DStream[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] =
+//    new Join[DStream[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] {
+//      def apply(v1: DStream[(K :: K1, R1)], v2: DStream[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
+//        //X
+//        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
+//        //Y
+//        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
+//        //Xc'
+//        val leftCumulative = left.updateStateByKey[R1]((pairs,acc) =>
+//          Some(
+//            ring1.add(acc.getOrElse(ring1.zero), pairs.map(_._2).reduce(ring1.add))
+//          )
+//        )
+//        //Yc'
+//        val rightCumulative = right.updateStateByKey[R2]((pairs,acc) =>
+//          Some(
+//            ring2.add(acc.getOrElse(ring2.zero), pairs.map(_._2).reduce(ring2.add))
+//          )
+//        )
+//        //Xc
+//        val leftC = leftCumulative //todo diff
+//        val rightC = rightCumulative //todo diff
+//        //todo implicitly use RDDJoins etc... wont need to do the maps above either on v1 or v2.
+//        val justDeltas = leftC.transformWith(rightC, (l,r) => l.)
+//        left.transform { rdd =>
+//          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
+//        }
+//      }
+//    }
 }
 
 object Sum {
@@ -197,13 +280,23 @@ object Sum {
   implicit def MapSum[K, R](implicit ring: Ring[R]): Sum[Map[K,R],R] =
     instance { _.values.reduce(ring.add) }
 
-  implicit def RddNumericSum[K : ClassTag, N : ClassTag](implicit ring: Ring[N], numeric: Numeric[N]): Sum[RDD[(K,N)],N] =
+  implicit def RddNumericSum[K :ClassTag, N :ClassTag](implicit ring: Ring[N], numeric: Numeric[N]): Sum[RDD[(K,N)],N] =
     instance { _.values.reduce(ring.add) }
 
-  implicit def RddMapSum[K : ClassTag, K1 : ClassTag, R1 : ClassTag]
-  (implicit ring: Ring[R1], tag: ClassTag[Map[K1,R1]]): Sum[RDD[(K,Map[K1,R1])],RDD[(K1,R1)]] =
+  implicit def RddMapSum[K :ClassTag, K1 :ClassTag, R1 :ClassTag]
+  (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[RDD[(K,Map[K1,R1])],RDD[(K1,R1)]] =
     instance { v1 =>
       v1.values.flatMap(x => x).reduceByKey(ring.add)
+    }
+
+  //todo - dstreamnumericsum
+//  implicit def DStreamNumericSum[K :ClassTag, N :ClassTag](implicit ring: Ring[N], numeric: Numeric[N]): Sum[DStream[(K,N)],N] =
+//    instance { _.map(_._2).reduce(ring.add). }
+
+  implicit def DStreamMapSum[K :ClassTag, K1 :ClassTag, R1 :ClassTag]
+  (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[DStream[(K,Map[K1,R1])],DStream[(K1,R1)]] =
+    instance { v1 =>
+      v1.map(_._2).flatMap(x => x).reduceByKey(ring.add)
     }
 }
 
@@ -219,6 +312,9 @@ object Group {
       }
     }
 
+  //todo - DStreamGroup - obviously not possible to do efficiently but is there some sort of hack that can be done here?
+  //to make testing against the recomputed version more elegant?
+
   //todo - map group
 }
 
@@ -230,6 +326,10 @@ object Mapper {
 
   implicit def rddMapper[K,R,R1]: Mapper[(K,R) => (K,R1),RDD[(K,R)],RDD[(K,R1)]] = new Mapper[(K,R) => (K,R1),RDD[(K,R)],RDD[(K,R1)]] {
     def apply(v1: RDD[(K,R)], v2: (K,R) => (K,R1)): RDD[(K,R1)] = v1.map { case (k,v) => v2(k,v) }
+  }
+
+  implicit def dstreamMapper[K,R,R1]: Mapper[(K,R) => (K,R1),DStream[(K,R)],DStream[(K,R1)]] = new Mapper[(K,R) => (K,R1),DStream[(K,R)],DStream[(K,R1)]] {
+    def apply(v1: DStream[(K,R)], v2: (K,R) => (K,R1)): DStream[(K,R1)] = v1.map { case (k,v) => v2(k,v) }
   }
 }
 
@@ -273,7 +373,7 @@ object Mapper {
 //  }
 
 //
-//  implicit def rdd2Rdd2Join[K: ClassTag, K1: ClassTag, K2: ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
+//  implicit def rdd2Rdd2Join[K:ClassTag, K1:ClassTag, K2:ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
 //    Join[RDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] =
 //      new Join[PairRDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] {
 //        def apply(v1: PairRDD[(K,K1),R1], v2: PairRDD[(K,K2),R2]): PairRDD[(K,(K1,K2)),O] = {
@@ -283,7 +383,7 @@ object Mapper {
 //        }
 //      }
 //
-//  implicit def rdd2Rdd3Join[K: ClassTag, K11: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
+//  implicit def rdd2Rdd3Join[K:ClassTag, K11:ClassTag, K21:ClassTag, K22:ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
 //  Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] =
 //    new Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] {
 //      def apply(v1: PairRDD[(K,K11),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,(K11,(K21,K22))),O] = {
@@ -294,7 +394,7 @@ object Mapper {
 //    }
 //
 //  implicit def rdd3Rdd2Join[
-//  K: ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, R1, R2, O
+//  K:ClassTag, K11:ClassTag, K12:ClassTag, K21:ClassTag, R1, R2, O
 //  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] =
 //    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] {
 //      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21),R2]): PairRDD[(K,((K11,K12),K21)),O] = {
@@ -305,7 +405,7 @@ object Mapper {
 //    }
 //
 //  implicit def rdd3Rdd3Join[
-//    K: ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O
+//    K:ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O
 //  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] =
 //    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] {
 //      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,((K11,K12),(K21,K22))),O] = {
