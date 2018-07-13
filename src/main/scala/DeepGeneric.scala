@@ -10,32 +10,6 @@ trait DeepGeneric[T] extends Serializable {
   def from(r: Repr): T
 }
 
-//trait HDeepGeneric[T,S] extends Serializable {
-//  def to(t: T): S
-//  def from(s: S): T
-//}
-//
-//object HDeepGeneric {
-//
-//  implicit def hconsDataGeneric[H,T <: HList,HR,TR <: HList](implicit genH: HDeepGeneric[H,HR], genT: HDeepGeneric[T,TR]):
-//  HDeepGeneric[H :: T, HR :: TR] =
-//    new HDeepGeneric[H :: T, HR :: TR] {
-//      def to(v1: H :: T): HR :: TR = v1 match {
-//        case (h :: t) => genH.to(h) :: genT.to(t)
-//      }
-//
-//      def from(v1: HR :: TR): H :: T = v1 match {
-//        case (hr :: tr) => genH.from(hr) :: genT.from(tr)
-//      }
-//    }
-//
-//  implicit def hnilDeepGeneric: HDeepGeneric[HNil,HNil] = new HDeepGeneric[HNil,HNil] {
-//    def to(v1: HNil): HNil = HNil
-//    def from(v1: HNil): HNil = HNil
-//  }
-//
-//}
-
 object DeepGeneric extends Priority1DeepGenericImplicits {
 
   type Aux[T,Repr0] = DeepGeneric[T] { type Repr = Repr0 }

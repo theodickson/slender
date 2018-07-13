@@ -22,6 +22,7 @@ import shapeless._
   */
 trait Resolver[-In,+Out] extends (In => Out) with Serializable
 
+
 object Resolver extends Priority1ResolutionImplicits {
 
   def instance[In, Out](f: In => Out): Resolver[In,Out] = new Resolver[In,Out] {
@@ -61,10 +62,10 @@ object Resolver extends Priority1ResolutionImplicits {
 trait Priority1ResolutionImplicits  {
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
-  implicit def LiteralResolver[V]: Resolver[LiteralExpr[V],LiteralExpr[V]] =
-    Resolver.nonResolver[LiteralExpr[V]]
+  implicit def LiteralResolver[V,ID]: Resolver[LiteralExpr[V,ID],LiteralExpr[V,ID]] =
+    Resolver.nonResolver[LiteralExpr[V,ID]]
 
-  implicit def VariableResolver[V <: UntypedVariable,T]: Resolver[TypedVariable[T],TypedVariable[T]] =
+  implicit def TypedVariableResolver[T]: Resolver[TypedVariable[T],TypedVariable[T]] =
     Resolver.nonResolver[TypedVariable[T]]
 
   /**Standard inductive cases*/
@@ -104,13 +105,110 @@ trait Priority1ResolutionImplicits  {
   (implicit resolveK: Resolver[K,K1], resolveR: Resolver[R,R1]): Resolver[SngExpr[K,R],SngExpr[K1,R1]] =
     Resolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
 
-  implicit def PredicateResolver[L,R,L1,R1,T1,T2]
-  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
-    Resolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
+//  implicit def PredicateResolver[L,R,L1,R1,T1,T2]
+//  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
+//    Resolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
+
+  implicit def ApplyExprResolver[K1,K2,T,U]
+  (implicit resolve: Resolver[K1,K2]): Resolver[ApplyExpr[K1,T,U],ApplyExpr[K2,T,U]] =
+    Resolver.instance { case ApplyExpr(c,f) => ApplyExpr(resolve(c),f) }
 
   implicit def HNilResolver: Resolver[HNil,HNil] = Resolver.nonResolver[HNil]
 
   implicit def HListResolver[H1, T1 <: HList, H2, T2 <: HList]
   (implicit resolveH: Resolver[H1, H2], resolveT: Resolver[T1, T2]): Resolver[H1 :: T1, H2 :: T2] =
     Resolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
+}
+
+trait ShreddedResolver[-In,+Out] extends (In => Out) with Serializable
+
+object ShreddedResolver extends LowPriorityShreddedResolverImplicits {
+
+  def instance[In, Out](f: In => Out): ShreddedResolver[In,Out] = new ShreddedResolver[In,Out] {
+    def apply(v1: In): Out = f(v1)
+  }
+
+  def nonShreddedResolver[E]: ShreddedResolver[E,E] = instance { v1 => v1 }
+
+  implicit def MultiplyInfResolver[
+  LHS, LHS1, V, C, KT, VB,
+  R1, R2, R3
+  ](implicit resolveLeft: ShreddedResolver[LHS,LHS1], eval: ShreddedEval[LHS1,C,_], coll: Collection[C,KT,_],
+    tagKey: Tagger[V,KT,V,VB], tagValue: Tagger[V,KT,R1,R2], resolveRight: ShreddedResolver[R2,R3]):
+  ShreddedResolver[
+    MultiplyExpr[LHS,InfiniteMappingExpr[V,R1]],
+    MultiplyExpr[LHS1,InfiniteMappingExpr[VB,R3]]
+    ] =
+    instance {
+      case MultiplyExpr(l,InfiniteMappingExpr(k,r)) =>
+        MultiplyExpr(
+          resolveLeft(l),
+          InfiniteMappingExpr(tagKey(k),resolveRight(tagValue(r)))
+        )
+    }
+}
+
+trait LowPriorityShreddedResolverImplicits {
+
+  //todo - for some reason with just an Induct method here that took a normal resolver, this was being used
+  //even in place of the specialised MultiplyinfShredded resolver, depsite attempts to control prioirty with scope.
+  //thus for now, just leave it as duplicated code.
+  /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
+    * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
+  implicit def LiteralShreddedResolver[V,ID]: ShreddedResolver[LiteralExpr[V,ID],LiteralExpr[V,ID]] =
+    ShreddedResolver.nonShreddedResolver[LiteralExpr[V,ID]]
+
+  implicit def TypedVariableShreddedResolver[T]: ShreddedResolver[TypedVariable[T],TypedVariable[T]] =
+    ShreddedResolver.nonShreddedResolver[TypedVariable[T]]
+
+  /**Standard inductive cases*/
+  implicit def AddShreddedResolver[L, R, L1, R1]
+  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[AddExpr[L,R],AddExpr[L1,R1]] =
+    ShreddedResolver.instance { case AddExpr(l,r) => AddExpr(resolveL(l),resolveR(r)) }
+
+  implicit def MultiplyShreddedResolver[L, R, L1, R1]
+  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
+    ShreddedResolver.instance { case MultiplyExpr(l,r) => MultiplyExpr(resolveL(l),resolveR(r)) }
+
+  implicit def JoinShreddedResolver[L, R, L1, R1]
+  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
+    ShreddedResolver.instance { case JoinExpr(l,r) => JoinExpr(resolveL(l),resolveR(r)) }
+
+  implicit def DotShreddedResolver[L, R, L1, R1]
+  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[DotExpr[L,R],DotExpr[L1,R1]] =
+    ShreddedResolver.instance { case DotExpr(l,r) => DotExpr(resolveL(l),resolveR(r)) }
+
+  implicit def NotShreddedResolver[R1,R2]
+  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[NotExpr[R1],NotExpr[R2]] =
+    ShreddedResolver.instance { case NotExpr(c) => NotExpr(resolve(c)) }
+
+  implicit def NegateShreddedResolver[R1,R2]
+  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[NegateExpr[R1],NegateExpr[R2]] =
+    ShreddedResolver.instance { case NegateExpr(c) => NegateExpr(resolve(c)) }
+
+  implicit def SumShreddedResolver[R1,R2]
+  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[SumExpr[R1],SumExpr[R2]] =
+    ShreddedResolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
+
+  implicit def GroupShreddedResolver[R1,R2]
+  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[GroupExpr[R1],GroupExpr[R2]] =
+    ShreddedResolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
+
+  implicit def SngShreddedResolver[K,R,K1,R1]
+  (implicit resolveK: ShreddedResolver[K,K1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[SngExpr[K,R],SngExpr[K1,R1]] =
+    ShreddedResolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
+
+//  implicit def PredicateShreddedResolver[L,R,L1,R1,T1,T2]
+//  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
+//    ShreddedResolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
+
+  implicit def ApplyExprShreddedResolver[K1,K2,T,U]
+  (implicit resolve: ShreddedResolver[K1,K2]): ShreddedResolver[ApplyExpr[K1,T,U],ApplyExpr[K2,T,U]] =
+    ShreddedResolver.instance { case ApplyExpr(c,f) => ApplyExpr(resolve(c),f) }
+
+  implicit def HNilShreddedResolver: ShreddedResolver[HNil,HNil] = ShreddedResolver.nonShreddedResolver[HNil]
+
+  implicit def HListShreddedResolver[H1, T1 <: HList, H2, T2 <: HList]
+  (implicit resolveH: ShreddedResolver[H1, H2], resolveT: ShreddedResolver[T1, T2]): ShreddedResolver[H1 :: T1, H2 :: T2] =
+    ShreddedResolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
 }

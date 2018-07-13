@@ -16,12 +16,12 @@ import shapeless.ops.hlist.Prepend
 import scala.collection.immutable.Map
 import scala.reflect.ClassTag
 
+
 trait Ring[R] extends Serializable {
   def zero: R
   def add(x1: R, x2: R): R
   def not(x1: R): R
   def negate(x1: R): R
-  //def filterZeros(x1: R): R = x1
 }
 
 /**Trait witnessing that C is a collection type with key of type K and value of type V*/
@@ -44,6 +44,14 @@ trait Group[T,S] extends (T => S) with Serializable
 trait Mapper[F,T,S] extends ((T,F) => S) with Serializable
 
 object Ring {
+
+  implicit def BooleanRing: Ring[Boolean] = new Ring[Boolean] {
+    def zero = false
+    def one = true
+    def add(t1: Boolean, t2: Boolean): Boolean = t1 || t2
+    def not(t1: Boolean): Boolean = !t1
+    def negate(t1: Boolean): Boolean = !t1
+  }
 
   implicit def NumericRing[N](implicit num: Numeric[N]): Ring[N] = new Ring[N] {
     def zero: N = num.fromInt(0)
@@ -101,6 +109,7 @@ object Collection {
 
 object NonCollection {
   /**Numerics and products are not collections*/
+  implicit def BooleanNonCollection = new NonCollection[Boolean] {}
   implicit def NumericNonCollection[N:Numeric] = new NonCollection[N] {}
   implicit def ProductNonCollection[H <: HList] = new NonCollection[H] {}
 }
@@ -110,6 +119,12 @@ object Multiply {
   def instance[T1,T2,O](f: (T1,T2) => O): Multiply[T1, T2, O] = new Multiply[T1,T2,O] {
     def apply(v1: T1, v2: T2): O = f(v1,v2)
   }
+
+  implicit def BooleanMultiply: Multiply[Boolean,Boolean,Boolean] = instance { (t1,t2) => t1 && t2 }
+
+  implicit def BooleanNumericMultiply[N](implicit num: Numeric[N]): Multiply[Boolean,N,N] = instance { (t1,t2) => if (t1) t2 else num.zero }
+
+  implicit def NumericBooleanMultiply[N](implicit num: Numeric[N]): Multiply[N,Boolean,N] = instance { (t1,t2) => if (t2) t1 else num.zero }
 
   implicit def NumericMultiply[N](implicit num: Numeric[N]): Multiply[N,N,N] =
     instance { (t1,t2) => num.times(t1,t2) }
@@ -135,7 +150,7 @@ object Multiply {
       t2.transform { rdd => t1.join(rdd) map { case (k, v) => k -> dot(v._1, v._2) } }
     }
 
-  implicit def dStreamRDDMultiply[K:ClassTag, R1, R2:ClassTag, O]
+  implicit def dStreamRDDMultiply[K:ClassTag, R1:ClassTag, R2:ClassTag, O]
   (implicit dot: Dot[R1,R2,O]): Multiply[DStream[(K,R1)], RDD[(K,R2)], DStream[(K,O)]] =
     instance { (t1,t2) =>
       t1.transform { rdd => rdd.join(t2) map { case (k, v) => k -> dot(v._1, v._2) } }
@@ -171,7 +186,13 @@ object Dot {
     def apply(v1: T1, v2: T2): O = f(v1,v2)
   }
 
+  implicit def BooleanDot: Dot[Boolean,Boolean,Boolean] = instance { (t1,t2) => t1 && t2 }
+
   implicit def numericDot[N](implicit num: Numeric[N]): Dot[N, N, N] = instance { (t1,t2) => num.times(t1,t2) }
+
+  implicit def BooleanNumericDot[N](implicit num: Numeric[N]): Dot[Boolean,N,N] = instance { (t1,t2) => if (t1) t2 else num.zero }
+
+  implicit def NumericBooleanDot[N](implicit num: Numeric[N]): Dot[N,Boolean,N] = instance { (t1,t2) => if (t2) t1 else num.zero }
 
   implicit def mapMapDot[K1, K2, R1, R2, O]
   (implicit dot: Dot[R1, R2, O]): Dot[Map[K1, R1], Map[K2, R2], Map[(K1, K2), O]] =
@@ -202,7 +223,7 @@ object Dot {
 object Join {
 
   implicit def rddRddJoin[
-  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+    K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
   ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] =
     new Join[RDD[(K :: K1, R1)], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] {
       def apply(v1: RDD[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): RDD[(K :: K12, O)] = {
@@ -283,6 +304,9 @@ object Sum {
   implicit def RddNumericSum[K :ClassTag, N :ClassTag](implicit ring: Ring[N], numeric: Numeric[N]): Sum[RDD[(K,N)],N] =
     instance { _.values.reduce(ring.add) }
 
+  implicit def RddBooleanSum[K :ClassTag](implicit ring: Ring[Boolean]): Sum[RDD[(K,Boolean)],Boolean] =
+    instance { _.values.reduce(ring.add) }
+
   implicit def RddMapSum[K :ClassTag, K1 :ClassTag, R1 :ClassTag]
   (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[RDD[(K,Map[K1,R1])],RDD[(K1,R1)]] =
     instance { v1 =>
@@ -290,8 +314,6 @@ object Sum {
     }
 
   //todo - dstreamnumericsum
-//  implicit def DStreamNumericSum[K :ClassTag, N :ClassTag](implicit ring: Ring[N], numeric: Numeric[N]): Sum[DStream[(K,N)],N] =
-//    instance { _.map(_._2).reduce(ring.add). }
 
   implicit def DStreamMapSum[K :ClassTag, K1 :ClassTag, R1 :ClassTag]
   (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[DStream[(K,Map[K1,R1])],DStream[(K1,R1)]] =
@@ -303,12 +325,28 @@ object Sum {
 
 object Group {
 
-  implicit def RddGroup[K1:ClassTag,K2 <: HList,R](implicit ring: Ring[R]): Group[RDD[(K1::K2,R)],RDD[(K1::Map[K2,R]::HNil,Int)]] =
-    new Group[RDD[(K1::K2,R)],RDD[(K1::Map[K2,R]::HNil,Int)]] {
-      def apply(v1: RDD[(K1::K2,R)]): RDD[(K1::Map[K2,R]::HNil,Int)] = {
-        //todo - this is wrong - it doesnt aggregate - the toMap just does overwrites
-        val grouped = v1.groupBy(_._1.head).mapValues[Map[K2,R]] { _.map { case (_::k2,v) => (k2,v) } toMap }
-        grouped.map[(K1::Map[K2,R]::HNil,Int)] { case (k1,k2s) => (k1::k2s::HNil,1) }
+  //Note - when this was done generically, it meant that when grouping pairs, the grouped 'second' element was always
+  //treated as an HList even when it was just e.g. K2::HNil, which meant getting a map result type with a product of
+  //just one element. And, even with scoping, the special case of just K1::K2::HNil was not being used ahead of the
+  //generic case. Hence for now just have two special cases, one for pairs and one for triples.
+  implicit def RddGroup2[K1:ClassTag,K2:ClassTag,R](implicit ring: Ring[R]): Group[RDD[(K1::K2::HNil,R)],RDD[(K1::Map[K2,R]::HNil,Boolean)]] =
+    new Group[RDD[(K1::K2::HNil,R)],RDD[(K1::Map[K2,R]::HNil,Boolean)]] {
+      def apply(v1: RDD[(K1::K2::HNil,R)]): RDD[(K1::Map[K2,R]::HNil,Boolean)] = {
+        val grouped = v1.groupBy(_._1.head) //RDD[(K1,Iterable[(K1::K2,R)])]
+        //we need to turn the iterable of (K1::K2,R) pairs into a Map[K2,R]
+        //since we have grouped by K1, we know that the K2s will be unique in each iterable, hence can just map to (k2,v)
+        //pairs and use toMap. (normally toMap would be dangerous here since it overwrites)
+        val grouped = v1.groupBy(_._1.head).mapValues[Map[K2,R]] { _.map { case (_::k2::HNil,v) => (k2,v) } toMap }
+        grouped.map[(K1::Map[K2,R]::HNil,Boolean)] { case (k1,k2s) => (k1::k2s::HNil,true) }
+      }
+    }
+
+  implicit def RddGroup3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R]
+  (implicit ring: Ring[R]): Group[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] =
+    new Group[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] {
+      def apply(v1: RDD[(K1::K2::K3::HNil,R)]): RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)] = {
+        val grouped = v1.groupBy(_._1.head).mapValues[Map[K2::K3::HNil,R]] { _.map { case (_::k2::k3::HNil,v) => (k2::k3::HNil,v) } toMap }
+        grouped.map[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)] { case (k1,k2s) => (k1::k2s::HNil,true) }
       }
     }
 
@@ -317,6 +355,8 @@ object Group {
 
   //todo - map group
 }
+
+
 
 object Mapper {
 
@@ -332,119 +372,3 @@ object Mapper {
     def apply(v1: DStream[(K,R)], v2: (K,R) => (K,R1)): DStream[(K,R1)] = v1.map { case (k,v) => v2(k,v) }
   }
 }
-
-//  implicit def Tuple2Ring[R1,R2](implicit r1: Ring[R1], r2: Ring[R2]): NonCollectionRing[(R1,R2)] =
-//    new NonCollectionRing[(R1,R2)] {
-//      def zero: (R1,R2) = (r1.zero,r2.zero)
-//      def add(t1: (R1,R2), t2: (R1,R2)): (R1,R2) = (r1.add(t1._1, t2._1),r2.add(t1._2,t2._2))
-//      def not(t1: (R1,R2)): (R1,R2) = (r1.not(t1._1),r2.not(t1._2))
-//      def negate(t1: (R1,R2)): (R1,R2) = (r1.negate(t1._1),r2.negate(t1._2))
-//    }
-//
-//  implicit def Tuple3Ring[R1,R2,R3](implicit r1: Ring[R1], r2: Ring[R2], r3: Ring[R3]): NonCollectionRing[(R1,R2,R3)] =
-//    new NonCollectionRing[(R1,R2,R3)] {
-//      def zero: (R1,R2,R3) = (r1.zero,r2.zero,r3.zero)
-//      def add(t1: (R1,R2,R3), t2: (R1,R2,R3)): (R1,R2,R3) = (r1.add(t1._1, t2._1),r2.add(t1._2,t2._2),r3.add(t1._3,t2._3))
-//      def not(t1: (R1,R2,R3)): (R1,R2,R3) = (r1.not(t1._1),r2.not(t1._2),r3.not(t1._3))
-//      def negate(t1: (R1,R2,R3)): (R1,R2,R3) = (r1.negate(t1._1),r2.negate(t1._2),r3.negate(t1._3))
-//    }
-
-//  implicit def tuple2NumericDot[R1,R2,N : NumericRing,O1,O2](implicit dot1: Dot[R1,N,O1], dot2: Dot[R2,N,O2]):
-//  Dot[(R1,R2),N,(O1,O2)] = new Dot[(R1,R2),N,(O1,O2)] {
-//    def apply(v1: (R1, R2), v2: N): (O1, O2) = (dot1(v1._1, v2), dot2(v1._2, v2))
-//  }
-//
-//  implicit def numericTuple2Dot[R1,R2,N : NumericRing,O1,O2](implicit dot1: Dot[N,R1,O1], dot2: Dot[N,R2,O2]):
-//  Dot[N,(R1,R2),(O1,O2)] = new Dot[N,(R1,R2),(O1,O2)] {
-//    def apply(v1: N, v2: (R1, R2)): (O1, O2) = (dot1(v1, v2._1), dot2(v1, v2._2))
-//  }
-//
-//  implicit def tuple3NumericDot[R1,R2,R3,N : NumericRing,O1,O2,O3]
-//  (implicit dot1: Dot[R1,N,O1], dot2: Dot[R2,N,O2], dot3: Dot[R3,N,O3]): Dot[(R1,R2,R3),N,(O1,O2,O3)] =
-//    new Dot[(R1,R2,R3),N,(O1,O2,O3)] {
-//      def apply(v1: (R1, R2, R3), v2: N): (O1, O2, O3) = (dot1(v1._1, v2), dot2(v1._2, v2), dot3(v1._3, v2))
-//    }
-//
-//
-//  implicit def numericTuple3Dot[R1,R2,R3,N : NumericRing,O1,O2,O3]
-//  (implicit dot1: Dot[N,R1,O1], dot2: Dot[N,R2,O2], dot3: Dot[N,R3,O3]):
-//  Dot[N,(R1,R2,R3),(O1,O2,O3)] = new Dot[N,(R1,R2,R3),(O1,O2,O3)] {
-//    def apply(v1: N, v2: (R1,R2,R3)): (O1,O2,O3) = (dot1(v1,v2._1),dot2(v1,v2._2),dot3(v1,v2._3))
-//  }
-
-//
-//  implicit def rdd2Rdd2Join[K:ClassTag, K1:ClassTag, K2:ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
-//    Join[RDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] =
-//      new Join[PairRDD[(K,K1),R1],PairRDD[(K,K2),R2],PairRDD[(K,(K1,K2)),O]] {
-//        def apply(v1: PairRDD[(K,K1),R1], v2: PairRDD[(K,K2),R2]): PairRDD[(K,(K1,K2)),O] = {
-//          val left = v1.map { case ((k,k1),r1) => (k,(k1,r1)) }
-//          val right = v2.map { case ((k,k2),r2) => (k,(k2,r2)) }
-//          left.join(right).map { case (k,((k1,r1),(k2,r2))) => ((k,(k1,k2)),dot(r1,r2)) }
-//        }
-//      }
-//
-//  implicit def rdd2Rdd3Join[K:ClassTag, K11:ClassTag, K21:ClassTag, K22:ClassTag, R1, R2, O](implicit dot: Dot[R1,R2,O]):
-//  Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] =
-//    new Join[PairRDD[(K,K11),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,(K11,(K21,K22))),O]] {
-//      def apply(v1: PairRDD[(K,K11),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,(K11,(K21,K22))),O] = {
-//        val left = v1.map { case ((k,k11),r1) => (k,(k11,r1)) }
-//        val right = v2.map { case ((k,k21,k22),r2) => (k,(k21,k22,r2)) }
-//        left.join(right).map { case (k,((k11,r1),(k21,k22,r2))) => ((k,(k11,(k21,k22))),dot(r1,r2)) }
-//      }
-//    }
-//
-//  implicit def rdd3Rdd2Join[
-//  K:ClassTag, K11:ClassTag, K12:ClassTag, K21:ClassTag, R1, R2, O
-//  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] =
-//    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21),R2],PairRDD[(K,((K11,K12),K21)),O]] {
-//      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21),R2]): PairRDD[(K,((K11,K12),K21)),O] = {
-//        val left = v1.map { case ((k,k11,k12),r1) => (k,(k11,k12,r1)) }
-//        val right = v2.map { case ((k,k21),r2) => (k,(k21,r2)) }
-//        left.join(right).map { case (k,((k11,k12,r1),(k21,r2))) => ((k,((k11,k12),k21)),dot(r1,r2)) }
-//      }
-//    }
-//
-//  implicit def rdd3Rdd3Join[
-//    K:ClassTag, K11: ClassTag, K12: ClassTag, K21: ClassTag, K22: ClassTag, R1, R2, O
-//  ](implicit dot: Dot[R1,R2,O]): Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] =
-//    new Join[PairRDD[(K,K11,K12),R1],PairRDD[(K,K21,K22),R2],PairRDD[(K,((K11,K12),(K21,K22))),O]] {
-//      def apply(v1: PairRDD[(K,K11,K12),R1], v2: PairRDD[(K,K21,K22),R2]): PairRDD[(K,((K11,K12),(K21,K22))),O] = {
-//        val left = v1.map { case ((k,k11,k12),r1) => (k,(k11,k12,r1)) }
-//        val right = v2.map { case ((k,k21,k22),r2) => (k,(k21,k22,r2)) }
-//        left.join(right).map { case (k,((k11,k12,r1),(k21,k22,r2))) => ((k,((k11,k12),(k21,k22))),dot(r1,r2)) }
-//      }
-//    }
-
-
-//  implicit def MapGroup2[K1,K2,R](implicit ring: Ring[R]): Group[Map[(K1,K2),R],Map[(K1,Map[K2,R]),Int]] =
-//    new Group[Map[(K1,K2),R],Map[(K1,Map[K2,R]),Int]] {
-//      def apply(v1: Map[(K1,K2),R]): Map[(K1,Map[K2,R]),Int] = {
-//        val grouped = v1.groupBy(_._1._1).mapValues(_.toList.map { case ((k1,k2),v) => (k2,v) }.toMap)
-//        grouped.toList.zip(Stream.from(1,0)).toMap
-//      }
-//    }
-//
-//  implicit def MapGroup3[K1,K2,K3,R](implicit ring: Ring[R]): Group[Map[(K1,K2,K3),R],Map[(K1,Map[(K2,K3),R]),Int]] =
-//    new Group[Map[(K1,K2,K3),R],Map[(K1,Map[(K2,K3),R]),Int]] {
-//      def apply(v1: Map[(K1,K2,K3),R]): Map[(K1,Map[(K2,K3),R]),Int] = {
-//        val grouped = v1.groupBy(_._1._1).mapValues(_.toList.map { case ((k1,k2,k3),v) => ((k2,k3),v) }.toMap)
-//        grouped.toList.zip(Stream.from(1,0)).toMap
-//      }
-//    }
-
-//  implicit def RddGroup2[K1:ClassTag,K2,R](implicit ring: Ring[R]): Group[PairRDD[(K1,K2),R],PairRDD[(K1,Map[K2,R]),Int]] =
-//    new Group[PairRDD[(K1,K2),R],PairRDD[(K1,Map[K2,R]),Int]] {
-//      def apply(v1: PairRDD[(K1,K2),R]): PairRDD[(K1,Map[K2,R]),Int] = {
-//        val grouped = v1.groupBy(_._1._1).mapValues[Map[K2,R]](_.map { case ((_,k2),v) => (k2,v) }.toMap)
-//        grouped.map { case (k,v) => ((k,v),1) }
-//      }
-//    }
-//
-//  implicit def RddGroup3[K1:ClassTag,K2,K3,R](implicit ring: Ring[R]):
-//  Group[PairRDD[(K1,K2,K3),R],PairRDD[(K1,Map[(K2,K3),R]),Int]] =
-//    new Group[PairRDD[(K1,K2,K3),R],PairRDD[(K1,Map[(K2,K3),R]),Int]] {
-//      def apply(v1: PairRDD[(K1,K2,K3),R]): PairRDD[(K1,Map[(K2,K3),R]),Int] = {
-//        val grouped = v1.groupBy(_._1._1).mapValues[Map[(K2,K3),R]](_.map { case ((_,k2,k3),v) => ((k2,k3),v) }.toMap)
-//        grouped.map { case (k,v) => ((k,v),1) }
-//      }
-//    }

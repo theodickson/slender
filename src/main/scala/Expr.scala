@@ -4,7 +4,12 @@
   * */
 package slender
 
+import org.apache.spark.rdd.RDD
+import shapeless.syntax.SingletonOps
+import shapeless.syntax.singleton._
 import shapeless.{::, HList, HNil}
+
+import scala.language.experimental.macros
 
 /**Typeclass witnessing that E is an expression*/
 trait Expr[E]
@@ -12,7 +17,32 @@ trait Expr[E]
 /**Base trait for all explicit ExprNodes*/
 trait ExprNode
 
-case class LiteralExpr[V](value: V) extends ExprNode
+//todo - make private
+case class LiteralExpr[V,ID](value: V, id: ID) extends ExprNode
+
+object LiteralExpr {
+  def One = LiteralExpr(1,1.narrow)
+}
+
+object Bag {
+
+  def apply[T,U,ID](value: RDD[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], ID] =
+    LiteralExpr[RDD[(U,Int)],ID](value.map(t => (gen.to(t),1)), id)
+
+//  def apply[T,U](value: RDD[T], id: SingletonOps)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], id.T] =
+//    LiteralExpr[RDD[(U,Int)],id.T](value.map(t => (gen.to(t),1)), id.narrow)
+////
+//  def apply[T,U,ID](value: Set[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[Map[U, Int], ID] =
+//    LiteralExpr[Map[U,Int],ID](value.toSeq.map(t => (gen.to(t),1)).toMap, id)
+}
+
+//object Collection {
+//  def apply[T, U: ClassTag](rdd: RDD[T])(implicit gen: DeepGeneric.Aux[T, U]): LiteralExpr[RDD[U]] =
+//    LiteralExpr(rdd.map(t => gen.to(t)))
+//
+//  def apply[K, V, K1: ClassTag, V1: ClassTag](map: Map[K, V])(implicit gen: DeepGeneric.Aux[(K, V), (K1, V1)]): LiteralExpr[Map[K1, V1]] =
+//    LiteralExpr(map.map(gen.to))
+//}
 
 case class AddExpr[E1,E2](c1: E1, c2: E2) extends ExprNode
 
@@ -30,19 +60,25 @@ case class SumExpr[E](c1: E) extends ExprNode
 
 case class GroupExpr[E](c1: E) extends ExprNode
 
-case class ShreddedGroupExpr[E](c1: E) extends ExprNode
-
 /**Mapping constructs*/
 case class InfiniteMappingExpr[K,R](key: K, value: R) extends ExprNode
 
 case class SngExpr[K,R](key: K, value: R) extends ExprNode
 
-/**Predicates*/
-case class Predicate[K1,K2,T1,T2](c1: K1, c2: K2, p: (T1,T2) => Boolean, opString: String) extends ExprNode
+/**For a key expression K which evaluates to a type T, apply the T => U function to the output.*/
+case class ApplyExpr[K,T,U](c1: K, f: T => U) extends ExprNode
 
-object EqualsPredicate {
-  val anyEq = (x:Any,y:Any) => x == y
-  def apply[K1, K2](k1: K1, k2: K2) = Predicate[K1,K2,Any,Any](k1,k2,anyEq,"==")
+object ApplyExpr {
+  case class Factory[T,U](f: T => U) {
+    def $[K](k: K): ApplyExpr[K,T,U] = ApplyExpr(k,f)
+  }
+
+  case class Factory2[T1,T2,U](f: (T1,T2) => U) {
+    def $[K1,K2](k1: K1, k2: K2): ApplyExpr[K1::K2::HNil,T1::T2::HNil,U] = {
+      val f0 = (x: T1::T2::HNil) => x match { case (t1::t2::HNil) => f(t1,t2) }
+      ApplyExpr(k1::k2::HNil,f0)
+    }
+  }
 }
 
 /**VariableExpr*/
@@ -50,10 +86,14 @@ case class UnusedVariable() extends ExprNode
 
 case class TypedVariable[T](name: String) extends ExprNode
 
-trait UntypedVariable extends ExprNode {
-  def name: String
-  def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name)
+trait UntypedVariable[Name] extends ExprNode {
+  def name: Name
+  def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name.toString)
   override def toString = s"""$name:?""""
+}
+
+object UntypedVariable {
+  implicit def apply(a: SingletonOps): UntypedVariable[a.T] = new UntypedVariable[a.T] { val name = a.narrow }
 }
 
 object Expr {

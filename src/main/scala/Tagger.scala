@@ -17,14 +17,18 @@ object Tagger extends Priority2TaggingImplicits {
 
 trait Priority0TaggingImplicits {
   //The case that V1 <:< V and so actually tags to T takes precedence, hence this non-tager is here.
-  implicit def VariableNonTagger[V <: UntypedVariable,V1 <: UntypedVariable,T]: Tagger[V,T,V1,V1] =
-    Tagger.nonTagger[V,T,V1]
+//  implicit def VariableNonTagger[V <: UntypedVariable,V1 <: UntypedVariable,T]: Tagger[V,T,V1,V1] =
+//    Tagger.nonTagger[V,T,V1]
 
-  implicit def BindHList[V1, V2 <: HList, T1, T2 <: HList, E1, E2, E3]
+  implicit def VariableNonTagger[V,V1,T]:
+    Tagger[UntypedVariable[V],T,UntypedVariable[V1],UntypedVariable[V1]] =
+    Tagger.nonTagger[UntypedVariable[V],T,UntypedVariable[V1]]
+
+  implicit def TagHList[V1, V2 <: HList, T1, T2 <: HList, E1, E2, E3]
   (implicit tag1: Tagger[V1,T1,E1,E2], tag2: Tagger[V2,T2,E2,E3]): Tagger[V1::V2, T1::T2, E1, E3] =
     Tagger.instance { v1 => tag2(tag1(v1)) }
 
-  implicit def BindHNil[T,E]: Tagger[HNil,T,E,E] = Tagger.nonTagger[HNil,T,E]
+  implicit def TagHNil[T,E]: Tagger[HNil,T,E,E] = Tagger.nonTagger[HNil,T,E]
 }
 
 trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
@@ -66,9 +70,9 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
   (implicit tagK: Tagger[V, T, K, K1], tagR: Tagger[V, T, R, R1]): Tagger[V, T, SngExpr[K, R], SngExpr[K1, R1]] =
     Tagger.instance { case SngExpr(k,r) => SngExpr(tagK(k), tagR(r)) }
 
-  implicit def PredicateTagger[V, T, K1, K2, K1B, K2B,T1,T2]
-  (implicit tag1: Tagger[V,T,K1,K1B], tag2: Tagger[V,T,K2,K2B]): Tagger[V,T,Predicate[K1,K2,T1,T2],Predicate[K1B,K2B,T1,T2]] =
-    Tagger.instance { case Predicate(k1,k2,f,s) => Predicate(tag1(k1),tag2(k2),f,s) }
+  implicit def ApplyExprTagger[V, T, R, R1, T1,U1]
+  (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, ApplyExpr[R,T1,U1], ApplyExpr[R1,T1,U1]] =
+    Tagger.instance { case ApplyExpr(c,f) => ApplyExpr(tag(c),f) }
 
   implicit def HNilTagger[V,T]: Tagger[V,T,HNil,HNil] = Tagger.nonTagger[V,T,HNil]
 
@@ -94,10 +98,10 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   /** Binding base cases - primitive expressions don't need to tag anything, variables tag iff they are untyped variables
     * matching the type in the tager. (otherwise they use the low priority non-taging case)
     */
-  implicit def LiteralTagger[V, T, V1]: Tagger[V, T, LiteralExpr[V1], LiteralExpr[V1]] =
-    Tagger.nonTagger[V, T, LiteralExpr[V1]]
+  implicit def LiteralTagger[V, T, V1,ID]: Tagger[V, T, LiteralExpr[V1,ID], LiteralExpr[V1,ID]] =
+    Tagger.nonTagger[V, T, LiteralExpr[V1,ID]]
 
-  implicit def VariableTagger[V <: UntypedVariable, T]: Tagger[V, T, V, TypedVariable[T]] =
+  implicit def VariableTagger[V, T]: Tagger[UntypedVariable[V],T,UntypedVariable[V],TypedVariable[T]] =
     Tagger.instance { v1 => v1.tag[T] }
 
   /** Special tager for inner infinite mappings - dont attempt to tag the key */

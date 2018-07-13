@@ -6,30 +6,79 @@ package slender
 
 import org.apache.spark.rdd.RDD
 import shapeless._
+import shapeless.syntax.SingletonOps
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.{Type, TypeTag, typeTag}
+import scala.reflect.runtime.universe.{Type, TypeTag, WeakTypeTag, typeTag}
 
-case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr(1))
+case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr.One)
 case class KeyRingPair[K:Expr, R:Expr](k: K, r: R)
 
 case class ExprOps[E:Expr](e: E) {
+
+  def hlistEval[R,Repr](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr]): Repr =
+    evaluator(resolve(e),Map.empty)
 
   def eval[R,Repr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr], tupler: DeepTupler[Repr,T]): T =
     tupler(evaluator(resolve(e),Map.empty))
   def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
 
-  def shreddedEval[T,C](implicit eval: ShreddedEval[E,T,C]): (T,C) =
-    eval(e,Map.empty)
+  def shreddedEval[T,R,C <: HList](implicit shredResolve: ShreddedResolver[E,R], eval: ShreddedEval[R,T,C]): ShreddedResult[T,C] =
+    eval(shredResolve(e),Map.empty)
+
+  def shreddedResolve[R](implicit shredResolve: ShreddedResolver[E,R]): R = shredResolve(e)
 
   def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
-//  def shred[Shredded:Expr](implicit shredder: Shredder[E,Shredded]): Shredded = shredder(e)
-//  def shreddable[Shredded:Expr](implicit canShred: Perhaps[Shredder[E,Shredded]]) = canShred.value.isDefined
   def isEvaluable[T](implicit canEval: Perhaps[Eval[E,_]]) = canEval.value.isDefined
   def isResolvable[T](implicit canResolve: Perhaps[Resolver[E,_]]): Boolean = canResolve.value.isDefined
 
-  def ===[K1:Expr](k1: K1) = EqualsPredicate(e, k1)
-  def =!=[K1:Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
+  def report[R,T](name: String)(implicit resolve: Resolver[E,R], eval: Eval[R,RDD[T]], tag: WeakTypeTag[RDD[T]]): Unit = {
+    val result = eval(resolve(e),Map.empty)
+    val resultType = prettyType(result)
+    val resultString = result.dataToString
+    val rep = s"""
+Query: $name
+Output type: $resultType
+Output sample:
+
+$resultString
+
+      """
+    println(rep)
+  }
+
+  def shreddedReport[R,T,RS,TS,C <: HList](name: String)
+                               (implicit resolve: Resolver[E,R], eval: Eval[R,RDD[T]], tag: WeakTypeTag[RDD[T]],
+                                shreddedResolve: ShreddedResolver[E,RS],
+                                shreddedEval: ShreddedEval[RS,RDD[TS],C],
+                                tag2: WeakTypeTag[RDD[TS]],
+                                tag3: WeakTypeTag[C]): Unit = {
+    val result = eval(resolve(e),Map.empty)
+    val resultType = prettyType(result)
+    val resultString = result.dataToString
+
+    val shreddedResult = shreddedEval(shreddedResolve(e),Map.empty)
+    val flatResultType = prettyType(shreddedResult.flat)
+    val flatSample = shreddedResult.flat.dataToString
+    val ctxType = prettyType(shreddedResult.ctx)
+    val rep = s"""
+Query: $name
+Output type: $resultType
+Output sample:
+
+$resultString
+
+Shredded output type: $flatResultType
+Shredded context type: $ctxType
+Shredded output sample:
+
+$flatSample
+
+      """
+    println(rep)
+  }
+
+//  def ===[K1:Expr](k1: K1) = EqualsPredicate(e, k1)
+//  def =!=[K1:Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
 //  def >[K1:Expr](k1: K1) = Predicate(e, k1, _ > _, ">")
 //  def <[K1:Expr](k1: K1) = Predicate(e, k1, _ < _, "<")
   def -->[R:Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
@@ -44,7 +93,7 @@ case class ExprOps[E:Expr](e: E) {
   def &&[R1:Expr](expr1: R1) = this.*[R1](expr1)
   def ||[R1:Expr](expr1: R1) = this.+[R1](expr1)
 
-  def <--[R:Expr](r: R): VariableRingPredicate[E,R,LiteralExpr[Int]] = VariableRingPredicate(e,r)
+  def <--[R:Expr](r: R) = VariableRingPredicate(e,r)
   def ==>[R:Expr](r: R): InfiniteMappingExpr[E,R] = InfiniteMappingExpr(e,r)
 }
 
@@ -103,16 +152,26 @@ trait MakeKeyRingPair[X,K,R] extends (X => KeyRingPair[K,R])
 
 object MakeKeyRingPair {
 
+  def instance[X,K:Expr,R:Expr](f: X => KeyRingPair[K,R]): MakeKeyRingPair[X,K,R] = new MakeKeyRingPair[X,K,R] {
+    def apply(v1: X): KeyRingPair[K,R] = f(v1)
+  }
+
   implicit def IdMakeKeyRingPair[K:Expr,R:Expr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
     new MakeKeyRingPair[KeyRingPair[K,R],K,R] { def apply(v1: KeyRingPair[K,R]): KeyRingPair[K,R] = v1 }
 
-  implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
-    new MakeKeyRingPair[X,K,LiteralExpr[Int]] {
-      def apply(v1: X): KeyRingPair[K,LiteralExpr[Int]] = KeyRingPair(make(v1),LiteralExpr(1))
-    }
+//  implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
+  ////    new MakeKeyRingPair[X,K,LiteralExpr[Int]] {
+  ////      def apply(v1: X): KeyRingPair[K,LiteralExpr[Int]] = KeyRingPair(make(v1),LiteralExpr(1))
+  ////    }
+
+  implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]) = instance {
+    v1: X => KeyRingPair(make(v1),LiteralExpr.One)
+  }
 }
 
 trait Syntax {
+
+  val __ = UnusedVariable()
 
   implicit def toExprOps[X,E](x: X)(implicit make: MakeExpr[X,E], expr: Expr[E]): ExprOps[E] = ExprOps(make(x))
 
@@ -120,10 +179,17 @@ trait Syntax {
 
   def Sng[K:Expr, R:Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
-  def Sng[T,K](t: T)(implicit make: MakeExpr[T, K], expr: Expr[K]): SngExpr[K, LiteralExpr[Int]] =
-    SngExpr(make(t), LiteralExpr(1))
+  def Sng[T,K](t: T)(implicit make: MakeExpr[T, K], expr: Expr[K]) = SngExpr(make(t), LiteralExpr.One)
 
   def Group[T,R](t: T)(implicit make: MakeExpr[T,R], expr: Expr[R]): GroupExpr[R] = GroupExpr(make(t))
+
+  def Lift[T,U](f: T => U) = ApplyExpr.Factory(f)
+
+  implicit def function1ToTransformKeyExprFactory[T,U](f: T => U): ApplyExpr.Factory[T,U] =
+    ApplyExpr.Factory(f)
+
+  implicit def function2ToTransformKeyExprFactory2[T1,T2,U](f: (T1,T2) => U): ApplyExpr.Factory2[T1,T2,U] =
+    ApplyExpr.Factory2(f)
 
   object For {
     def apply[V:Expr, R:Expr, P:Expr](vrp: VariableRingPredicate[V,R,P]):
@@ -134,21 +200,18 @@ trait Syntax {
     def If[P2:Expr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
   }
 
-  object Bag {
-    def apply[T,U](rdd: RDD[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U,Int)]] =
-      LiteralExpr(rdd.map(t => (gen.to(t),1)))
-    def apply[T,U](set: Set[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[Map[U,Int]] =
-      LiteralExpr(set.toSeq.map(t => (gen.to(t),1)).toMap)
-  }
+  def Var(a: SingletonOps): UntypedVariable[a.T] = new UntypedVariable[a.T] { val name = a.narrow }
 
-  object Collection {
-    def apply[T,U:ClassTag](rdd: RDD[T])(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[U]] =
-      LiteralExpr(rdd.map(t => gen.to(t)))
-    def apply[K,V,K1:ClassTag,V1:ClassTag](map: Map[K,V])(implicit gen: DeepGeneric.Aux[(K,V),(K1,V1)]): LiteralExpr[Map[K1,V1]] =
-      LiteralExpr(map.map(gen.to))
-  }
+  def Vars(a1: SingletonOps, a2: SingletonOps): (UntypedVariable[a1.T],UntypedVariable[a2.T]) =
+    (new UntypedVariable[a1.T] { val name = a1.narrow },new UntypedVariable[a2.T] { val name = a2.narrow })
 
+  def Vars(a1: SingletonOps, a2: SingletonOps, a3: SingletonOps): (UntypedVariable[a1.T],UntypedVariable[a2.T],UntypedVariable[a3.T]) =
+    (new UntypedVariable[a1.T] { val name = a1.narrow },
+      new UntypedVariable[a2.T] { val name = a2.narrow },
+      new UntypedVariable[a3.T] { val name = a3.narrow }
+    )
 }
+
 
 //case class NestedForComprehensionBuilder[
 //V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
