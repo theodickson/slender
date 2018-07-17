@@ -3,3 +3,4 @@ target/*
 metastore_db/*
 project/*
 derby.log
+_checkpoint/*
