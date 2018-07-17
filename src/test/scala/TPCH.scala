@@ -4,6 +4,7 @@ import java.sql.Timestamp
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession) {
 
@@ -66,4 +67,18 @@ class TpchLocal(sampleName: String = "10_customers")(implicit spark: SparkSessio
   lazy val nation = toLocalCollection(rdds.nation)
   lazy val region = toLocalCollection(rdds.region)
 
+}
+
+class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: SparkSession, ssc: StreamingContext) {
+
+  private val rdds = new TpchRdds(sampleName)
+
+  lazy val customer = rddToDStream(rdds.customer, n, rep)
+  lazy val orders = rddToDStream(rdds.orders, n, rep)
+  lazy val lineitem = rddToDStream(rdds.lineitem, n, rep)
+  lazy val part = rddToDStream(rdds.part, n, rep)
+  lazy val partSupp = rddToDStream(rdds.partSupp, n, rep)
+  lazy val supplier = rddToDStream(rdds.supplier, n, rep)
+  lazy val nation = rddToDStream(rdds.nation, n, rep)
+  lazy val region = rddToDStream(rdds.region, n, rep)
 }

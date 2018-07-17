@@ -125,6 +125,8 @@ object MakeExpr extends Priority1MakeExprImplicits {
     def apply(v1: X): E = f(v1)
   }
 
+  implicit def intMakeExpr: MakeExpr[Int,LiteralExpr[Int,Int]] = instance { i => LiteralExpr(i,i) }
+
   implicit def hconsMakeExpr[H, HE, T <: HList, TE <: HList](implicit makeH: MakeExpr[H,HE], makeT: MakeExpr[T,TE]):
   MakeExpr[H::T,HE::TE] = new MakeExpr[H::T,HE::TE] {
     def apply(v1: H::T) = v1 match {
@@ -159,10 +161,6 @@ object MakeKeyRingPair {
   implicit def IdMakeKeyRingPair[K:Expr,R:Expr]: MakeKeyRingPair[KeyRingPair[K,R],K,R] =
     new MakeKeyRingPair[KeyRingPair[K,R],K,R] { def apply(v1: KeyRingPair[K,R]): KeyRingPair[K,R] = v1 }
 
-//  implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]): MakeKeyRingPair[X,K,LiteralExpr[Int]] =
-  ////    new MakeKeyRingPair[X,K,LiteralExpr[Int]] {
-  ////      def apply(v1: X): KeyRingPair[K,LiteralExpr[Int]] = KeyRingPair(make(v1),LiteralExpr(1))
-  ////    }
 
   implicit def ImplicitOne[X,K](implicit make: MakeExpr[X,K], expr: Expr[K]) = instance {
     v1: X => KeyRingPair(make(v1),LiteralExpr.One)

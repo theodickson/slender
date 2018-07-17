@@ -1,5 +1,8 @@
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.DStream
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -50,6 +53,21 @@ package object slender extends types with Serializable {
     //      } else false
     //    }
   }
+
+  def rddToDStream[T:ClassTag](rdd: RDD[T], n: Int = 5, rep: Int = 1)(implicit ssc: StreamingContext): DStream[T] = {
+    val rddWithIds: RDD[(T,Long)] = rdd.zipWithUniqueId
+    val queue = new mutable.Queue[RDD[T]]
+    (0 until rep).foreach { _ =>
+      (0 until n).map(i => rddWithIds.filter(_._2 % n == i)).foreach { r => queue.enqueue(r.map(_._1)) }
+    }
+    ssc.queueStream(queue,true)
+  }
+
+//  case class Counter() extends Serializable {
+//    var i = 0
+//    def inc: Unit = i += 1
+//  }
+
 
 
 }

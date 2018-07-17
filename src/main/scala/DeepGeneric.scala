@@ -1,6 +1,7 @@
 package slender
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.dstream.DStream
 import shapeless._
 import shapeless.ops.hlist.Tupler
 
@@ -71,6 +72,12 @@ object DeepTupler extends LowPriorityDeepTuplerImplicits {
   (implicit kTupler: DeepTupler[K,KT], vTupler: DeepTupler[V,VT]): DeepTupler[RDD[(K,V)],RDD[(KT,VT)]] =
     new DeepTupler[RDD[(K,V)],RDD[(KT,VT)]] {
       def apply(v1: RDD[(K,V)]): RDD[(KT,VT)] = v1.map { case (k,v) => (kTupler(k),vTupler(v)) }
+    }
+
+  implicit def pairDstreamDeepTupler[K,V,KT,VT]
+  (implicit kTupler: DeepTupler[K,KT], vTupler: DeepTupler[V,VT]): DeepTupler[DStream[(K,V)],DStream[(KT,VT)]] =
+    new DeepTupler[DStream[(K,V)],DStream[(KT,VT)]] {
+      def apply(v1: DStream[(K,V)]): DStream[(KT,VT)] = v1.map { case (k,v) => (kTupler(k),vTupler(v)) }
     }
 
   implicit def mapDeepTupler[K,V,KT,VT]

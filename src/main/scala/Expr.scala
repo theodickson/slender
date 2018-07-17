@@ -5,6 +5,7 @@
 package slender
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.dstream.DStream
 import shapeless.syntax.SingletonOps
 import shapeless.syntax.singleton._
 import shapeless.{::, HList, HNil}
@@ -28,6 +29,9 @@ object Bag {
 
   def apply[T,U,ID](value: RDD[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], ID] =
     LiteralExpr[RDD[(U,Int)],ID](value.map(t => (gen.to(t),1)), id)
+
+  def apply[T,U,ID](value: DStream[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[IncDStream.Aux[(U, Int)], ID] =
+    LiteralExpr[IncDStream.Aux[(U,Int)],ID](IncDStream(value.map(t => (gen.to(t),1))), id)
 
 //  def apply[T,U](value: RDD[T], id: SingletonOps)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], id.T] =
 //    LiteralExpr[RDD[(U,Int)],id.T](value.map(t => (gen.to(t),1)), id.narrow)

@@ -13,6 +13,10 @@ object Tagger extends Priority2TaggingImplicits {
     def apply(v1: In): Out = f(v1)
   }
   def nonTagger[V,T,E]: Tagger[V,T,E,E] = instance { v1 => v1 }
+
+  //Never try to get a tagger for an unused variable.
+  implicit def UnusedTagger2[V, T]: Tagger[UnusedVariable, T, V, V] =
+    Tagger.nonTagger[UnusedVariable, T, V]
 }
 
 trait Priority0TaggingImplicits {
@@ -90,10 +94,6 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   //Never try to tag unused variables.
   implicit def UnusedTagger1[V, T]: Tagger[V, T, UnusedVariable, UnusedVariable] =
     Tagger.nonTagger[V, T, UnusedVariable]
-
-  //Never try to get a tagger for an unused variable.
-  implicit def UnusedTagger2[V, T]: Tagger[UnusedVariable, T, V, V] =
-    Tagger.nonTagger[UnusedVariable, T, V]
 
   /** Binding base cases - primitive expressions don't need to tag anything, variables tag iff they are untyped variables
     * matching the type in the tager. (otherwise they use the low priority non-taging case)
