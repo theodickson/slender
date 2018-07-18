@@ -11,6 +11,7 @@ import shapeless.syntax.singleton._
 import shapeless.{::, HList, HNil}
 
 import scala.language.experimental.macros
+import scala.reflect.ClassTag
 
 /**Typeclass witnessing that E is an expression*/
 trait Expr[E]
@@ -30,7 +31,7 @@ object Bag {
   def apply[T,U,ID](value: RDD[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], ID] =
     LiteralExpr[RDD[(U,Int)],ID](value.map(t => (gen.to(t),1)), id)
 
-  def apply[T,U,ID](value: DStream[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[IncDStream.Aux[(U, Int)], ID] =
+  def apply[T,U:ClassTag,ID](value: DStream[T], id: ID)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[IncDStream.Aux[(U, Int)], ID] =
     LiteralExpr[IncDStream.Aux[(U,Int)],ID](IncDStream(value.map(t => (gen.to(t),1))), id)
 
 //  def apply[T,U](value: RDD[T], id: SingletonOps)(implicit gen: DeepGeneric.Aux[T,U]): LiteralExpr[RDD[(U, Int)], id.T] =

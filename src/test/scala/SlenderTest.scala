@@ -57,4 +57,6 @@ trait SlenderSparkStreamingTest extends SlenderSparkTest {
   val N = 5
   implicit val ssc = new StreamingContext(sc, Seconds(1))
   ssc.checkpoint("_checkpoint")
+
+
 }

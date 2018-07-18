@@ -41,17 +41,31 @@ package object slender extends types with Serializable {
 
   implicit class RddTestImplicits[T](rdd: RDD[T]) {
 
-    //    implicit def unsafeMapOrdering[K,V]: Ordering[Map[K,V]] = new Ordering[Map[K,V]] {
-    //      def compare(x: Map[K,V], y: Map[K,V]): Int = ???
-    //    }
     def dataToString: String = rdd.take(10).map(_.toString).mkString("\n")
     def printData: Unit = print(dataToString)
-    //    def ~=(other: RDD[(K,V)])(implicit ord: Ordering[K]): Boolean = {
-    //      val c1 = rdd.count; val c2 = other.count
-    //      if (c1 == c2) {
-    //        rdd.sortByKey(ascending=true).zip(other.sortByKey(ascending=true)).map { case (x,y) => x == y } reduce (_ && _)
-    //      } else false
-    //    }
+
+  }
+
+  implicit class DStreamTestImplicits[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)])(implicit ring: Ring[V]) extends Serializable {
+    def equalsRdd(rdd: RDD[(K,V)]): DStream[Boolean] = {
+//      val rddReduced = rdd.reduceByKey(ring.add).cache
+      dstream.transform[Boolean] { rdd1: RDD[(K,V)] =>
+        //val reduced = r.reduceByKey(ring.add)
+        rdd.reduceByKey(ring.add).fullOuterJoin(rdd1.reduceByKey(ring.add))
+          .map { case (_,(r1Opt,r2Opt)) => ((),r1Opt.fold(false)(r1 => r2Opt.fold(false)(r2 => ring.equiv(r1,r2))))}
+          .reduceByKey(_ && _).map(_._2)
+      }
+    }
+  }
+
+  def dstreamEqualsRdd[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)], rdd: RDD[(K,V)])(implicit ring: Ring[V]): DStream[Boolean] = {
+    val rddReduced = rdd.reduceByKey(ring.add).cache
+    dstream.transform[Boolean] { rdd1: RDD[(K,V)] =>
+      //val reduced = r.reduceByKey(ring.add)
+      rddReduced.fullOuterJoin(rdd1.reduceByKey(ring.add))
+        .map { case (_,(r1Opt,r2Opt)) => ((),r1Opt.fold(false)(r1 => r2Opt.fold(false)(r2 => ring.equiv(r1,r2))))}
+        .reduceByKey(_ && _).map(_._2)
+    }
   }
 
   def rddToDStream[T:ClassTag](rdd: RDD[T], n: Int = 5, rep: Int = 1)(implicit ssc: StreamingContext): DStream[T] = {

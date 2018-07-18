@@ -17,6 +17,7 @@ trait Ring[R] extends Serializable {
   def add(x1: R, x2: R): R
   def not(x1: R): R
   def negate(x1: R): R
+  def equiv(x1: R, x2: R): Boolean
 }
 
 /**Trait witnessing that C is a collection type with key of type K and value of type V*/
@@ -47,6 +48,7 @@ object Ring {
     def add(t1: Boolean, t2: Boolean): Boolean = t1 || t2
     def not(t1: Boolean): Boolean = !t1
     def negate(t1: Boolean): Boolean = !t1
+    def equiv(t1: Boolean, t2: Boolean) = t1 == t2
   }
 
   implicit def NumericRing[N](implicit num: Numeric[N]): Ring[N] = new Ring[N] {
@@ -55,6 +57,7 @@ object Ring {
     def add(t1: N, t2: N): N = num.plus(t1,t2)
     def not(t1: N): N = if (t1 == zero) one else zero
     def negate(t1: N): N = num.negate(t1)
+    def equiv(t1: N, t2: N): Boolean = num.equiv(t1, t2)
   }
 
   implicit def ProductRing[H,T <: HList](implicit rH: Ring[H], rT: Ring[T]): Ring[H :: T] =
@@ -63,6 +66,7 @@ object Ring {
       def add(t1: H::T, t2: H::T): H::T = rH.add(t1.head, t2.head) :: rT.add(t1.tail,t2.tail)
       def not(t1: H::T): H::T = rH.not(t1.head) :: rT.not(t1.tail)
       def negate(t1: H::T): H::T = rH.negate(t1.head) :: rT.negate(t1.tail)
+      def equiv(t1: H::T, t2: H::T): Boolean = rH.equiv(t1.head, t2.head) && rT.equiv(t1.tail, t2.tail)
     }
 
   implicit def RDDCollection[K:ClassTag, R:ClassTag](implicit ring: Ring[R]): Ring[RDD[(K,R)]] =
@@ -72,6 +76,19 @@ object Ring {
         x1.union(x2)//.groupByKey.mapValues(_.reduce(ring.add))
       def not(x1: RDD[(K,R)]) = x1.mapValues(ring.not)
       def negate(x1: RDD[(K,R)]) = x1.mapValues(ring.negate)
+      def equiv(x1: RDD[(K,R)], x2: RDD[(K,R)]): Boolean = {
+        //aggregate both to be pure collections:
+        val reduced1 = x1.reduceByKey(ring.add)
+        val reduced2 = x2.reduceByKey(ring.add)
+        //do a full outer join, so there is one row per unique key in either collection:
+        reduced1.fullOuterJoin(reduced2)
+          .map { case (_,(r1Opt,r2Opt)) =>
+            //each key is equal in both collections if:
+            //neither entry is None in the full outer join
+            //and if neither is None, the contained values are equivalent.
+            r1Opt.fold(false)(r1 => r2Opt.fold(false)(r2 => ring.equiv(r1,r2)))
+          }.reduce(_ && _)
+      }
 //      def filter(c: RDD[(K,R)], f: (K,R) => Boolean): RDD[(K,R)] = c.filter { case (k, v) => f(k, v) }
     }
 
@@ -81,6 +98,7 @@ object Ring {
     def add(x1: RDD[R], x2: RDD[R]) = x1.union(x2)
     def not(x1: RDD[R]) = x1.map(ring.not)
     def negate(x1: RDD[R]) = x1.map(ring.negate)
+    def equiv(x1: RDD[R], x2: RDD[R]): Boolean = ring.equiv(x1.reduce(ring.add), x1.reduce(ring.add))
   }
 
   //A single ring value distributed over a DStream
@@ -124,6 +142,15 @@ object Ring {
         t1 ++ t2.map { case (k, v) => k -> ring.add(v, t1.getOrElse(k, ring.zero)) }
       def not(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.not(v)) }
       def negate(t1: Map[K,R]): Map[K, R] = t1.map { case (k,v) => (k,ring.negate(v)) }
+      def equiv(t1: Map[K,R], t2: Map[K,R]): Boolean = {
+        //if they are the same size
+        if (t1.size == t2.size) {
+          //return whether all of the keys in t1 exist in t2 and have the same value there
+          t1.forall { case (k,r1) =>
+            t2.get(k).map(r2 => ring.equiv(r1, r2)).fold(false)(identity)
+          }
+        } else false
+      }
 //      def filter(c: Map[K, R], f: (K, R) => Boolean): Map[K, R] = c.filter { case (k, v) => f(k, v) }
     }
 }
@@ -455,8 +482,52 @@ object Group {
       }
     }
 
-  //todo - DStreamGroup - obviously not possible to do efficiently but is there some sort of hack that can be done here?
-  //to make testing against the recomputed version more elegant?
+  //In order to group a dstream, we must produce the cumulative version first and group this.
+  implicit def DStreamGroup2[DS <: SDStream[DS],K1:ClassTag,K2:ClassTag,R]
+  (implicit ring: Ring[R], acc: Accumulate[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::K2::HNil,R)]]):
+    Group[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::Map[K2,R]::HNil,Boolean)]] =
+    new Group[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::Map[K2,R]::HNil,Boolean)]] {
+
+      def iterableToMap(x: Iterable[(K2,R)]): Map[K2,R] = x.foldRight(Map.empty[K2,R]) {
+        case ((k2,r),mp) => {
+          val prevValue = mp.getOrElse[R](k2,ring.zero)
+          val newValue = ring.add(prevValue,r)
+          mp + ((k2,newValue))
+        }
+      }
+
+      def apply(v1: SDStream.Aux[DS,(K1::K2::HNil,R)]): AggDStream.Aux[(K1::Map[K2,R]::HNil,Boolean)] = {
+        val accumulated = acc(v1) //first get the cumulative version of the input (this may be no change if the input is already cumulative)
+        accumulated.map { ds =>
+          val grouped = ds.transform(_.groupBy(_._1.head).mapValues(_.map { case (_::k2::HNil,v) => (k2,v) }).mapValues(iterableToMap))
+          grouped.map[(K1::Map[K2,R]::HNil,Boolean)] { case (k1,k2s) => (k1::k2s::HNil,true) }
+        }
+      }
+    }
+
+  //In order to group a dstream, we must produce the cumulative version first and group this.
+  implicit def DStreamGroup3[DS <: SDStream[DS],K1:ClassTag,K2:ClassTag,K3:ClassTag,R]
+  (implicit ring: Ring[R], acc: Accumulate[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::K2::K3::HNil,R)]]):
+  Group[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] =
+    new Group[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] {
+
+      def iterableToMap(x: Iterable[(K2::K3::HNil,R)]): Map[K2::K3::HNil,R] = x.foldRight(Map.empty[K2::K3::HNil,R]) {
+        case ((k2k3,r),mp) => {
+          val prevValue = mp.getOrElse[R](k2k3,ring.zero)
+          val newValue = ring.add(prevValue,r)
+          mp + ((k2k3,newValue))
+        }
+      }
+
+      def apply(v1: SDStream.Aux[DS,(K1::K2::K3::HNil,R)]): AggDStream.Aux[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)] = {
+        val accumulated = acc(v1) //first get the cumulative version of the input (this may be no change if the input is already cumulative)
+        accumulated.map { ds =>
+          val grouped = ds.transform(_.groupBy(_._1.head).mapValues(_.map { case (_::k2::k3::HNil,v) => (k2::k3::HNil,v) }).mapValues(iterableToMap))
+          grouped.map[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)] { case (k1,k2s) => (k1::k2s::HNil,true) }
+        }
+      }
+    }
+
 }
 
 

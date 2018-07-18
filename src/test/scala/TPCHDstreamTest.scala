@@ -42,37 +42,69 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
 
 
   object Q1 {
-    val (orderKey0,partName0) = Vars("X1","X2")
-    val (partNames0,custKey0,orderDate0) = Vars("Y1","Y2","Y3")
-    val (orderDate1,partNames1,custName0) = Vars("Z1","Z2","Z3")
+    /**Q1 with ONLY lineitem streamed*/
+    def apply[V,ID](lineitem: LiteralExpr[V,ID]) = {
+      val (orderKey0, partName0) = Vars("X1", "X2")
+      val (partNames0, custKey0, orderDate0) = Vars("Y1", "Y2", "Y3")
+      val (orderDate1, partNames1, custName0) = Vars("Z1", "Z2", "Z3")
 
-    //Drop the suppkeys to get a Bag[(partkey,orderkey)]
-    val partOrders = For ((l_orderkey,l_partkey,__) <-- lineitemStreamed) Yield (l_partkey,l_orderkey)
+      //Drop the suppkeys to get a Bag[(partkey,orderkey)]
+      val partOrders = For((l_orderkey, l_partkey, __) <-- lineitem) Yield(l_partkey, l_orderkey)
 
-    //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
-    //a Bag[(orderKey,Bag[partName])]
-    val orderPartNames = Group(
-      For ((__,orderKey0,partName0) <-- partOrders.join(part)) Yield (orderKey0,partName0)
-    )
-    //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
-    val customerOrders =
-      For ((__,partNames0,custKey0,orderDate0) <-- orderPartNames.join(orders)) Yield (custKey0,orderDate0,partNames0)
+      //join with part to get a Bag[(partkey,(orderKey,partName))], drop the partkeys and group to get
+      //a Bag[(orderKey,Bag[partName])]
+      val orderPartNames = Group(
+        For((__, orderKey0, partName0) <-- partOrders.join(part)) Yield(orderKey0, partName0)
+      )
+      //join with orders and reshape to get a Bag[(custKey,orderDate,Bag[partName])]
+      val customerOrders =
+        For((__, partNames0, custKey0, orderDate0) <-- orderPartNames.join(orders)) Yield(custKey0, orderDate0, partNames0)
 
-    //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
-    val customerNameOrders =
-      For ((__,orderDate1,partNames1,custName0,__) <-- customerOrders.join(customer)) Yield
-        (custName0,orderDate1,partNames1)
+      //join with customers and reshape to get a Bag[(custName,orderDate,Bag[partName])]
+      val customerNameOrders =
+        For((__, orderDate1, partNames1, custName0, __) <-- customerOrders.join(customer)) Yield
+          (custName0, orderDate1, partNames1)
 
-    //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
-    val query = Group(customerNameOrders)
+      //finally group to get a Bag[(custName,Bag[(orderDate,Bag[partName])])]
+      val query = Group(customerNameOrders)
+      query
+    }
   }
 
   test("Q1") {
-    import Q1._
-    val query = For ((__,orderKey0,partName0) <-- partOrders.join(part)) Yield (orderKey0,partName0)
-    val distResult = query.eval
-    //distResult.dstream.prin
-    distResult.dstream.print
+    val static = Q1(lineitem)
+    val streamed = Q1(lineitemStreamed)
+    val staticResult = static.eval
+    val streamedResult = streamed.eval
+    staticResult.printData
+    streamedResult.print
+    dstreamEqualsRdd(streamedResult.dstream, staticResult).print
+//    streamed.eval.print
+//    streamed.foreachRdd
+    ssc.start
+    ssc.awaitTermination()
+    ssc.stop(true)
+  }
+
+  test("Q1-shredded-inc") {
+    val query = Q1(lineitemStreamed)
+    val ShreddedResult(flat,ctx) = query.shreddedEval
+    //flat.printType; ctx.printType
+    flat.print
+    ctx.head.print
+    ctx.tail.head.print
+    ssc.start
+    ssc.awaitTermination()
+    ssc.stop(true)
+  }
+
+  test("Q1-shredded-acc") {
+    val query = Q1(lineitemStreamed)
+    val ShreddedResult(flat,ctx) = query.shreddedEval
+    //flat.printType; ctx.printType
+    flat.acc.print
+    ctx.head.acc.print
+    ctx.tail.head.acc.print
     ssc.start
     ssc.awaitTermination()
     ssc.stop(true)

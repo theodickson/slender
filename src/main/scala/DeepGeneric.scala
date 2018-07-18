@@ -74,10 +74,11 @@ object DeepTupler extends LowPriorityDeepTuplerImplicits {
       def apply(v1: RDD[(K,V)]): RDD[(KT,VT)] = v1.map { case (k,v) => (kTupler(k),vTupler(v)) }
     }
 
-  implicit def pairDstreamDeepTupler[K,V,KT,VT]
-  (implicit kTupler: DeepTupler[K,KT], vTupler: DeepTupler[V,VT]): DeepTupler[DStream[(K,V)],DStream[(KT,VT)]] =
-    new DeepTupler[DStream[(K,V)],DStream[(KT,VT)]] {
-      def apply(v1: DStream[(K,V)]): DStream[(KT,VT)] = v1.map { case (k,v) => (kTupler(k),vTupler(v)) }
+  implicit def pairDstreamDeepTupler[DS <: SDStream[DS],K,V,KT,VT]
+  (implicit kTupler: DeepTupler[K,KT], vTupler: DeepTupler[V,VT]): DeepTupler[SDStream.Aux[DS,(K,V)],SDStream.Aux[DS,(KT,VT)]] =
+    new DeepTupler[SDStream.Aux[DS,(K,V)],SDStream.Aux[DS,(KT,VT)]] {
+      def apply(v1: SDStream.Aux[DS,(K,V)]): SDStream.Aux[DS,(KT,VT)] =
+        v1.map(_.map { case (k,v) => (kTupler(k),vTupler(v)) })
     }
 
   implicit def mapDeepTupler[K,V,KT,VT]

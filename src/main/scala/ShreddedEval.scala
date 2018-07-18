@@ -42,6 +42,28 @@ object GroupLabeller {
         (flat,dict)
       }
     }
+
+  implicit def dstream2[K1:ClassTag,K2:ClassTag,R,Expr]:
+  GroupLabeller[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] =
+    new GroupLabeller[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] {
+      def apply(v1: IncDStream.Aux[(K1::K2::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])]) = {
+
+        val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
+        val dict = v1.map(_.map { case (k1::k2::HNil,r) => (Label[Expr,K1](k1),Map(k2 -> r))})
+        (flat,dict)
+      }
+    }
+
+  implicit def dstream3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr]:
+  GroupLabeller[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
+    new GroupLabeller[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
+      def apply(v1: IncDStream.Aux[(K1::K2::K3::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
+
+        val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
+        val dict = v1.map(_.map { case (k1::k2::k3::HNil,r) => (Label[Expr,K1](k1),Map((k2::k3::HNil) -> r))})
+        (flat,dict)
+      }
+    }
 }
 
 
