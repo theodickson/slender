@@ -73,12 +73,12 @@ class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: Spa
 
   private val rdds = new TpchRdds(sampleName)
 
-  lazy val customer = rddToDStream(rdds.customer, n, rep)
-  lazy val orders = rddToDStream(rdds.orders, n, rep)
-  lazy val lineitem = rddToDStream(rdds.lineitem, n, rep)
-  lazy val part = rddToDStream(rdds.part, n, rep)
-  lazy val partSupp = rddToDStream(rdds.partSupp, n, rep)
-  lazy val supplier = rddToDStream(rdds.supplier, n, rep)
-  lazy val nation = rddToDStream(rdds.nation, n, rep)
-  lazy val region = rddToDStream(rdds.region, n, rep)
+  lazy val customer = rddToDStream2(rdds.customer, n)
+  lazy val orders = rddToDStream2(rdds.orders, n)
+  lazy val lineitem = rddToDStream2(rdds.lineitem, n)
+  lazy val part = rddToDStream2(rdds.part, n)
+  lazy val partSupp = rddToDStream2(rdds.partSupp, n)
+  lazy val supplier = rddToDStream2(rdds.supplier, n)
+  lazy val nation = rddToDStream2(rdds.nation, n)
+  lazy val region = rddToDStream2(rdds.region, n)
 }

@@ -2,12 +2,12 @@ package slender
 
 import shapeless.{::, HList, HNil}
 
-trait Eval[-E,+T] extends ((E,BoundVars) => T) with Serializable
+trait Eval[-E,+T] extends ((E,Namespace) => T) with Serializable
 
 object Eval {
 
-  def instance[E,T](f: (E,BoundVars) => T): Eval[E,T] = new Eval[E,T] {
-    def apply(v1: E, v2: BoundVars): T = f(v1,v2)
+  def instance[E,T](f: (E,Namespace) => T): Eval[E,T] = new Eval[E,T] {
+    def apply(v1: E, v2: Namespace): T = f(v1,v2)
   }
 
   implicit def VariableEval[T]: Eval[TypedVariable[T],T] = instance {
@@ -19,7 +19,7 @@ object Eval {
   implicit def LiteralEval[V,ID]: Eval[LiteralExpr[V,ID],V] = instance { (v1, _) => v1.value }
 
   implicit def InfiniteMappingEval[V,R,KT,RT]
-  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: Binder[V, KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
+  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: Binder[V,KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
     instance { case (InfiniteMappingExpr(v,r),bvs) =>
       (k: KT) => evalR(r,bvs ++ varBinder(v, k))
     }

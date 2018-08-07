@@ -29,10 +29,7 @@ case class ExprOps[E:Expr](e: E) {
 
   def shreddedEval[T,R,C <: HList](implicit shredResolve: ShreddedResolver[E,R], eval: ShreddedEval[R,T,C]): ShreddedResult[T,C] =
     eval(shredResolve(e),Map.empty)
-
-//  def accShreddedEval[T,R,C <: HList](implicit shredResolve: ShreddedResolver[E,R], eval: ShreddedEval[R,T,C]): ShreddedResult[T,C] =
-//    eval(shredResolve(e),Map.empty)
-
+  
   def shreddedResolve[R](implicit shredResolve: ShreddedResolver[E,R]): R = shredResolve(e)
 
   def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
@@ -206,15 +203,15 @@ trait Syntax {
     def If[P2:Expr](p: P2): VariableRingPredicate[V,R,P2] = VariableRingPredicate(pair.k,pair.r,p)
   }
 
-  def Var(a: SingletonOps): UntypedVariable[a.T] = new UntypedVariable[a.T] { val name = a.narrow }
+  def Var(a: SingletonOps): Variable[a.T] = new Variable[a.T] { val name = a.narrow }
 
-  def Vars(a1: SingletonOps, a2: SingletonOps): (UntypedVariable[a1.T],UntypedVariable[a2.T]) =
-    (new UntypedVariable[a1.T] { val name = a1.narrow },new UntypedVariable[a2.T] { val name = a2.narrow })
+  def Vars(a1: SingletonOps, a2: SingletonOps): (Variable[a1.T],Variable[a2.T]) =
+    (new Variable[a1.T] { val name = a1.narrow },new Variable[a2.T] { val name = a2.narrow })
 
-  def Vars(a1: SingletonOps, a2: SingletonOps, a3: SingletonOps): (UntypedVariable[a1.T],UntypedVariable[a2.T],UntypedVariable[a3.T]) =
-    (new UntypedVariable[a1.T] { val name = a1.narrow },
-      new UntypedVariable[a2.T] { val name = a2.narrow },
-      new UntypedVariable[a3.T] { val name = a3.narrow }
+  def Vars(a1: SingletonOps, a2: SingletonOps, a3: SingletonOps): (Variable[a1.T],Variable[a2.T],Variable[a3.T]) =
+    (new Variable[a1.T] { val name = a1.narrow },
+      new Variable[a2.T] { val name = a2.narrow },
+      new Variable[a3.T] { val name = a3.narrow }
     )
 }
 

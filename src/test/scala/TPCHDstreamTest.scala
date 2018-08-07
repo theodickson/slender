@@ -1,19 +1,18 @@
 package slender
 
-import java.sql.Timestamp
-
-import org.apache.spark.streaming.StreamingContext
-import shapeless._
-import shapeless.ops.hlist.Replacer
 import shapeless.syntax.singleton._
+import java.lang.System.nanoTime
+
+import org.apache.spark.streaming.Seconds
 
 class TPCHDstreamTest extends SlenderSparkStreamingTest {
 
   import dsl._
-  import spark.implicits._
-
-  val rdds = new TpchRdds("10_customers")
-  val dstreams = new TpchDstreams("10_customers", N)
+  val N = 50
+  val batchDuration = Seconds(1)
+  val sampleName = "10000_customers"
+  val rdds = new TpchRdds(sampleName)
+  val dstreams = new TpchDstreams(sampleName, N)
 
   lazy val customer = Bag(rdds.customer, "customer".narrow)
   lazy val orders = Bag(rdds.orders, "orders".narrow)
@@ -42,6 +41,7 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
 
 
   object Q1 {
+    val inputs = List(rdds.lineitem, rdds.part, rdds.orders, rdds.customer)
     /**Q1 with ONLY lineitem streamed*/
     def apply[V,ID](lineitem: LiteralExpr[V,ID]) = {
       val (orderKey0, partName0) = Vars("X1", "X2")
@@ -71,44 +71,72 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
     }
   }
 
+//  test("Q1-perf") {
+//    val query = Q1(lineitemStreamed)
+//    val stdResult = query.eval
+//    val ShreddedResult(flat,ctx) = query.shreddedEval
+//    println("Std evaluation profiling:")
+//    stdResult.dstream.profile(N, Q1.inputs)
+//    println
+//    println("Shredded evaluation profiling:")
+//    flat.dstream.profile(N, Q1.inputs)
+//  }
+
+  test("Group std") {
+    val query = Group(Group(Group(lineitemStreamed)))
+    query.eval.dstream.profile(N, List(rdds.lineitem))
+  }
+
+//  test("Group cost") {
+//    val groupByOrderKey = Group(
+//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_orderkey,l_partkey,l_suppkey)
+//    )
+//    groupByOrderKey.eval.profile("orderkey", List(rdds.lineitem))
+//
+//    val groupByPartKey = Group(
+//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_partkey,l_orderkey,l_suppkey)
+//    )
+//    groupByPartKey.eval.profile("partkey", List(rdds.lineitem))
+//
+//    val groupBySuppKey = Group(
+//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_suppkey,l_orderkey,l_partkey)
+//    )
+//    groupBySuppKey.eval.profile("suppkey", List(rdds.lineitem))
+//  }
+
+  test("Group shredded") {
+    val query = Group(Group(Group(lineitemStreamed)))
+    query.shreddedEval.flat.dstream.profile(N, List(rdds.lineitem))
+  }
+
   test("Q1") {
-    val static = Q1(lineitem)
     val streamed = Q1(lineitemStreamed)
-    val staticResult = static.eval
-    val streamedResult = streamed.eval
-    staticResult.printData
-    streamedResult.print
-    dstreamEqualsRdd(streamedResult.dstream, staticResult).print
-//    streamed.eval.print
-//    streamed.foreachRdd
-    ssc.start
-    ssc.awaitTermination()
-    ssc.stop(true)
+    streamed.eval.dstream.profile(N, Q1.inputs)
   }
 
   test("Q1-shredded-inc") {
     val query = Q1(lineitemStreamed)
     val ShreddedResult(flat,ctx) = query.shreddedEval
-    //flat.printType; ctx.printType
-    flat.print
-    ctx.head.print
-    ctx.tail.head.print
-    ssc.start
-    ssc.awaitTermination()
-    ssc.stop(true)
+    flat.dstream.profile(N, Q1.inputs)
+//    flat.print
+//    ctx.head.print
+//    ctx.tail.head.print
+//    ssc.start
+//    ssc.awaitTermination()
+//    ssc.stop(true)
   }
-
-  test("Q1-shredded-acc") {
-    val query = Q1(lineitemStreamed)
-    val ShreddedResult(flat,ctx) = query.shreddedEval
-    //flat.printType; ctx.printType
-    flat.acc.print
-    ctx.head.acc.print
-    ctx.tail.head.acc.print
-    ssc.start
-    ssc.awaitTermination()
-    ssc.stop(true)
-  }
+//
+//  test("Q1-shredded-acc") {
+//    val query = Q1(lineitemStreamed)
+//    val ShreddedResult(flat,ctx) = query.shreddedEval
+//    //flat.printType; ctx.printType
+//    flat.acc.print
+//    ctx.head.acc.print
+//    ctx.tail.head.acc.print
+//    ssc.start
+//    ssc.awaitTermination()
+//    //ssc.stop(true)
+//  }
 //  object Q2 {
 //    /**For each supplier, return the name and the names of all customers who have used them*/
 //

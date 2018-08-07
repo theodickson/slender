@@ -2,12 +2,12 @@ package slender
 
 import shapeless.{::, HList, HNil}
 
-trait Binder[V, T] extends ((V,T) => BoundVars) with Serializable
+trait Binder[V, T] extends ((V,T) => Namespace) with Serializable
 
 object Binder {
 
-  def instance[V,T](f: (V,T) => BoundVars): Binder[V,T] = new Binder[V,T] {
-    def apply(v1: V, v2: T): BoundVars = f(v1,v2)
+  def instance[V,T](f: (V,T) => Namespace): Binder[V,T] = new Binder[V,T] {
+    def apply(v1: V, v2: T): Namespace = f(v1,v2)
   }
 
   implicit def UnusedVariableBinder[T]: Binder[UnusedVariable,T] =

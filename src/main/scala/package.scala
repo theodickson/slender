@@ -5,9 +5,10 @@ import org.apache.spark.streaming.dstream.DStream
 import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import java.lang.System.currentTimeMillis
 
 trait types {
-  type BoundVars = Map[String,Any]
+  type Namespace = Map[String,Any]
 }
 
 package object slender extends types with Serializable {
@@ -33,6 +34,8 @@ package object slender extends types with Serializable {
     }
   }
 
+  implicit def SDStreamToDStream[S <: SDStream[S]](s: S): DStream[s.T] = s.dstream
+
   implicit class AnyImplicits[T](x: T) {
 
     def printType(implicit tag: WeakTypeTag[T]): Unit = println(prettyType(tag))
@@ -43,6 +46,13 @@ package object slender extends types with Serializable {
 
     def dataToString: String = rdd.take(10).map(_.toString).mkString("\n")
     def printData: Unit = print(dataToString)
+    def profile(name: String, toCache: List[RDD[_]]): Unit = {
+      toCache.foreach { r => r.cache.count }
+      val startTime = currentTimeMillis()
+      rdd.count
+      val timeTaken = currentTimeMillis - startTime
+      println(s"$name: $timeTaken")
+    }
 
   }
 
@@ -55,6 +65,31 @@ package object slender extends types with Serializable {
           .map { case (_,(r1Opt,r2Opt)) => ((),r1Opt.fold(false)(r1 => r2Opt.fold(false)(r2 => ring.equiv(r1,r2))))}
           .reduceByKey(_ && _).map(_._2)
       }
+    }
+  }
+
+  implicit class DStreamImplicits[T](dstream: DStream[T]) {
+    def profile(limit: Int = 10, toCache: List[RDD[_]])(implicit ssc: StreamingContext): Unit = {
+      toCache.foreach { rdd => rdd.cache.count }
+      var counter: Int = 0
+      var time = currentTimeMillis()
+      var done: Boolean = false
+      var totalTime: Long = 0
+      dstream.foreachRDD { rdd =>
+        if (!done) {
+          counter += 1
+          rdd.count
+          val currentTime = currentTimeMillis()
+          val interval = currentTime - time
+          totalTime += interval
+          println(s"$counter - $totalTime ($interval)")
+          time = currentTime
+          if (counter == limit) done = true
+        }
+      }
+      ssc.start()
+      while(!done) { java.lang.Thread.sleep(100) }
+      ssc.stop()
     }
   }
 
@@ -74,15 +109,19 @@ package object slender extends types with Serializable {
     (0 until rep).foreach { _ =>
       (0 until n).map(i => rddWithIds.filter(_._2 % n == i)).foreach { r => queue.enqueue(r.map(_._1)) }
     }
-    ssc.queueStream(queue,true)
+    ssc.queueStream(queue, true)
   }
 
-//  case class Counter() extends Serializable {
-//    var i = 0
-//    def inc: Unit = i += 1
-//  }
-
-
+  //same as above but first batch contains 50%, rest is evenly split between the subsequent batches.
+  def rddToDStream2[T:ClassTag](rdd: RDD[T], n: Int = 5)(implicit ssc: StreamingContext): DStream[T] = {
+    val rddWithIds: RDD[(T,Long)] = rdd.zipWithUniqueId
+    val queue = new mutable.Queue[RDD[T]]
+    val firstBatch = rddWithIds.filter(_._2 % 2 == 0).map(_._1)
+    queue.enqueue(firstBatch)
+    val N = n - 1
+    (0 until N).map(i => rddWithIds.filter(_._2 % (N*2) == (2*i)+1)).foreach { r => queue.enqueue(r.map(_._1)) }
+    ssc.queueStream(queue, true)
+  }
 
 }
 

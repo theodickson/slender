@@ -2,7 +2,7 @@ package slender
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.{Duration, Milliseconds, Seconds, StreamingContext}
 import org.scalatest.FunSuiteLike
 
 import scala.reflect.ClassTag
@@ -54,9 +54,10 @@ trait SlenderSparkTest extends SlenderTest with SparkTestImplicits {
 }
 
 trait SlenderSparkStreamingTest extends SlenderSparkTest {
-  val N = 5
-  implicit val ssc = new StreamingContext(sc, Seconds(1))
-  ssc.checkpoint("_checkpoint")
-
-
+  def batchDuration: Duration
+  implicit lazy val ssc = {
+    val out = new StreamingContext(sc,batchDuration)
+    out.checkpoint("_checkpoint")
+    out
+  }
 }

@@ -67,12 +67,12 @@ object GroupLabeller {
 }
 
 
-trait ShreddedEval[-Expr,+Flat,+Ctx <: HList] extends ((Expr,BoundVars) => ShreddedResult[Flat,Ctx]) with Serializable
+trait ShreddedEval[-Expr,+Flat,+Ctx <: HList] extends ((Expr,Namespace) => ShreddedResult[Flat,Ctx]) with Serializable
 
 object ShreddedEval {
 
-  def instance[E,T,C <: HList](f: (E,BoundVars) => ShreddedResult[T,C]): ShreddedEval[E,T,C] = new ShreddedEval[E,T,C] {
-    def apply(v1: E, v2: BoundVars): ShreddedResult[T,C] = f(v1,v2)
+  def instance[E,T,C <: HList](f: (E,Namespace) => ShreddedResult[T,C]): ShreddedEval[E,T,C] = new ShreddedEval[E,T,C] {
+    def apply(v1: E, v2: Namespace): ShreddedResult[T,C] = f(v1,v2)
   }
 
   implicit def literalShreddedEval[T,ID]: ShreddedEval[LiteralExpr[T,ID],T,HNil] = instance {

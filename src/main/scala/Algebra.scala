@@ -424,18 +424,18 @@ object Sum {
 //      v1.map(_._2).flatMap(x => x)//.reduceByKey(ring.add)
 //    }
 
-    implicit def DStreamNumericSum[DS <: SDStream[DS], K:ClassTag, N:ClassTag]
-    (implicit ring: Ring[N], numeric: Numeric[N]): Sum[SDStream.Aux[DS,(K,N)],SDStream.Aux[DS,N]] =
-      instance { _.map(_.map(_._2)) } //.reduce(ring.add)
+  implicit def DStreamNumericSum[DS <: SDStream[DS], K:ClassTag, N:ClassTag]
+  (implicit ring: Ring[N], numeric: Numeric[N]): Sum[SDStream.Aux[DS,(K,N)],SDStream.Aux[DS,N]] =
+    instance { _.map(_.map(_._2)) } //.reduce(ring.add)
 
-    implicit def DStreamBooleanSum[DS <: SDStream[DS],K:ClassTag](implicit ring: Ring[Boolean]): Sum[SDStream.Aux[DS,(K,Boolean)],SDStream.Aux[DS,Boolean]] =
-      instance { _.map(_.map(_._2)) } //.reduce(ring.add)
+  implicit def DStreamBooleanSum[DS <: SDStream[DS],K:ClassTag](implicit ring: Ring[Boolean]): Sum[SDStream.Aux[DS,(K,Boolean)],SDStream.Aux[DS,Boolean]] =
+    instance { _.map(_.map(_._2)) } //.reduce(ring.add)
 
-    implicit def DStreamMapSum[DS <: SDStream[DS], K:ClassTag, K1:ClassTag, R1:ClassTag]
-    (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[SDStream.Aux[DS,(K,Map[K1,R1])],SDStream.Aux[DS,(K1,R1)]] =
-      instance { v1 =>
-        v1.map(_.map(_._2).flatMap(x => x))//.reduceByKey(ring.add)
-      }
+  implicit def DStreamMapSum[DS <: SDStream[DS], K:ClassTag, K1:ClassTag, R1:ClassTag]
+  (implicit ring: Ring[R1], tag:ClassTag[Map[K1,R1]]): Sum[SDStream.Aux[DS,(K,Map[K1,R1])],SDStream.Aux[DS,(K1,R1)]] =
+    instance { v1 =>
+      v1.map(_.map(_._2).flatMap(x => x))//.reduceByKey(ring.add)
+    }
 }
 
 

@@ -91,14 +91,14 @@ case class UnusedVariable() extends ExprNode
 
 case class TypedVariable[T](name: String) extends ExprNode
 
-trait UntypedVariable[Name] extends ExprNode {
+trait Variable[Name] extends ExprNode {
   def name: Name
   def tag[KT]: TypedVariable[KT] = TypedVariable[KT](name.toString)
   override def toString = s"""$name:?""""
 }
 
-object UntypedVariable {
-  implicit def apply(a: SingletonOps): UntypedVariable[a.T] = new UntypedVariable[a.T] { val name = a.narrow }
+object Variable {
+  implicit def apply(a: SingletonOps): Variable[a.T] = new Variable[a.T] { val name = a.narrow }
 }
 
 object Expr {
