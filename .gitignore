@@ -4,3 +4,5 @@ metastore_db/*
 project/*
 derby.log
 _checkpoint/*
+*.log
+*.pdf
