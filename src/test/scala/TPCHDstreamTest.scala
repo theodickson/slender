@@ -3,16 +3,18 @@ package slender
 import shapeless.syntax.singleton._
 import java.lang.System.nanoTime
 
-import org.apache.spark.streaming.Seconds
+import org.apache.spark.streaming.{Milliseconds, Seconds}
 
 class TPCHDstreamTest extends SlenderSparkStreamingTest {
 
   import dsl._
-  val N = 50
-  val batchDuration = Seconds(1)
-  val sampleName = "10000_customers"
+  val N = 10
+  val batchDuration = Milliseconds(50)
+  val sampleName = "100000_customers"
+
   val rdds = new TpchRdds(sampleName)
   val dstreams = new TpchDstreams(sampleName, N)
+  val locals = new TpchLocal(sampleName)
 
   lazy val customer = Bag(rdds.customer, "customer".narrow)
   lazy val orders = Bag(rdds.orders, "orders".narrow)
@@ -38,7 +40,8 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
   val (l_orderkey,l_partkey,l_suppkey) = Vars("L1","L2","L3")
   val (p_partkey,p_name) = Vars("P1","P2")
   val (ps_partkey, ps_suppkey) = Vars("PS1","PS2")
-
+  val (n_nationkey,n_regionkey,n_name) = Vars("N1","N2","N3")
+  val (r_regionkey,r_name) = Vars("R1", "R2")
 
   object Q1 {
     val inputs = List(rdds.lineitem, rdds.part, rdds.orders, rdds.customer)
@@ -71,6 +74,65 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
     }
   }
 
+  object Q4 {
+
+    val inputs = List(rdds.orders, rdds.nation, rdds.region, rdds.customer)
+
+    val (orderKeys0,custNames1,nationCustNames) = Vars("X1", "X2","X3")
+
+    val customerOrders = Group(
+      For ((o_orderkey,o_custkey,o_orderdate) <-- ordersStreamed) Yield (o_custkey,o_orderkey)
+    )
+
+    val nationCustomers = Group(
+      For ((c_custkey,orderKeys0,c_name,c_nationkey) <-- customerOrders.join(Collect(customer))) Yield (c_nationkey,(c_name,orderKeys0))
+    )
+
+//    val regionCustomers = Group(
+//      For((n_nationkey,n_regionkey,n_name,custNames0) <-- nation.join(nationCustomers)) Yield (n_regionkey,n_name,custNames0)
+//    )
+//
+//    val query = Group(
+//      For ((r_regionkey,r_name,nationCustNames) <-- region.join(regionCustomers)) Yield (r_name,nationCustNames)
+//    )
+
+  }
+
+  object Q5 {
+    val inputs = List(rdds.nation, rdds.region, rdds.customer)
+
+    val regionNations = For ((n_nationkey,n_regionkey,n_name) <-- nation) Yield (n_regionkey,n_nationkey)
+
+    val regionNameNations = Collect(
+      For ((n_regionkey,n_nationkey,r_name) <-- regionNations.join(region)) Yield (n_nationkey,r_name)
+    )
+
+    val customerNations = For ((c_custkey,c_name,c_nationkey) <-- customerStreamed) Yield (c_nationkey,c_name)
+
+    val regionCustomers = Group(
+        For ((__,c_name,r_name) <-- customerNations.join(regionNameNations)) Yield (r_name,c_name)
+    )
+  }
+
+  test("customer-count") {
+    dstreams.customer.profile(N, List(rdds.customer))
+  }
+
+  test("collect-test") {
+    val query = Collect(customer)
+    query.eval.printType
+  }
+
+  test("region-customers") {
+    import Q5._
+    regionCustomers.eval.dstream.profile(N, inputs)
+  }
+
+  test("region-customers-shredded") {
+    import Q5._
+    regionCustomers.shreddedEval.flat.dstream.profile(N, inputs)
+  }
+
 //  test("Q1-perf") {
 //    val query = Q1(lineitemStreamed)
 //    val stdResult = query.eval
@@ -82,8 +144,19 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
 //    flat.dstream.profile(N, Q1.inputs)
 //  }
 
+  test("Q4") {
+    import Q4._
+    nationCustomers.eval.dstream.profile(N, inputs)
+  }
+
+  test("Q4-shredded") {
+    import Q4._
+    nationCustomers.shreddedEval.flat.acc.dstream.profile(N, inputs)
+  }
+
+
   test("Group std") {
-    val query = Group(Group(Group(lineitemStreamed)))
+    val query = Group(Group(Group(Group(Group(Group(lineitemStreamed))))))
     query.eval.dstream.profile(N, List(rdds.lineitem))
   }
 
@@ -105,7 +178,7 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
 //  }
 
   test("Group shredded") {
-    val query = Group(Group(Group(lineitemStreamed)))
+    val query = Group(Group(Group(Group(Group(Group(lineitemStreamed))))))
     query.shreddedEval.flat.dstream.profile(N, List(rdds.lineitem))
   }
 

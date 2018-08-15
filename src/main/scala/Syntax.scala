@@ -178,6 +178,8 @@ trait Syntax {
 
   implicit def toExprOps[X,E](x: X)(implicit make: MakeExpr[X,E], expr: Expr[E]): ExprOps[E] = ExprOps(make(x))
 
+  def Collect[E:Expr](e: E): CollectExpr[E] = CollectExpr(e)
+
   def Sum[R:Expr](r: R): SumExpr[R] = SumExpr(r)
 
   def Sng[K:Expr, R:Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)

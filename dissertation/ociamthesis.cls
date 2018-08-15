@@ -107,6 +107,7 @@
     {{\@college} \par}
 \vspace*{1ex}
     {University of Oxford \par}
+    {{\large \vspace*{1ex} Supervised by Dr Milos Nikolic} \par}
 \vspace*{25mm}
     {{\submittedtext} \par}
 \vspace*{1ex}

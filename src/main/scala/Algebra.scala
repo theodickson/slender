@@ -295,6 +295,26 @@ object Dot {
 
 object Join {
 
+  implicit def rddMapJoin[
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], Map[K::K2, R2], RDD[(K :: K12, O)]] =
+    new Join[RDD[(K::K1, R1)], Map[K::K2, R2], RDD[(K :: K12, O)]] {
+      def apply(v1: RDD[(K :: K1, R1)], v2: Map[K::K2,R2]): RDD[(K :: K12, O)] = {
+        val bmap = v2.map { case (k::k2,r2) => (k,(k2,r2)) }
+        v1.flatMap { case (k::k1,r1) => bmap.get(k).map { case (k2,r2) => (k::prepend(k1,k2),dot(r1,r2)) } }
+      }
+    }
+
+  implicit def dstreamMapJoin[
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O, DS <: SDStream[DS]
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[SDStream.Aux[DS,(K :: K1, R1)], Map[K::K2, R2], SDStream.Aux[DS,(K :: K12, O)]] =
+    new Join[SDStream.Aux[DS,(K::K1, R1)], Map[K::K2, R2], SDStream.Aux[DS,(K :: K12, O)]] {
+      def apply(v1: SDStream.Aux[DS,(K :: K1, R1)], v2: Map[K::K2,R2]): SDStream.Aux[DS,(K :: K12, O)] = {
+        val bmap = v2.map { case (k::k2,r2) => (k,(k2,r2)) }
+        v1.map(_.transform(_.flatMap { case (k::k1,r1) => bmap.get(k).map { case (k2,r2) => (k::prepend(k1,k2),dot(r1,r2)) } }))
+      }
+    }
+
   implicit def rddRddJoin[
     K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
   ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] =
@@ -331,64 +351,6 @@ object Join {
         })
       }
     }
-
-//  implicit def rddDStreamJoin[
-//  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
-//  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] =
-//    new Join[RDD[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] {
-//      def apply(v1: RDD[(K :: K1, R1)], v2: DStream[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
-//        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
-//        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
-//        right.transform { rdd =>
-//          left.join(rdd).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
-//        }
-//      }
-//    }
-//
-//  implicit def dstreamRDDJoin[
-//  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
-//  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[DStream[(K :: K1, R1)], RDD[(K :: K2, R2)], DStream[(K :: K12, O)]] =
-//    new Join[DStream[(K :: K1, R1)], RDD[(K :: K2, R2)], DStream[(K :: K12, O)]] {
-//      def apply(v1: DStream[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
-//        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
-//        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
-//        left.transform { rdd =>
-//          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
-//        }
-//      }
-//    }
-//
-//  implicit def dstreamDstreamJoin[
-//  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
-//  ](implicit ring1: Ring[R1], ring2: Ring[R2], dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[DStream[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] =
-//    new Join[DStream[(K :: K1, R1)], DStream[(K :: K2, R2)], DStream[(K :: K12, O)]] {
-//      def apply(v1: DStream[(K :: K1, R1)], v2: DStream[(K :: K2, R2)]): DStream[(K :: K12, O)] = {
-//        //X
-//        val left = v1.map { case (k :: k1, r1) => (k, (k1, r1)) }
-//        //Y
-//        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
-//        //Xc'
-//        val leftCumulative = left.updateStateByKey[R1]((pairs,acc) =>
-//          Some(
-//            ring1.add(acc.getOrElse(ring1.zero), pairs.map(_._2).reduce(ring1.add))
-//          )
-//        )
-//        //Yc'
-//        val rightCumulative = right.updateStateByKey[R2]((pairs,acc) =>
-//          Some(
-//            ring2.add(acc.getOrElse(ring2.zero), pairs.map(_._2).reduce(ring2.add))
-//          )
-//        )
-//        //Xc
-//        val leftC = leftCumulative //todo diff
-//        val rightC = rightCumulative //todo diff
-//        //todo implicitly use RDDJoins etc... wont need to do the maps above either on v1 or v2.
-//        val justDeltas = leftC.transformWith(rightC, (l,r) => l.)
-//        left.transform { rdd =>
-//          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
-//        }
-//      }
-//    }
 }
 
 object Sum {

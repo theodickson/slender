@@ -45,7 +45,7 @@ trait SlenderSparkTest extends SlenderTest with SparkTestImplicits {
   Logger.getLogger("org").setLevel(Level.ERROR)
   implicit val spark = SparkSession.builder
     .appName("test")
-    .config("spark.master", "local")
+    .config("spark.master", "local[1]")
     .getOrCreate()
 
   implicit val sc = spark.sparkContext

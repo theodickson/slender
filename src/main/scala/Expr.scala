@@ -86,6 +86,8 @@ object ApplyExpr {
   }
 }
 
+case class CollectExpr[E](c1: E) extends ExprNode
+
 /**VariableExpr*/
 case class UnusedVariable() extends ExprNode
 

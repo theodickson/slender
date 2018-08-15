@@ -8,3 +8,10 @@ _checkpoint/*
 *.pdf
 *.gz
 *.aux
+dissertation/chapter1.aux
+
+*.aux
+
+dissertation/chapter1.aux
+
+dissertation/ociamthesismain.synctex.gz

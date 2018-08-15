@@ -78,11 +78,11 @@ package object slender extends types with Serializable {
       dstream.foreachRDD { rdd =>
         if (!done) {
           counter += 1
-          rdd.count
+          val count = rdd.count
           val currentTime = currentTimeMillis()
           val interval = currentTime - time
           totalTime += interval
-          println(s"$counter - $totalTime ($interval)")
+          println(s"$counter - $totalTime ($interval) ($count)")
           time = currentTime
           if (counter == limit) done = true
         }

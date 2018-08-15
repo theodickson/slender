@@ -25,10 +25,12 @@
 \newcommand{\Yield}[1]{\textrm{ yield } #1}
 \newcommand{\YieldP}[2]{\Yield #1 \mapsto #2}
 \newcommand{\Collect}[1]{\textrm{ collect } #1}
+\newcommand{\proj}[2]{#1.\_#2}
+\newcommand{\pair}[2]{\langle #1, #2 \rangle}
 
 \title{Efficient Processing of Nested Collections in Apache Spark}   %note \\[1ex] is a line break in the title
 
-\author{Theodore Dickson}             %your name
+\author{Theodore Dickson}         %your name
 \college{Worcester College}  %your college
 
 %\renewcommand{\submittedtext}{change the default text here if needed}
@@ -58,21 +60,22 @@
 \end{romanpages}            % end roman page numbering
 
 %now include the files of latex for each of the chapters etc
-\include{chapter1}
-\include{chapter2}
-\include{conclusions}
+\include{introduction}
+\include{nrc}
+
+%\include{examples}
 
 %now enable appendix numbering format and include any appendices
-\appendix
-\include{appendix1}
-\include{appendix2}
+%\appendix
+%\include{appendix1}
+%\include{appendix2}
 
 %next line adds the Bibliography to the contents page
-\addcontentsline{toc}{chapter}{Bibliography}
+%\addcontentsline{toc}{chapter}{Bibliography}
 %uncomment next line to change bibliography name to references
 %\renewcommand{\bibname}{References}
-\bibliography{refs}        %use a bibtex bibliography file refs.bib
-\bibliographystyle{plain}  %use the plain bibliography style
+%\bibliography{refs}        %use a bibtex bibliography file refs.bib
+%\bibliographystyle{plain}  %use the plain bibliography style
 
 \end{document}
 

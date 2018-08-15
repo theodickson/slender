@@ -13,14 +13,14 @@ case class ShreddedResult[+Flat,+Ctx <: HList](flat: Flat, ctx: Ctx) {
 }
 
 //todo - rename/redesign?
-trait GroupLabeller[-In,+Out,+Dict,Expr] extends (In => (Out,Dict)) with Serializable
+trait GroupShredder[-In,+Out,+Dict,Expr] extends (In => (Out,Dict)) with Serializable
 
-object GroupLabeller {
+object GroupShredder {
   //see discussion on Group for why these are not done generically
   implicit def rdd2[K1:ClassTag,K2:ClassTag,R,Expr]
   (implicit group: Group[RDD[(K1::K2::HNil,R)],RDD[(K1::Map[K2,R]::HNil,Boolean)]]):
-    GroupLabeller[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] =
-    new GroupLabeller[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] {
+    GroupShredder[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] =
+    new GroupShredder[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] {
       def apply(v1: RDD[(K1::K2::HNil,R)]): (RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])]) = {
         //val labelled = v1.map { case ((k1::k2),r) => ((Label(k1)::k2,r)) }
         val grouped = group(v1)
@@ -32,8 +32,8 @@ object GroupLabeller {
 
   implicit def rdd3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr]
   (implicit group: Group[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]]):
-  GroupLabeller[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
-    new GroupLabeller[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
+  GroupShredder[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
+    new GroupShredder[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
       def apply(v1: RDD[(K1::K2::K3::HNil,R)]): (RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
         //val labelled = v1.map { case ((k1::k2),r) => ((Label(k1)::k2,r)) }
         val grouped = group(v1)
@@ -44,8 +44,8 @@ object GroupLabeller {
     }
 
   implicit def dstream2[K1:ClassTag,K2:ClassTag,R,Expr]:
-  GroupLabeller[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] =
-    new GroupLabeller[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] {
+  GroupShredder[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] =
+    new GroupShredder[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] {
       def apply(v1: IncDStream.Aux[(K1::K2::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])]) = {
 
         val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
@@ -55,8 +55,8 @@ object GroupLabeller {
     }
 
   implicit def dstream3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr]:
-  GroupLabeller[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
-    new GroupLabeller[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
+  GroupShredder[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
+    new GroupShredder[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
       def apply(v1: IncDStream.Aux[(K1::K2::K3::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
 
         val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
@@ -117,8 +117,16 @@ object ShreddedEval {
     }
   }
 
+  implicit def CollectExprRddShreddedEval[E,K:ClassTag,R:ClassTag,C <: HList]
+  (implicit eval: ShreddedEval[E,RDD[(K,R)],C]): ShreddedEval[CollectExpr[E],Map[K,R],C] = instance {
+    case (CollectExpr(e),vars) => {
+      val ShreddedResult(f,c) = eval(e,vars)
+      ShreddedResult(f.collectAsMap.toMap,c)
+    }
+  }
+
   implicit def GroupShreddedEval[InExpr,InFlat,InCtx <: HList,Flat,Dict]
-  (implicit eval: ShreddedEval[InExpr,InFlat,InCtx], label: GroupLabeller[InFlat,Flat,Dict,InExpr]):
+  (implicit eval: ShreddedEval[InExpr,InFlat,InCtx], label: GroupShredder[InFlat,Flat,Dict,InExpr]):
   ShreddedEval[GroupExpr[InExpr],Flat,Dict::InCtx] = instance {
     case (GroupExpr(e),bvs) => {
       val ShreddedResult(inFlat,inCtx) = eval(e,bvs)

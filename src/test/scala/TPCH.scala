@@ -43,8 +43,8 @@ class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession
     .as[(Int,String,Int)].rdd//.productsToHlists
 
   lazy val nation = loadTable("nation")
-    .select("n_nationkey", "n_name")
-    .as[(Int,String)].rdd//.productsToHlists
+    .select("n_nationkey", "n_regionkey", "n_name")
+    .as[(Int,Int,String)].rdd//.productsToHlists
 
   lazy val region = loadTable("region")
     .select("r_regionkey", "r_name")
@@ -56,7 +56,7 @@ class TpchLocal(sampleName: String = "10_customers")(implicit spark: SparkSessio
 
   private val rdds = new TpchRdds(sampleName)
 
-  private def toLocalCollection[T](rdd: => RDD[T]): Map[T,Int] = rdd.collect.map(t => (t,1)).toMap
+  private def toLocalCollection[T](rdd: => RDD[T]): LiteralExpr[Map[T,Int],String] = LiteralExpr(rdd.collect.map(t => (t,1)).toMap,"")
 
   lazy val customer = toLocalCollection(rdds.customer)
   lazy val orders = toLocalCollection(rdds.orders)
@@ -73,12 +73,12 @@ class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: Spa
 
   private val rdds = new TpchRdds(sampleName)
 
-  lazy val customer = rddToDStream2(rdds.customer, n)
-  lazy val orders = rddToDStream2(rdds.orders, n)
-  lazy val lineitem = rddToDStream2(rdds.lineitem, n)
-  lazy val part = rddToDStream2(rdds.part, n)
-  lazy val partSupp = rddToDStream2(rdds.partSupp, n)
-  lazy val supplier = rddToDStream2(rdds.supplier, n)
-  lazy val nation = rddToDStream2(rdds.nation, n)
-  lazy val region = rddToDStream2(rdds.region, n)
+  lazy val customer = rddToDStream(rdds.customer, n)
+  lazy val orders = rddToDStream(rdds.orders, n)
+  lazy val lineitem = rddToDStream(rdds.lineitem, n)
+  lazy val part = rddToDStream(rdds.part, n)
+  lazy val partSupp = rddToDStream(rdds.partSupp, n)
+  lazy val supplier = rddToDStream(rdds.supplier, n)
+  lazy val nation = rddToDStream(rdds.nation, n)
+  lazy val region = rddToDStream(rdds.region, n)
 }

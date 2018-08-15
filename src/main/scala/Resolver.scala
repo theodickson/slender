@@ -97,6 +97,10 @@ trait Priority1ResolutionImplicits  {
   (implicit resolve: Resolver[R1,R2]): Resolver[SumExpr[R1],SumExpr[R2]] =
     Resolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
 
+  implicit def CollectResolver[R1,R2]
+  (implicit resolve: Resolver[R1,R2]): Resolver[CollectExpr[R1],CollectExpr[R2]] =
+    Resolver.instance { case CollectExpr(c) => CollectExpr(resolve(c)) }
+
   implicit def GroupResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[GroupExpr[R1],GroupExpr[R2]] =
     Resolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
@@ -189,6 +193,10 @@ trait LowPriorityShreddedResolverImplicits {
   implicit def SumShreddedResolver[R1,R2]
   (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[SumExpr[R1],SumExpr[R2]] =
     ShreddedResolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
+
+  implicit def CollectShreddedResolver[R1,R2]
+  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[CollectExpr[R1],CollectExpr[R2]] =
+    ShreddedResolver.instance { case CollectExpr(c) => CollectExpr(resolve(c)) }
 
   implicit def GroupShreddedResolver[R1,R2]
   (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[GroupExpr[R1],GroupExpr[R2]] =

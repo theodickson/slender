@@ -66,6 +66,10 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
   (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, SumExpr[R], SumExpr[R1]] =
     Tagger.instance { case SumExpr(c) => SumExpr(tag(c)) }
 
+  implicit def CollectTagger[V, T, R, R1]
+  (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, CollectExpr[R], CollectExpr[R1]] =
+    Tagger.instance { case CollectExpr(c) => CollectExpr(tag(c)) }
+
   implicit def GroupTagger[V, T, R, R1]
   (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, GroupExpr[R], GroupExpr[R1]] =
     Tagger.instance { case GroupExpr(c) => GroupExpr(tag(c)) }
