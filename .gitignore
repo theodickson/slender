@@ -6,3 +6,5 @@ derby.log
 _checkpoint/*
 *.log
 *.pdf
+*.gz
+*.aux
