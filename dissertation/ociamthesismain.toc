@@ -13,3 +13,11 @@
 \contentsline {section}{\numberline {2.2}Expressions}{8}
 \contentsline {subsection}{\numberline {2.2.1}Ring expressions}{9}
 \contentsline {subsection}{\numberline {2.2.2}Key expressions}{12}
+\contentsline {section}{\numberline {2.3}For-comprehension syntax}{12}
+\contentsline {section}{\numberline {2.4}Incremental updates to queries}{14}
+\contentsline {section}{\numberline {2.5}The shredding transformation}{15}
+\contentsline {subsection}{\numberline {2.5.1}Output type of the shredding transformation}{15}
+\contentsline {subsection}{\numberline {2.5.2}Formal definition of shredding}{17}
+\contentsline {chapter}{\numberline {3}Implementation of the DSL}{18}
+\contentsline {section}{\numberline {3.1}Representing Abstract Syntax Trees}{18}
+\contentsline {section}{\numberline {3.2}Implementing natural syntax}{21}

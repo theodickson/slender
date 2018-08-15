@@ -1,0 +1,137 @@
+\chapter{Implementation of the DSL}
+
+In this chapter we describe how a DSL was created in Scala which can express any query in our version of the Nested Relational Calculus, where the relations may be either local Scala collections or Spark RDDs.
+
+We first explain why Scala was chosen as our language, with particular attention to the features which make it well-suited to the implementation of DSLs.
+
+Then we show how and why the basic Abstract Syntax Trees (ASTs) were implemented using Scala?s polymorphic case classes and Shapeless HLists.
+
+Finally we describe the techniques used to allow these ASTs to be generated with syntax which closely matches that of the NRC.
+
+\section{Representing Abstract Syntax Trees}
+
+As our calculus consists purely in constants, variables, unary operators and binary operators, it is straightforward to represent any expression as an abstract syntax tree (AST), where the leaves are either constants or variables and the other nodes are operators. For example, below we see how a simple usage of the for/yield construct translates into an AST:
+
+\begin{equation*}
+\begin{split}
+\For{x}{X} \Collect{x + 1} &= sum(X*\{x => x + 1\}) \\
+&\cong Sum(Multiply(X,InfMapping(x,Add(x,1))))
+\end{split}
+\end{equation*}
+
+The core task is thus in creating a representation of these ASTs. Scala provides us with a feature which is perfectly suited to this, in the form of a \textit{case class} \cite{caseclass}. (In fact, Scala ASTs themselves are represented by the compiler with case classes\cite{compilerasts}). A case class is type of class in Scala specialised for immutable objects fully defined by their construction arguments. By default, they are compared for equality and calculate their hash value from these arguments, and not from their reference. They also enable the use of \textit{pattern-matching} \cite{patternmatch}, a powerful syntactic construction in Scala which will make manipulating these ASTs far easier.
+
+\begin{figure}
+\begin{lstlisting}
+case class LiteralExpr[V](value: V) extends ExprNode
+
+case class AddExpr[E1,E2](c1: E1, c2: E2) extends ExprNode
+
+case class NegateExpr[E](c1: E) extends ExprNode
+
+case class GroupExpr[E](c1: E) extends ExprNode
+
+case class InfiniteMappingExpr[K,R](key: K, value: R) extends ExprNode
+
+case class SngExpr[K,R](key: K, value: R) extends ExprNode
+
+case class Variable(name: String) extends ExprNode
+
+\end{lstlisting}
+\caption{Signatures of expression nodes.}
+\label{exprnodes}
+\end{figure}
+
+In figure \ref{exprnodes} we present the signatures of the case classes for many of the constructs in our formalism. We omit several of the algebraic operators, as these are exactly analogous to those shown. Note that they all inherit from a common trait \lstinline{ExprNode}, and that they are polymorphic in their construction arguments, so that the compile-time type of an AST node contains the types of all of its child nodes. For example, the node:
+
+\begin{lstlisting}
+
+AddExpr(MultiplyExpr(1,2),3)
+\end{lstlisting} 
+
+will have type \lstinline{AddExpr[MultiplyExpr[LiteralExpr[Int],LiteralExpr[Int]],LiteralExpr[Int]]}.
+This will be crucial later on for implementing the evaluation of these ASTs.
+
+The other omission from the case classes shown is product types. Instead of creating explicit case classes for product types, such as:
+
+\begin{lstlisting}
+
+case class ExprPair[E1,E2](e1: E1, e2: E2) extends ExprNode
+\end{lstlisting} \vspace{1em}
+
+we will design the rest of our framework to treat products of these case classes directly as expressions, without any common inheritance, using a design pattern called a \textit{typeclass}, which will be explained later.
+
+Additionally, we will not use native Scala tuples to represent these products. This is because Scala tuples have a different type for each arity, with no common ancestor except for the trait \lstinline{Product}, which among other things does not support element access. This makes it impossible to write code which applies common logic to tuples of different arities, something we will have to do in many places when writing the code for evaluation. Instead, in each of these situations we would have to write separate implementations of a class or function for every arity of tuple we wish to support.
+	
+Instead, we will use Shapeless \cite{shapeless}, a generic programming library for Scala. The key feature of shapeless is the \lstinline{HList} (or \textit{heterogenous list}), which can be thought of as a linked list in which the type of each element may be different but is known at compile time. This is actually quite straightforwardly implemented, using the following interface (presentation is simplified):
+
+\begin{lstlisting}
+
+trait HList
+case class HCons[H,T <: HList](h: H, t: T) extends HList
+case object HNil extends HList
+\end{lstlisting} \vspace{1em}
+
+Here, \lstinline{HCons} and \lstinline{HNil} act as \lstinline{Cons} and \lstinline{Nil} do in a standard Scala immutable linked list \cite{scalalist}. But, since \lstinline{HCons} is polymorphic in both the type of its head and its tail, an \lstinline{HList} is therefore polymorphic in all of its elements.
+
+It can be noted then that in terms of the expressiveness of types, this offers nothing beyond limiting ourselves to only using \lstinline{Tuple2}, and representing higher arities by nesting these tuples. For example, an \lstinline{HCons[T1,HCons[T2,HCons[T3,HNil]]]} is isomorphic to a \lstinline{Tuple2[T1,Tuple2[T2,Tuple2[T3,Unit]]]]}.
+
+However, the Shapeless library additionally offers many list-like methods for manipulating \lstinline{HList}s, such as concatenation and element access by index, which will be helpful to us later on. It also offers the same syntax for constructing \lstinline{HList}s as can be used to construct regular Scala lists, the double colon (\lstinline{::}). For example, we can construct an \lstinline{HList} isomorphic to the tuple:
+\begin{lstlisting}
+(LiteralExpr(1),LiteralExpr(2),LiteralExpr(3))
+\end{lstlisting}
+
+using the syntax
+\begin{lstlisting}
+LiteralExpr(1)::LiteralExpr(2)::LiteralExpr(3)::HNil.
+\end{lstlisting}
+
+If we were using nesting of Tuple2 values, we would have to write the triple as
+
+\begin{lstlisting}
+(LiteralExpr(1),(LiteralExpr(2),(LiteralExpr(3),()))).
+\end{lstlisting}
+
+Now we can represent any expression as an AST. However, it is cumbersome to generate this by directly constructing every node in the tree. For example, to generate the AST for the expression: 
+
+\begin{equation*}
+\For{x}{X} \Yield{(\For{y}{x} \Collect{y+1})}
+\end{equation*}
+
+We would need to write the following code:
+
+\begin{lstlisting}
+
+val inner = SumExpr(
+  MultiplyExpr(
+    Variable('x'),
+    InfMapping(Variable('y'),AddExpr(Variable('y'),LiteralExpr(1))
+  )
+)
+val expr = SumExpr(
+  MultiplyExpr(
+    X,InfMapping(Variable('x'),SngExpr(Variable('x'),inner))
+  )
+)
+\end{lstlisting} \vspace{1em}
+
+In the next section we describe how we implemented syntax almost identical to the formalism to generate this same AST.
+
+\section{Implementing natural syntax}
+
+In order to generate queries with more natural syntax, the first task is to implement prefix syntax for the unary operators and infix syntax for the binary operators. For example, we would like to be able to write:
+\vs
+\begin{lstlisting}
+ -LiteralExpr(1) * LiteralExpr(2)
+\end{lstlisting}
+\vs
+in order to construct the AST:
+\vs
+\begin{lstlisting}
+MultiplyExpr(NegateExpr(LiteralExpr(1)),LiteralExpr(2))
+\end{lstlisting}
+\vs
+
+Scala provides the perfect features for this. In the case of prefix syntax, this can be achieved for various symbols, including $-$, by implementing the method \lstinline{unary_-}. The compiler simply parses the expression \lstinline{-LiteralExpr(1)} as \lstinline{LiteralExpr(1).unary_-}. In the case of infix syntax, this can be achieved as a natural result of the fact that Scala does not require the use of dots or brackets to invoke methods.  \lstinline{LiteralExpr(1) * LiteralExpr(2)} is desugared by the Scala compiler to \lstinline{LiteralExpr(1).*(LiteralExpr(2))}.
+
+Hence it remains to implement the method \lstinline{*}. Unfortunately, this is not straightforward. These methods must be available to all ring-typed expressions. However, there is no common ancestor class for all ring-typed expressions - although our explicit case classes all inherit from \lstinline{ExprNode}, products are represented as \lstinline{HList}s which clearly do not. Therefore there is no single place to implement these methods. 

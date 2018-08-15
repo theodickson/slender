@@ -184,7 +184,7 @@ This groups $X$ by the first element of its key and creates a key-nested collect
 
 \textit{(explanation of why key-nesting makes sense here, may want to focus on semantics of further joins etc instead of keeping track of multiplicity)}
 
-We recognise that this being the only way to construct key-nested collections is quite restrictive. In fact, in earlier work \cite{draftpaper}, the variant of the NRC used did not include this construct, but instead used a more general construct $toK$, which would box arbitrary sub-queries of ring type. Unfortunately, although this allowed for a more general query language, the queries written in this way proved highly impractical to implement within Spark. Appendix \cite{groupvstok} contains a discussion on this for the interested reader. Despite this, we will see in section \cite{} that even with this restriction we are still able to express a wide range of quite complex queries.
+We recognise that this being the only way to construct key-nested collections is quite restrictive. In fact, in earlier work \cite{draftpaper}, the variant of the NRC used did not include this construct, but instead used a more general construct $toK$, which would box arbitrary sub-queries of ring type. Unfortunately, although this allowed for a more general query language, the queries written in this way proved highly impractical to implement within Spark. Appendix \ref{groupvstok} contains a discussion on this for the interested reader. Despite this, we will see in section \ref{} that even with this restriction we are still able to express a wide range of quite complex queries.
 
 }
 
@@ -196,6 +196,179 @@ As with ring expressions, we also have tupling and projection.
 }
 
 
+\section{For-comprehension syntax} {
+In this section we introduce several variants of a familiar syntactic construction, the for-comprehension, which will allow many queries to be written more naturally.
 
+Let $X$ be a finite collection of type $\coll{\K}{\R}$, $r_1$ be a ring expression of type $\R_1$, and $x$ be a variable of type $\K$. Our basic for-comprehension syntax is thus defined as:
 
+\begin{equation*}
+ \For{x}{X} \Collect{r_1} := sum(X * \{x => r_1\})
+ \end{equation*}
+ 
+ It is helpful to think of this as iterating over the key-value pairs $\pair{k}{r}$ in $X$, calculating the value of $r_1$ for each key $k$, and aggregating the result of multiplying this with $r$. For example, the query:
+
+\begin{equation*} 
+X : Bag(Int) \\
+ \For{x}{X} \Collect{x > 2} = sum(X * \{x => x > 2\})
+\end{equation*}
+
+calculates the aggregate count of the keys in $X$ which are greater than 2, since:
+
+\begin{equation*}
+\begin{split}
+(X*\{x => x > 2\})(y) &= X(y)*true = X(y)\textrm{, if } y > 2 \\
+ &= X(y)*false = 0\textrm{, otherwise.}
+\end{split}
+\end{equation*}
+
+We now add a variant of this which enables filtering collections with a natural syntax. With $p(x)$ a predicate expression:
+\begin{equation*}
+ \ForIf{x}{X}{p(x)} \Collect{x > 2} := sum(X * \{x => r_1 \cdot p(x) \})
+\end{equation*}
+
+Hence, we can instead write the above query as:
+
+\begin{equation*}
+\begin{split}
+ \ForIf{x}{X}{x > 2} \Collect{1} &= sum(X * \{x => 1 \cdot (x > 2) \}) \\
+ &=sum(X * \{x => x > 2) \}
+ \end{split}
+ \end{equation*}
+ 
+These examples are quite limited in that they are only aggregations of a collection $X$. In order to transform $X$ more generally, we can use the singleton constructor. For example, consider the following query:
+\begin{equation*}
+\begin{split}
+&X: \coll{\K_1 \times \K_2}{\R} \\
+&Y = \For{\pair{k_1}{k_2}}{X} \Collect{sng(\pair{k_2}{k_1}, 1)}
+\end{split}
+\end{equation*}
+
+ Then $Y$ is $X$ but with the pairs reversed. To see how this works, let?s examine the translation of $Y$ into basic syntax:
+ 
+\[ Y = sum(X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}) \]
+
+The inner expression $X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}$ iterates over $X$ and and maps each key $\pair{k_1}{k_2}$ to its original value, multiplied by $sng(\pair{k_2}{k_1},1)$. Thus, suppose $X = \{\pair{a}{b} \mapsto 1, \pair{c}{d} \mapsto 2\}$, then: \\
+
+$X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\} = \{(a,b) \mapsto \{(b,a) \mapsto 1\}, (c,d) \mapsto \{(d,c) \mapsto 2\}\}$ \\
+
+Then the sum outside this simply aggregates all of the values via bag union, to produce the single collection: \\
+
+$\{(b,a) \mapsto 1, (d,c) \mapsto 2\}$ \\
+
+Which is indeed $X$ with the elements of the keys reversed.
+
+We encapsulate this construct with the following variant of our for-comprehension: 
+
+\begin{equation*}
+\begin{split}
+\ForIf{x}{X}{p(x)} \Yield{k \mapsto r} &:= \ForIf{x}{X}{p(x)} \Collect{sng(k,r)} \\
+& \ = sum(X * \{x => sng(k,r \cdot p(x)) \})
+\end{split}
+\end{equation*}
+
+The $r$ is optional and defaults to 1. Thus, we can write the above query to reverse the elements in a product-type key as: \\
+
+$\For{\pair{k_1}{k_2}}{X} \Yield{\pair{k_2}{k_1}}$ \\
+
+Which clearly gives us a very natural syntax with which to manipulate these collections.
+
+}
+
+\section{Incremental updates to queries} {
+
+In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
+
+Figure \ref{deltaexprs} shows these expressions. The fact that the updates are modelled with addition allows us to exploit the algebraic properties of the operators to derive efficient delta expressions in the majority of cases. For example, we exploit the linearity of $+$ to derive the delta rule: \\
+
+$\delta_X(r1 + r2) = \delta_X(r1) + \delta_X(r2)$, \\
+
+since \\
+
+$(r1 + \delta_X(r1)) + (r2 + \delta_X(r2)) = (r1 + r2) + (\delta_X(r1) + \delta_X(r2))$. \\
+
+Linearity is similarly used for $-$ and $sum$. These rules are very efficient because they do not depend at all on the $X$, only $\delta X$.
+
+The slightly more complicated rules for multiplication, the dot product, and the join operator are a result of their distributivity. We illustrate the derivation of the rule for multiplication below: \\
+
+\textit(derivation of delta rule for *) \\
+
+This derivation is also valid for the dot product and join as it only uses the distributive property which they all share. While these rules are not quite as efficient as the rules for the linear operators, they are still much more efficient than re-computing. This is because the terms that do depend on an input collection, e.g. $\delta X * Y$, will constitute a join in practice between an update and only one of the input collections. Since the updates are in general small compared to the size of the input collections, these joins will be much more efficient that the cost of the original join between the two input collections.
+
+Unfortunately, we can see that the expressions for $sng$ and $group$ are not efficient - they do require recomputation This is because they both can construct key-nested collections. But, unlike our other operators which are either linear, or distribute over $+$, the construction of key-nested collections is neither.
+
+Fortunately, in the case of $sng$, if the key-typed argument is unaffected by the update, the delta expression simplifies to: \\
+
+\textit{(simplified sng delta expression)} \\
+
+which is an efficient incrementalisation. In practice, usage of $sng$ will largely be confined to the for/yield construction where the yielded key is a variable expression, and so will be unaffected by updates to input collections. 
+
+For $group$, there is no such special case, but we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over $+$.
+	
+}
+
+\section{The shredding transformation} {
+
+Here we define the shredding transformation. As previously described, when we shred a query, we produce both a flat version of the query, in which all key-nested collections have been replaced by labels, and the shredding context, a structure containing the dictionaries defining the labels appearing in the flat query. Therefore shredding consists of two separate transformations - the flattening of the query, which we will denote $(\cdot)^F$, and the derivation of the shredding context, which we will denote $(\cdot)^\Gamma$.
+
+\subsection{Output type of the shredding transformation} {
+
+It will be useful to first examine how shredding works at the type level. Figure \ref{shreddingtypes} defines the two output types of the two constituent transformations.
+
+\begin{figure}
+\begin{equation*}
+\begin{aligned}[c]
+&(\K_1 \times \K_2)^F : \K_1^F \times \K_2^F \\
+&(\R_1 \times \R_2)^F : \R_1^F \times \R_2^F \\
+&\prim{Int}^F : \prim{Int} \\
+\\
+&(\K_1 \times \K_2)^\Gamma : \K_1^\Gamma \times \K_2^\Gamma \\
+&(\R_1 \times \R_2)^\Gamma : \R_1^\Gamma \times \R_2^\Gamma \\
+&\prim{Int}^F : \prim{Unit} \\
+\end{aligned}
+\qquad
+\begin{aligned}[c]
+&(\coll{\K}{\R})^F : \coll{\K^F}{\R^F} \\
+&[\R]^F: \prim{Label} \\
+&\prim{Dom}^F : \prim{Dom} \\
+\\
+&(\coll{\K}{\R})^\Gamma : \K^\Gamma \times \R^\Gamma \\
+&[R]^\Gamma : (\coll{\prim{Label}}{\R^F}) \times \R^\Gamma \\
+&\prim{Dom}^\Gamma : \prim{Unit} \\
+\end{aligned}
+\end{equation*}
+\caption{Output types of the shredding transformations.}
+\label{shreddingtypes}
+\end{figure}
+
+The type returned by $(\cdot)^F$ is straightforward - it is recursively defined to simply replace all boxed ring types with the $Label$ type, and it does nothing to primitive types.
+
+The type returned by of $(\cdot)^\Gamma$ slightly more complicated. The base cases of our primitive types contain no key-nested collections and so their context is empty, which is represented by the $\prim{Unit}$ type. Product types have a context consisting of the contexts of their elements, in a matching structure. Collections also have tupled shredding contexts, the first element for the context of it?s key and the second for its value.
+
+The interesting case is the boxed ring type $[\R]$. Here the shredding context will consist of two parts - first the dictionary defining the flattened boxed value, and second it recursively contains this value?s shredding context. This represents the fact that shredding proceeds recursively - for a boxed collection $\coll{\K}{\R}$ either the key or the value may contain further key-nested collections and so it is shredded to produce the collection $\coll{\K^F}{\R^F}$ before producing the dictionary defining the inner labels. Otherwise, we would only be able to derive the benefits of shredding for inner collections nested only at one level and not at arbitrary depth.
+
+An important thing to note about these definitions is that the structure of the shredding context is fully defined by the type of the shredded query, and additionally mirrors the output type of the shredded query. This has two important benefits: Firstly, as we will show when defining the transformations themselves on our calculus constructs, this allows contexts to be combined when performing operations on shredded queries. For example, if we add two shredded queries, we need to element-wise perform union on their contexts. Secondly, it means that it is unambiguous as to which dictionary corresponds to which labels in the flat output.
+
+To illustrate the process by which we apply the above rules to determine the flat output type and shredding context structure, we show an example of their application for a collection of type $\Bag{[\Bag{\prim{String}}]} = \coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}}$:
+\begin{equation*}
+\begin{split}
+(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^F&: \coll{\Label}{\Int^F} \\
+&: \coll{\Label}{\Int}
+\end{split}
+\end{equation*}
+\begin{equation*}
+\begin{split}
+(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^\Gamma&: ([\coll{\String}{\Int}]^\Gamma \times \Int^\Gamma) \\
+&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\coll{\String}{\Int})^\Gamma) \times \Unit) \\
+&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\String^\Gamma \times \Int^\Gamma) \times \Unit) \\
+&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\Unit \times \Unit) \times \Unit) \\
+\end{split}
+\end{equation*}
+
+While in this simple example, the nested structure containing various empty contexts and only a single dictionary may seem unnecessary, in complex queries with many levels of nesting, there will be multiple dictionaries within the context and their location is determined by the inner collection they define, and so this type of structure is very useful.
+
+}
+
+\subsection{Formal definition of shredding}
+
+Now we can formally define the transformations for the concrete expressions of our calculus. 
 }

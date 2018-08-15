@@ -6,8 +6,9 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{listings}
+\usepackage{textcomp}
 
-\lstset{language=Scala}
+\lstset{language=Scala, upquote=true}
 %input macros (i.e. write your own macros file called mymacros.tex 
 %and uncomment the next line)
 %\include{mymacros}
@@ -27,7 +28,11 @@
 \newcommand{\Collect}[1]{\textrm{ collect } #1}
 \newcommand{\proj}[2]{#1.\_#2}
 \newcommand{\pair}[2]{\langle #1, #2 \rangle}
-
+\newcommand{\Label}{\prim{Label}}
+\newcommand{\String}{\prim{String}}
+\newcommand{\Int}{\prim{Int}}
+\newcommand{\Unit}{\prim{Unit}}
+\newcommand{\vs}{\vspace{1em}}
 \title{Efficient Processing of Nested Collections in Apache Spark}   %note \\[1ex] is a line break in the title
 
 \author{Theodore Dickson}         %your name
@@ -62,7 +67,7 @@
 %now include the files of latex for each of the chapters etc
 \include{introduction}
 \include{nrc}
-
+\include{dsl}
 %\include{examples}
 
 %now enable appendix numbering format and include any appendices
