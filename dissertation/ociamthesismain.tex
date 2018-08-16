@@ -7,8 +7,9 @@
 \usepackage{amsmath}
 \usepackage{listings}
 \usepackage{textcomp}
+\usepackage{lmodern}
 
-\lstset{language=Scala, upquote=true}
+\lstset{language=Scala, upquote=true, columns=fullflexible, basicstyle=\ttfamily, keywordstyle=\bfseries}
 %input macros (i.e. write your own macros file called mymacros.tex 
 %and uncomment the next line)
 %\include{mymacros}
@@ -33,6 +34,7 @@
 \newcommand{\Int}{\prim{Int}}
 \newcommand{\Unit}{\prim{Unit}}
 \newcommand{\vs}{\vspace{1em}}
+\newcommand{\lin}[1]{\lstinline{#1}}
 \title{Efficient Processing of Nested Collections in Apache Spark}   %note \\[1ex] is a line break in the title
 
 \author{Theodore Dickson}         %your name
@@ -68,6 +70,7 @@
 \include{introduction}
 \include{nrc}
 \include{dsl}
+\include{evaluation}
 %\include{examples}
 
 %now enable appendix numbering format and include any appendices

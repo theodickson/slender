@@ -1,0 +1,219 @@
+\chapter{Evaluation of DSL queries}
+
+In this chapter we describe how we implemented the evaluation of the ASTs. First, we implement the algebraic operators in our calculus for local Scala collections and Spark RDDs. Due to the polymorphic nature of these operators and the static type system of Scala, simple recursive functions are not suitable. Instead, drawing on the techniques used by similar Scala libraries, we create a system of typeclasses and implicit resolution.
+
+Next, we introduce a similar system to recursively evaluate the ASTs themselves, building on the implementation of these operators and a simple simulation of a namespace using a Scala HashMap. 
+
+Finally, we discuss how this evaluation system was extended to include the shredding transformation, with particular focus on how the dictionaries discussed in the introduction were implemented.
+
+\section{Implementing algebraic operators}
+
+Before we can evaluate arbitrary ASTs, we must first implement the algebraic operators in our calculus for all Scala types which correspond to ring types in our calculus. This means:
+\begin{itemize}
+\item{\lin{Int}, or other primitive types admitting a ring structure, such as \lstinline|Double| and \lin{Boolean}.}
+\item{HLists consisting of ring-typed elements. E.g. \vs \lin{Int::Boolean::HNil.}} 
+\item{Maps with arbitrary key type, and a ring-typed value.
+E.g. \lin{Map[String,Int::Boolean::HNil]}.}
+\item{RDDs of pairs, where the first element is the key and is of arbitrary type, and the second element is the value and must be of ring type. E.g. \lin{RDD[(String,Int::Boolean::HNil)}}
+\end{itemize}
+
+Note that we support both RDDs and local Maps for collections because using a local Map within the RDD is how we achieve nested collections. For example, the type $\coll{\String}{(\coll{\String}{\Int})}$ would be represented with an \lin{RDD[(String,Map[String,Int])]}.
+
+The inductive nature of the definition of ring types means there are infinitely many valid concrete Scala types that can be considered to be of ring type in our calculus. Additionally, these types do not inherit from any common class. This means that a simple function to implement an operation such as addition is not practical. The only possible signature would be:
+\vs\begin{lstlisting}
+def add[T](t1: T, t2: T): T
+\end{lstlisting}\vs
+This is because we cannot constrain the types of the arguments in any way except by requiring they are the same type. However, this signature would be impossible to implement as we then have no information on what \lin{T} is. The only workaround would be pattern-matching, but this would then require infinitely many cases as pattern-matching does not allow us to decompose the structure of a type, only to match a type to a fully specified concrete type. For example:
+\vs\begin{lstlisting}
+def add[T](t1: T, t2: T): T = t1 match {
+  case _ : Int => t1 + t2
+  case _ : H :: T1 => .....
+  ...
+}
+\end{lstlisting}\vs
+is not valid Scala code as the types \lin{H} and \lin{T2} are not defined anywhere. Instead the following pattern would have to be used:
+\vs\begin{lstlisting}
+def add[T](t1: T, t2: T): T = t1 match {
+  case _ : Int => t1 + t2
+  case _ : Int :: Int :: HNil = ...
+  case _ : Int :: Int :: Int :: HNil => ...
+  case _ : RDD[(String,Int)] => ...
+}
+\end{lstlisting}\vs
+and so on for every possible concrete type we wished to support. This approach is not suitable for several reasons. Principally, it would be infeasible to do this - there are far too many permutations of our type system which would appear even in reasonably complex queries. Secondarily however, this would sacrifice compile-time safety - this signature accepts arguments of any type \lin{T}, an invocation of it when \lin{T} is not covered by a case statement would still compile, but fail at runtime producing a \lin{MatchError}. Instead, in the following section we detail how to implement such operations with minimal code, and full compile-time safety, while supporting all valid types.
+
+\subsection{The Ring typeclass}
+
+We will again use a typeclass-based system, as it is a very established approach in Scala for implementing algebras. Popular libraries such as Spire \cite{spire}, Cats \cite{cats} and Algebird \cite{algebird} all use this design pattern for algebraic operators.
+
+An instance of \lin{Ring[T]} will constitute evidence that \lin{T} is a valid ring type, and it will contain methods to apply the negate operator to a single value of type \lin{T} as well as a method to add two values of type \lin{T}. (The other operators will be discussed later as they require a separate design pattern). A simplified presentation of \lin{Ring} is as follows:
+\vs
+\begin{lstlisting}
+trait Ring[T] {
+  def add(x1: R, x2: R): R
+  def negate(x1: R): R
+}
+\end{lstlisting}\vs
+Now, we can implement the add function as follows:
+\vs
+\begin{lstlisting}
+def add[T](t1: T, t2: T)(implicit ring: Ring[T]): T = ring.add(t1,t2)
+\end{lstlisting}\vs
+Implicit resolution enables us to simply write \lin{add(x,y)}, omitting the implicit parameter, and if the instance of \lin{Ring} can be provided, the code will compile. As with the definition of what constitutes a valid expression, the definition of these two operators is inductive. For example, for addition, the base case is integer addition. The inductive cases are:
+\begin{itemize}
+\item{For products $r_1,r_2: \R_1 \times \R_2$, $r_ + \pair{r_3}{r_4} = \pair{r_1 + r_3}{r_2 + r_4}$.}
+\item{For collections $c_1,c_2: \coll{\K}{\R}$, $(c_1 + c_2)(k) = c_1(k) + c_2(k)$.}
+\end{itemize}
+
+Therefore, similarly to our \lin{Expr} typeclass, we can encode these inductive rules in implicit methods and therefore provide the compiler with the ability to instantiate instances of \lin{Ring[T]} for any valid type \lin{T} without duplicating any code. To illustrate this, we show a few examples of these methods. Here is one of our base cases, which provides an instance of Ring[Int]:
+\vs\begin{lstlisting}
+implicit def IntRing: Ring[Int] = new Ring[Int] {
+  def add(t1: Int, t2: Int): Int = t1 + t2
+  def negate(t1: Int): Int = -t1
+}
+\end{lstlisting}\vs
+Here is the inductive case for products, which provides an instance of \lin{Ring[H::T]} given instances of \lin{Ring[H]} and \lin{Ring[T]}, by applying element-wise the operations from these instances:
+\vs\begin{lstlisting}
+implicit def ProductRing[H,T <: HList](implicit rH: Ring[H], rT: Ring[T]) =
+    new Ring[H :: T] {
+      def add(t1: H::T, t2: H::T): H::T =
+        rH.add(t1.head, t2.head) :: rT.add(t1.tail,t2.tail)
+      def negate(t1: H::T): H::T =
+        rH.negate(t1.head) :: rT.negate(t1.tail)
+    }
+\end{lstlisting}\vs
+And finally here is the inductive case for RDDs, which provides an instance of \lin{Ring[RDD[(K,R)]]} given an instance of \lin{Ring[R]}:
+\vs\begin{lstlisting}
+implicit def RDDRing[K, R](implicit ring: Ring[R]) =
+  new Ring[RDD[(K,R)]] {
+    def add(x1: RDD[(K,R)], x2: RDD[(K,R)]) =
+      x1.union(x2).groupByKey.mapValues(_.reduce(ring.add))
+    def negate(x1: RDD[(K,R)]) =
+      x1.mapValues(ring.negate)
+}
+\end{lstlisting}\vs
+
+Negation is implemented by simply negating all the values with the method from the instance of \lin{Ring[R]}. To add two RDDs, we must first union them. This may have duplicate keys however, so then we must group by key and add together any values belonging to the same key using the add method from our \lin{Ring[R]} instance.
+
+\subsection{Further operators}
+Unfortunately, this design pattern does not encompass summation, multiplication, the dot product, joining or grouping. To understand this, consider the following attempt to incorporate them in our Ring typeclass:
+\vs\begin{lstlisting}
+trait Ring[T] {
+  ...
+  def multiply[R1](x1: R, x2: R1): ???
+  def dot[R1](x1: R, x2: R1): ???
+  def join[R1](x1: R, x2: R1): ???
+  def sum(x1: R): R = ???
+  def group(x1: R): ???
+}
+\end{lstlisting}\vs
+
+The main issue is that we have no return type for many of these operations - the return type is in fact a function of the argument types, but in Scala there is no way to express arbitrary type-level functions. For example, the  type of the dot product of two collections is defined recursively based on the type of the dot product of the values.
+
+Additionally, we can see that this would imply that we could apply these operators to any ring-typed arguments. This not true - for example we can only sum collection-typed values, and we can only multiply two values if they are both collections with the same key type. 
+
+Instead, we encapsulate each of these operators in their own typeclass-like trait which extends a Scala function. The definitions of these are as follows:
+\vs\begin{lstlisting}
+trait Multiply[T1,T2,O] extends ((T1,T2) => O)
+trait Dot[T1,T2,O] extends ((T1,T2) => O)
+trait Join[T1,T2,O] extends ((T1,T2) => O)
+trait Sum[T,O] extends (T => O)
+trait Group[T,O] extends (T => O)
+\end{lstlisting}\vs
+This is more flexible as it allows us to only provide instances for the valid argument types, and additionally build up the proper return type inductively.
+Taking \lin{Multiply} as an example, we need to make implicit instances of these available for all valid pairs of type \lin{T1} and \lin{T2}. For example, a \lin{Map[String,Int]} and a \lin{Map[String,Map[String,Int]]}, since they are both collections with the same key type \lin{String}. We do this by again writing implicit methods which encode the inductive rules by which these operations are defined. If these implicit methods are available, we can implement a generic multiply function like this:
+\vs\begin{lstlisting}
+def multiply[T1,T2,O](t1: T1, t2: T2)(implicit mult: Multiply[T1,T2,O]): O =
+  mult(t1,t2)
+\end{lstlisting}\vs
+Below we provide some examples of these implicit methods:
+\vs\begin{lstlisting}
+implicit def rddRddMultiply[K, R1, R2, O](implicit dot: Dot[R1, R2, O]) =
+  new Multiply[RDD[(K,R1)], RDD[(K,R2)], RDD[(K,O)]] {
+    def apply(t1: RDD[(K,R1)], t2: RDD[(K,R2)]): RDD[(K,O)] = 
+      t1.join(t2) map { case (k, v) => k -> dot(v._1, v._2) }
+    }
+}
+\end{lstlisting}\vs
+To multiply two RDDs, we need an instance of \lin{Dot} so we can apply the dot product to their values. Then we join the two RDDs by key, and calculate each keys new value as the dot product of the values from the two RDDs. Note that any keys which do not appear in both RDDs will disappear, which is correct as this means their new value must be zero. We can also see how this allows the proper return type to be built from the return type \lin{O} of the implicitly provided instance of \lin{Dot}.
+\vs\begin{lstlisting}
+implicit def MapSum[K, R](implicit ring: Ring[R]) =
+  new Sum[Map[K,R],R] {
+    def apply(v1: Map[K,R]): R =
+      v1.values.reduce(ring.add)
+  }
+\end{lstlisting}\vs
+To sum a \lin{Map[K,R]}, we need an instance of \lin{Ring[R]}, and reduce the values in the map using this instance's \lin{add} method.
+
+Now we have a complete framework to apply the operators in our calculus to Scala data types of arbitrary complexity. In the next section we will show how we this is used to implement the evaluation of ASTs.
+
+\section{The Eval interface}
+In this section we describe the interface used to evaluate ASTs in our DSL, which builds on the implementations of the algebraic operators.
+\subsection{Simplified presentation}
+First we introduce a simplified interface, in order to better explain the basic structure:
+\vs\begin{lstlisting}
+trait Eval[Expr,Out] extends (Expr => Out)
+\end{lstlisting}\vs
+This interface can evaluate all ASTs which do not include infinite mappings (and therefore variables). It is similar to that used for the operators, since evaluation of an AST is likewise a recursively defined function with an output type different to, yet dependent on, its arguments.
+
+The base case is naturally the method which creates Eval instances for any \lin{LiteralExpr}, as they are the leaves of our tree:
+\vs\begin{lstlisting}
+implicit def LiteralEval[V] = new Eval[LiteralExpr[V],V] {
+  def apply(v: LiteralExpr[V]): V = v.value //simply return the value
+}
+\end{lstlisting}\vs
+The inductive cases construct a function to recursively evaluate non-leaf ASTs by requiring implicit instances of \lin{Eval} for the children of the root node, and additionally the relevant typeclass for the operator which the node represents. For example, for an \lin{AddExpr}:
+\vs\begin{lstlisting}
+ implicit def AddEval[E1,E2,T]
+   (implicit evalL: Eval[E1,T], evalR: Eval[E2,T], ring: Ring[T]) =
+    new Eval[AddExpr[E1,E2],T]  {
+      def apply(v1: AddExpr[E1,E2]): T = v1 match {
+        case AddExpr(e1,e2) => ring.add(evalL(e1),evalR(e2))
+    }
+\end{lstlisting}\vs
+This implements the evaluation of an \lin{AddExpr} node by:
+\begin{enumerate}
+\item{Evaluating the left child, using \lin{evalL}}.
+\item{Evaluating the right child, using \lin{evalR}}
+\item{Adding the two results together, using \lin{ring}}
+\end{enumerate}
+The same pattern is followed for all other operators. The slight exceptions are \lin{SngExpr} and products of expressions, as they do not require instances of typeclasses to apply operators. \lin{SngExpr} simply evaluates its arguments and constructs a singleton \lin{Map} from them. In the case of an HList of expressions, it simply prepends the result of evaluating the head expression to the HList obtained by evaluating the tail expression.
+
+Then, as with the operators, we can implement a generic function to evaluate any valid expression:
+\vs\begin{lstlisting}
+def evaluate[E,T](e: E)(implicit expr: Expr[E], eval: Eval[E,T]): T =
+  eval(e)
+\end{lstlisting}\vs
+
+\subsection{Extending to infinite mappings and variables}
+The simplified presentation of \lin{Eval} is insufficient to evaluate ASTs containing infinite mappings and variables. This is because it is a simple unary function which must be able to evaluate any expression independent of the context in which it occurs. Yet, it should be clear that variables cannot be evaluated without being able to access the current value bound to that variable, which happens in an outer level of the evaluation.
+Therefore we introduce an updated interface, which includes a \textit{namespace} for this purpose:
+\vs\begin{lstlisting}
+trait Eval[Expr,Out] extends ((Expr,Namespace) => Out)
+\end{lstlisting}\vs
+This will allow evaluation to bind variables to concrete values before passing the \lin{Namespace} to the evaluation of its child expressions, where this is appropriate. Then, when a variable is evaluated at the leaf of the tree, its value can be looked up in the \lin{Namespace}. A simplified presentation of the \lin{Namespace} interface is as follows:
+\vs\begin{lstlisting}
+trait Namespace {
+  def bind[T](v: TypedVariable[T], t: T): Namespace
+  def get[T](v: TypedVariable[T]): T
+}
+\end{lstlisting}\vs
+Note that this requires a \lin{TypedVariable[T]} rather than just a \lin{Variable}. The type \lin{T} is the concrete type the variable will be bound to during evaluation. The reason for this is so that the \lin{Namespace} can return the value of the variable with the proper type, as it holds the variables internally in a \lin{Map[String,Any]}. This means that variables in ASTs must be tagged with these types before the ASTs can be evaluated. However, rather than having to write these manually into the query, which would be cumbersome and extremely tricky, there is a process to infer these automatically at compile time. This is included for the interested reader in Appendix \ref{codebase} in the files \textit{Resolver.scala} and \textit{Tagger.scala}.
+
+Putting aside the question of binding variables for the moment, evaluating variables is now straightforward. Assuming the namespace received by Eval has all variables correctly bound, we can now generate instances of Eval for variables:
+\vs\begin{lstlisting}
+implicit def VariableEval[T] = new Eval[TypedVariable[T],T] {
+  def apply(v1: TypedVariable[T], v2: Namespace): T = v2.get(v1)
+}
+\end{lstlisting}\vs
+Altering \lin{Eval} for nodes which do not bind any new variables, i.e. our standard operators, is also straightforward. The children of these nodes are simply evaluated with the namespace that was passed to the parent, without alteration. For example, evaluation of addition is now:
+\vs\begin{lstlisting}
+implicit def AddEval[E1,E2,T
+  (implicit evalL: Eval[E1,T], evalR: Eval[E2,T], ring: Ring[T]) =
+    new Eval[AddExpr[E1,E2],T]  {
+      def apply(v1: AddExpr[E1,E2], v2: Namespace): T = v1 match {
+        case AddExpr(e1,e2) => ring.add(evalL(e1, v2),evalR(e2, v2))
+      }
+   }
+\end{lstlisting}\vs
+
