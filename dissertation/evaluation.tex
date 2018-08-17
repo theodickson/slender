@@ -216,4 +216,78 @@ implicit def AddEval[E1,E2,T
       }
    }
 \end{lstlisting}\vs
+Finally, we come to the evaluation of infinite mappings, which is where variables are initially bound. An infinite mapping has two parts, the key, which is a variable, and a value (or body), which is a ring-typed expression which may contain the value. Although the infinite mapping itself cannot be evaluated to a concrete value, when it is multiplied with a finite collection, it produces a finite collection. We can model this by evaluating infinite mappings as anonymous functions, which, when passed a value for the variable, produce the result of evaluating the body with the variable bound to that value. This logic is encapsulated as follows:
+\vs\begin{lstlisting}
+implicit def InfMappingEval[T,R,KT,RT](implicit evalR: Eval[R,RT]) =
+  new Eval[InfMappingExpr[TypedVariable[T],R],T => RT] {
+    def apply(v1: InfMappingExpr[TypedVariable[T],R], v2: Namespace) =
+      v1 match { case InfMappingExpr(k,r) => (t: T) => {
+          //produce an updated namespace with the variable k
+          //bound to the value t:
+          val newNamespace = v2.bind(k,t)
+          //evaluate the body using this namespace
+          evalR(r,newNamespace) 
+        }
+      }
+    }
+\end{lstlisting}\vs
+Then, we can implement the multiplication of a finite collection with an infinite mapping as:
+\begin{enumerate}
+\item{Evaluate the left child, producing a finite collection of type $\coll{\K}{\R_1}$}.
+\item{Evaluate the right child, producing an anonymous function of type \lin{K => R2}}.
+\item{For each key in the finite collection, apply the anonymous function to that key to produce a value \lin{r2:R2} and update its original value \lin{r1:R1} to \lin{r1 dot r2}.}
+\end{enumerate}
+\vs
+This completes our construction of standard, non-shredded evaluation. In the next section we discuss how to extend this for shredded evaluation.
 
+\section{Evaluating shredded queries}
+
+In order to produce the shredded output, we introduce a second, similar interface to \lin{Eval}:
+\vs\begin{lstlisting}
+trait ShreddedEval[Expr,Flat,Ctx <: HList]
+  extends ((Expr,Namespace) => (Flat,Ctx))
+\end{lstlisting}\vs
+As opposed to \lin{Eval}, which is an abstraction of a function from an expression tree and a namespace to single result, this is an abstraction of a function from an expression tree and a namespace to flat result and a shredding context. We use an HList as the context because it allows us to easily construct and manipulate a product structure with arbitrary levels of nesting, which as shown in \ref{shreddingtypes} is the form that the shredding context takes.
+
+The implementations then proceed according to the definition of the shredding transformation. The flat output is produced by replacing key-nested collections where appropriate, and the context by combining child contexts and adding dictionaries where key-nested collections have been replaced. For the majority of operators, these implementations are straightforward. We illustrate this with the implementation for a product (i.e. HList) of expressions:
+\vs\begin{lstlisting}
+implicit def HListShreddedEval[
+  H,T,HF,TF,HC <: HList,TC <: HList,C <: HList
+](implicit evalH: ShreddedEval[H,HF,HC], evalT: ShreddedEval[T,TF,TC]) =
+  new ShreddedEval[H::T,HF::TF,C] {
+    def apply(v1: H::T, v2: Namespace): (HF::TF,HC::TC) = {
+      val (hf,hc) = eval1(v1.head,v2)
+      val (tf,tc) = eval2(v1.tail,v2)
+      (hf::tf,hc::tc)
+    }
+  }
+\end{lstlisting}\vs
+Here, the head and tail are shredded and evaluated recursively, producing a flat output and shredding context for each. Then, the flat outputs and contexts are themselves combined using :: to produce the final output.
+
+However, in the case of $group$, the operator which actually constructs nested collections, we must replace these nested collections with labels in the flat output, and compute the defining dictionary for these labels to be added to the shredding context. Formally, given input $X: \coll{\K_1 \times \K_2}{\R}$, we must first recursively shred this, resulting in $X^F: \coll{\K_1^F \times \K_2^F}{\R^F}$, and then compute $flatGroup(X^F): \coll{(K_1^F \times \Label)}{\R^F}$ and $dict(X^F): \coll{\Label}{(\coll{\K_2^F}{\R^F})}$.
+
+To compute $flatGroup(X^F)$, we needn?t first compute the result of applying the group operator, which can lead to load-imbalance. Leveraging the semantics of the group operator, instead we just need to output one element per unique value of type $\K_1^F$, along with a label replacing the inner collection. These elements must have multiplicity equal to the aggregate multiplicity of all keys in $X^F$ with that value for $K_1^F$. For RDDs, this is done as follows:
+\vs\begin{lstlisting}
+val flatIn: RDD[((K1F,K2F),RF)]
+val flatOut: RDD[((K1F,Label),Int)] = flatIn.map { case ((k1f,k2f),rf) => (k1f,1) }
+  .reduceByKey(_ + _)
+  .map { case (k1,r) => ((k1,Label(k1)),r) } //add the label for each
+\end{lstlisting}\vs
+Here a memory-efficient \lin{reduceByKey} operation is used with addition as the reduction function in order to compute the aggregate value for each element with a given value of $\K_1^F$.
+
+To compute the dictionary, we first need to choose an implementation. As mentioned previously, we would like the dictionaries to load-balance the inner collections as well as be efficiently updatable. To do this, since these dictionaries are themselves collections, we will also use an RDD. However, it will have an important distinction from the RDDs representing other collections - the RDDs for dictionaries will be a \textit{sharded representation}. That is, for each label, we will allow multiple rows, and consider the full nested collection defined by the label to be the sum of the values of each matching row. Thus the dictionary is computed as follows:
+\vs\begin{lstlisting}
+val flatIn: RDD[((K1F,K2F),RF)]
+val dict: RDD[(Label,Map[K2F,RF]) = flatIn.map { case ((k1f,k2f),rf) =>
+  (Label(k1f),Map(k2f -> rf))
+}
+\end{lstlisting}\vs
+
+Instead of actually grouping together the key elements of type $\K_2^F$ for each key element of type $\K_1^F$, we simple create a shard from each row by instantiating a singleton \lin{Map}. Now our dictionary contains the full definitions of each Label, but is load-balanced as all inner physical collections are singletons. Additionally, it has been efficiently created using a simple map operation.
+
+Finally, we add this dictionary to the shredding context by pairing it with the shredding context for the input collection to group. The logic for these two actions is encapsulated in a single interface \lin{GroupShredder}, which takes an input collection and produces the flat output and corresponding dictionary. It has the following signature:
+\vs\begin{lstlisting}
+trait GroupShredder[In,Flat,Dict] extends (In => (Flat,Dict))
+\end{lstlisting}\vs
+
+To summarise, we have thus calculated a representation of the output of $group(X)$ which contains, instead of one key-nested output, two value-nested outputs, without having to physically aggregate inner collections on one worker, thus improving the load-balancing of the computation. Additionally, since these outputs are value-nested, and the value-nested collections are sharded, they can be updated efficiently if we wish to incrementalise the query. The next section focuses on how we implemented this incrementalisation.

@@ -97,9 +97,17 @@ This operation can natively implement certain useful operations. For example, th
 The dot product is distributive:
 
 \begin{equation*}
-\textrm{\textit{(Proof of dot product distributivity)}}
+\begin{split}
+& \textrm{If } X: \prim{Int}, \ Y: \prim{Int}\textrm, \ Z: \Int: \\
+&X \cdot (Y + Z) = X * (Y + Z) = X*Y + X*Z = X \cdot Y + X \cdot Z \\ \\
+& \textrm{If } X: \coll{\K}{\R}, \ Y: \prim{Int}, \ Z: \Int: \\
+& (X \cdot (Y+Z))(k) = X(k) \cdot (Y+Z) = X(k) \cdot Y + X(k) \cdot Z = (X \cdot Y)(k) + (X \cdot Z)(k) \\ \\
+& \textrm{If } X: \coll{\K_1}{\R_1}, \ Y: \coll{\K_2}{\R_2}, \ Z: \coll{\K_2}{\R_2} \\
+& (X \cdot (Y+Z))(\langle k_1, k_2 \rangle) = X(k_1) \cdot (Y+Z)(k_2) = X(k_1) \cdot Y(K_2) + X(k_1) \cdot Z(k_2) \\
+&= (X \cdot Y)(k_1) + (X \cdot Z)(k_2) 
+\end{split}
 \end{equation*}
-
+\vs
 It also allows us to extend the native ring multiplication operation to collections of the same key type but differing ring types, as follows:
 
 \begin{equation*}
@@ -125,9 +133,13 @@ Although the $*$ operator can be described as join-like when used on collections
 We can see that this is a join as a key $\langle k, \langle k_1, k_2 \rangle \rangle$ will only be non-zero in the output if $\langle k, k_1 \rangle$ is non-zero in $X$ and $\langle k, k_1 \rangle$ is non-zero in $Y$. It is general enough to model all inner-joins if we re-order the elements (or columns) of the key such that the element(s) we wish to join on constitute the first element of the key and the other columns are nested within the second element. 
 
 The $join$ operator is also distributive:
-
 \begin{equation*}
-\textrm{\textit{(Proof of join distributivity)}}
+\begin{split}
+&X: \coll{(\K,\K_1)}{\R_1},  \ Y: \coll{(\K,\K_2)}{\R_2}, \ Z: \coll{(\K,\K_2)}{\R_2} \\
+&join(X,Y+Z)(\pair{k}{\pair{k_1}{k_2}}) = X(\pair{k}{k_1}) \cdot (Y+Z)(\pair{k}{k_2}) \\
+&=X(\pair{k}{k_1}) \cdot Y(\pair{k}{k_2}) + X(\pair{k}{k_1}) \cdot Z(\pair{k}{k_2}) \\
+&=join(X,Y)(\pair{k}{\pair{k_1}{k_2}}) + join(X,Z)(\pair{k}{\pair{k_1}{k_2}})
+\end{split}
 \end{equation*}
 
 The sum operator is another which is used in our for-comprehension construct, and is defined as follows: 
@@ -276,30 +288,58 @@ Which clearly gives us a very natural syntax with which to manipulate these coll
 
 \section{Incremental updates to queries} {
 
+\begin{figure}
+\begin{equation*}
+\begin{aligned}
+&\delta_X(c) = 0 \qquad \delta_X(X) = \Delta X \qquad \delta_X(Y) = 0\\
+&\delta_X(\pair{r_1}{r_2}) = \pair{\delta_X(r_1)}{\delta_X(r_2)} \qquad \delta_X(\proj{r}{i}) = \proj{\delta_X(r)}{i}\\
+&\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2) \qquad \delta_X(-r) = -\delta_X(r)\\
+&\delta_X(r_1 * r_2) = \delta_X(r_1)*r_2 + r_1*\delta_X(r_2) + \delta_X(r_1) * \delta_X(r_2) \\
+&\delta_X(r_1 \cdot r_2) = \delta_X(r_1) \cdot r_2 + r_1 \cdot \delta_X(r_2) + \delta_X(r_1) \cdot \delta_X(r_2) \\
+&\delta_X(join(r_1,r_2)) = join(\delta_X(r_1),r_2) + join(r_1,\delta_X(r_2)) + join(\delta_X(r_1),\delta_X(r_2)) \\
+&\delta_X(sum(r)) = sum(\delta_X(r)) \qquad \delta_X(\{x => r\}) = \{x => \delta_X(r)\} \\
+&\delta_X(sng(k,r)) = sng(e^{new},r)  + sng(e^{new},\delta_X(r)) - sng(e^{old},r) \\
+&\delta_X(group(r)) = group(r + \delta_X(r)) - group(r)
+\end{aligned}
+\qquad
+\end{equation*}
+\caption{Delta derivation rules for NRC expressions.}
+\label{deltaexprs}
+\end{figure}
+
 In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
 
 Figure \ref{deltaexprs} shows these expressions. The fact that the updates are modelled with addition allows us to exploit the algebraic properties of the operators to derive efficient delta expressions in the majority of cases. For example, we exploit the linearity of $+$ to derive the delta rule: \\
 
-$\delta_X(r1 + r2) = \delta_X(r1) + \delta_X(r2)$, \\
+$\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)$, \\
 
 since \\
 
-$(r1 + \delta_X(r1)) + (r2 + \delta_X(r2)) = (r1 + r2) + (\delta_X(r1) + \delta_X(r2))$. \\
+$(r1 + \delta_X(r_1)) + (r2 + \delta_X(r_2)) = (r_1 + r_2) + (\delta_X(r_1) + \delta_X(r_2))$. \\
 
 Linearity is similarly used for $-$ and $sum$. These rules are very efficient because they do not depend at all on the $X$, only $\delta X$.
 
-The slightly more complicated rules for multiplication, the dot product, and the join operator are a result of their distributivity. We illustrate the derivation of the rule for multiplication below: \\
-
-\textit(derivation of delta rule for *) \\
-
-This derivation is also valid for the dot product and join as it only uses the distributive property which they all share. While these rules are not quite as efficient as the rules for the linear operators, they are still much more efficient than re-computing. This is because the terms that do depend on an input collection, e.g. $\delta X * Y$, will constitute a join in practice between an update and only one of the input collections. Since the updates are in general small compared to the size of the input collections, these joins will be much more efficient that the cost of the original join between the two input collections.
+The slightly more complicated rules for multiplication, the dot product, and the join operator are a result of their distributivity. We illustrate the derivation of the rule for multiplication below:
+\vs
+\begin{equation*}
+\begin{split}
+(r_1 + \delta_X(r_1))*(r_2 + \delta_X(r_2)) &= (r_1 + \delta_X(r_1))*r_2 + (r_1 + \delta_X(r_1))*\delta_X(r_2) \\
+&= r_1*r_2 + \delta_X(r_1)*r_2 + r_1*\delta_X(r_2) + \delta_X(r_1) * \delta_X(r_2) \\
+\implies \delta_X(r_1*r_2) &= \delta_X(r_1)*r_2 + r_1*\delta_X(r_2) + \delta_X(r_1) * \delta_X(r_2)
+\end{split}
+\end{equation*}
+\vs
+This derivation is also valid for the dot product and join as it only uses the distributive property which they all share. While these rules are not quite as efficient as the rules for the linear operators, they are still much more efficient than re-computing. This is because the terms that do depend on an input collection, e.g. $\delta_X(r_1) * r_2$, will constitute a join in practice between an update and only one of the input collections. Since the updates are in general small compared to the size of the input collections, these joins will be much more efficient that the cost of the original join between the two input collections.
 
 Unfortunately, we can see that the expressions for $sng$ and $group$ are not efficient - they do require recomputation This is because they both can construct key-nested collections. But, unlike our other operators which are either linear, or distribute over $+$, the construction of key-nested collections is neither.
 
-Fortunately, in the case of $sng$, if the key-typed argument is unaffected by the update, the delta expression simplifies to: \\
-
-\textit{(simplified sng delta expression)} \\
-
+Fortunately, in the case of $sng$, if the key-typed argument is unaffected by the update, so that $e^{new} = e^{old} = e$, the delta expression simplifies as follows:
+\begin{equation*}
+\begin{split}
+sng(e^{new},r) + sng(e^{new},\delta_X(r)) - sng(e^{old},r) &= sng(e,r) + sng(e,\delta_X(r)) - sng(e,r) \\
+&= sng(e,\delta_X(r))
+\end{split}
+\end{equation*}
 which is an efficient incrementalisation. In practice, usage of $sng$ will largely be confined to the for/yield construction where the yielded key is a variable expression, and so will be unaffected by updates to input collections. 
 
 For $group$, there is no such special case, but we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over $+$.
@@ -370,5 +410,69 @@ While in this simple example, the nested structure containing various empty cont
 
 \subsection{Formal definition of shredding}
 
-Now we can formally define the transformations for the concrete expressions of our calculus. 
+\begin{figure}
+\begin{equation*}
+\begin{aligned}
+&\pair{r_1}{r_2}^F = \pair{r_1^F}{r_2^F} \qquad (\proj{r}{i})^F = \proj{r^F}{i} \\
+&(r_1 + r_2)^F = r_1^F + r_2^F \qquad (-r)^F = -(r^F) \\
+&(r_1*r_2)^F = r_1^F * r_2^F \qquad (r_1 \cdot r_2)^F = r_1^F \cdot r_2^F  \\
+&join(r_1,r_2)^F = join(r_1^F,r_2^F) \qquad sum(r)^F = sum(r^F) \\
+&\{x => r\}^F = \{x => r^F \} \qquad sng(k,r)^F = sng(k^F,r^F) \\
+&group(r)^F = flatGroup(r^F) \\
+\end{aligned}
+\qquad
+\end{equation*}
+\caption{Definition of $(\cdot)^F$ transformation.}
+\label{flatdef}
+\end{figure}
+
+\begin{figure}
+\begin{equation*}
+\begin{aligned}
+&\pair{r_1}{r_2}^\Gamma = \pair{r_1^\Gamma}{r_2^\G} \qquad (\proj{r}{i})^\G = \proj{r^\G}{i}  \qquad (p(x))^\Gamma = \emptyset \\
+&(r_1 + r_2)^\G = r_1^\G \cup r_2^\G \qquad (-r)^\G = (r^\G) \\
+&(r_1*r_2)^\G = r_1^\G \odot r_2^\G \qquad (r_1 \cdot r_2)^\G = \pair{r_1^{\G_1} \cap r_2^{\G_1}}{r_1^{\G_2} \odot r_2^{\G_2}}  \\
+&join(r_1,r_2)^\G = \pair{\pair{r_1^{\G_{1_1}} \cap r_2^{\G_{1_1}}}{r_1^{\Gamma_{1_2}},r_2^{\Gamma_{2_2}}}}{r_1^{\G_2} \odot r_2^{\G_2}} \\&sum(r)^\G = r^\G_2 \qquad sng(k,r)^\G = sng(k^\G,r^\G) \\
+&group(r)^\G = \pair{dict(r^F)}{r^\G} \\
+\end{aligned}
+\qquad
+\end{equation*}
+\caption{Definition of $(\cdot)^\Gamma $ transformation.}
+\label{contextdef}
+\end{figure}
+
+The flattening transformation $(\cdot)^F$ is formally defined in Figure \ref{flatdef}. It is a simple recursive definition except for the case of $group$, which constructs key-nested collections. For $group(r)$, supposing $r: \coll{\K_1 \times \K_2}{\R}$, then $group(r): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\R}$. We use the notation $flatGroup(r)$ for the expression of type $\coll{K_1^F\times \Label}{\R^F}$ where the key-nested collections have been replaced by labels.
+
+The definition of $(\cdot)^\G$, given in Figure \ref{contextdef}, is much more involved. In these formulae, we assume the context of collection-typed arguments has two elements $\G_1$ and $\G_2$, as we know from our definition of the types of shredding contexts that the context of a collection $\coll{\K}{\R}$ is of the form $\pair{\K^\G}{\R^\G}$.
+
+The derivations for pairs, $sng$ and infinite mappings are straightforward - we construct the shredding context by simply pairing the contexts of the constituent parts. Sum is also straightforward - since summing a collection removes the keys, we only need the context for the values, so return the second part of the input context only.
+
+For the other operators, it is a little more complicated, as they require combining the corresponding dictionaries.
+
+For example, when adding two shredded collections, the two dictionaries for each boxed ring type must be added together to produce a dictionary containing the definitions for the key-nested collections from both collections. This is represented with the union operator.
+
+For the dot product, we represent the derivation of the shredding context with the operation:
+\begin{equation*}
+\begin{split}
+&r_1: \coll{\K_1}{\R_1}\textrm{, }r_2: \coll{\K_2}{\R_2} \\
+&r_1^\G \odot r_2^\G = \pair{\pair{r_1^{\G_1}}{r_2^{\G_1}}}{r_1^{\G_2} \odot r_2^{\G_2}}
+\end{split}
+\end{equation*}
+
+This operation, according to the definition of the dot product, pairs the contexts of the keys of the operands and is recursively applied to the values.
+
+For multiplication, the key's context is the intersection of the two operands key contexts, since keys will only appear in the output if they appear in both inputs. The value?s context, according to the definition of multiplication, is derived again using the $\odot$ operation as the value of the result is the dot product of the values.
+
+For $join$, the first element of the key is similarly the intersection of contexts, and the second element of the key pairs the context of the second elements of the inputs. Again, as the value is computed as the dot product of the input values, we use the $\odot$ operation to compute the context of the vaue.
+
+Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shred, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$.
+
+We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in sections \ref{} and \ref{} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
+
+
+
+
+
+
+
 }

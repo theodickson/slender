@@ -1,0 +1,50 @@
+\chapter{Incrementalising queries}
+
+In this chapter we discuss how the DSL was extended to evaluate queries on Spark DStreams, an abstraction for a sequence of RDDs which constitute batches of a single collection. We explain how we leverage the delta expressions derived in \ref{} to efficiently evaluate most expressions involving DStreams, and how we evaluate group expressions by recomputing the output with each new batch.
+
+We then show how recomputation is avoided when shredding is applied, as the dictionaries produced by shredding are not key-nested and so retain the distributive property over their keys.
+
+\section{DStreams}
+
+In Apache Spark, a DStream \cite{dstream} is a sequence of RDDs, paired with timestamps, which represent batches of a single collection. The abstraction is designed to enable the batch-processing of live streams of data. For example, Spark may be configured to periodically read from a log file, each time generating an \lin{RDD[(String,Int)]} consisting of the unique messages and their counts written to the file in the latest interval.
+
+Access to this sequence of RDDs is controlled by a \lin{DStream[(String,Int)]}, which offers a subset of the RDD API. This consists of operations which can be applied to the constituent RDDs independently, so that previous batches needn't remain in memory in order to process later batches. For example, there is no method \lin{distinct} on a DStream, because we would expect the output of each batch to consist only of rows not seen previously, and determining this would require the entire previous output to be held in memory. However, stateless operations such as \lin{map}, \lin{flatMap}, and \lin{filter} are available. There are also operations which can combine two DStreams, such as \lin{union} and \lin{join}.
+
+
+\section{Implementing algebraic operators for DStreams}
+
+In order to be able to evaluate queries with DStream inputs, we only need to implement the algebraic operators for DStream operands.  This is because the \lin{Eval} interface is agnostic to the type of the underlying dataset - to evaluate a give node it only needs to be able to evaluate its children and have available an instance of the relevant operator interface. For example, when multiplying two input collections of type \lin{DStream[(K,V)]}, it would just need to be able to evaluate a \lin{LiteralExpr[DStream[(K,V)]]} and then evaluating the outer \lin{MultiplyExpr} would just require an instance of \lin{Multiply[DStream[(K,V)],DStream[(K,V)],O]}.
+
+However, we must make sure that the implementations of the operators respect the delta expressions derived in section \ref{}, as each RDD in a DStream represents a delta update to the collection represented by the previous RDDs. To enable reasoning about DStreams in this way, we now introduce some notation.
+\vs
+Let $X$ be a \lin{DStream[(K,R)]}. Then:
+\begin{equation*}
+\begin{split}
+&X = [\pair{t_1}{x_1}, \pair{t_2}{x_2}, \dots, \pair{t_n}{x_n}] \textrm{ for some $n \in \mathbb{N}$, where:} \\
+&x_i: RDD[(K,R)] \\
+&t_i: \prim{Timestamp} \textrm{ is the time that batch $x_i$ was received.}
+\end{split}
+\end{equation*}
+We will assume that, according to the incrementalisation formalism introduced in \ref{}, the $x_i$ represent partitions of a single collection $X?: \coll{\K}{\R}$. This logical collection can be computed by summing the $x_i$ using the addition operator already implemented for RDDs:
+\begin{equation*}
+X' = x_1 + x_2 + \dots + x_n
+\end{equation*}
+Note that this means that the $x_i$ may have non-unique keys, and thus the value of a given key in $X'$ may be partitioned across multiple RDDs in the DStream.
+\vs
+We will use $\approx$ to denote equality up to partitioning. That is, Hence, $X \approx X'$. We will accept as outputs for queries involving DStreams results which are correct up to partitioning.
+\vs
+Also, for each $i = 1, \dots, n$ we will let:
+\begin{equation*}
+X^i = \sum_{j = 1}^i{x_j}
+\end{equation*}
+Hence, since:
+\begin{equation*}
+X^i = \sum_{j = 1}^i{x_j} = \sum_{j = 1}^{i-1}{x_j} + x_i.
+\end{equation*}
+We have that:
+\begin{equation*}
+\delta_X(X^{i-1}) = x_i.
+\end{equation*}
+\section{Shredded evaluation of DStream queries}
+
+Now that we have 
