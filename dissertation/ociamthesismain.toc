@@ -36,4 +36,7 @@
 \contentsline {chapter}{\numberline {5}Incrementalising queries}{41}
 \contentsline {section}{\numberline {5.1}DStreams}{41}
 \contentsline {section}{\numberline {5.2}Implementing algebraic operators for DStreams}{42}
-\contentsline {section}{\numberline {5.3}Shredded evaluation of DStream queries}{43}
+\contentsline {subsection}{\numberline {5.2.1}Linear operations}{43}
+\contentsline {subsection}{\numberline {5.2.2}Distributive operations}{43}
+\contentsline {subsection}{\numberline {5.2.3}Group}{44}
+\contentsline {section}{\numberline {5.3}Shredded evaluation of DStream queries}{45}
