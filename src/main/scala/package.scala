@@ -7,8 +7,12 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import java.lang.System.currentTimeMillis
 
+import org.apache.spark.sql.SparkSession
+import shapeless.HList
+
 trait types {
   type Namespace = Map[String,Any]
+  type DStreamTest = ((SparkSession,StreamingContext) => Unit)
 }
 
 package object slender extends types with Serializable {
@@ -68,8 +72,9 @@ package object slender extends types with Serializable {
     }
   }
 
-  implicit class DStreamImplicits[T](dstream: DStream[T]) {
-    def profile(limit: Int = 10, toCache: List[RDD[_]])(implicit ssc: StreamingContext): Unit = {
+  implicit class SDStreamImplicits[DS <: SDStream[DS],T](sdstream: SDStream.Aux[DS,T]) {
+    def profile(limit: Int = 10, toCache: List[RDD[_]], spark: SparkSession, ssc: StreamingContext): Unit = {
+      val dstream = sdstream.dstream
       toCache.foreach { rdd => rdd.cache.count }
       var counter: Int = 0
       var time = currentTimeMillis()
@@ -82,14 +87,43 @@ package object slender extends types with Serializable {
           val currentTime = currentTimeMillis()
           val interval = currentTime - time
           totalTime += interval
-          println(s"$counter - $totalTime ($interval) ($count)")
+          //println(s"$counter - $totalTime ($interval) ($count)")
           time = currentTime
-          if (counter == limit) done = true
+          if (counter == limit) {println(s"$counter - $totalTime ($interval) ($count)"); done = true}
         }
       }
       ssc.start()
       while(!done) { java.lang.Thread.sleep(100) }
       ssc.stop()
+      spark.stop()
+    }
+  }
+
+  implicit class ShreddedResultImplicits[DS <: SDStream[DS],T,Ctx <: HList](result: ShreddedResult[SDStream.Aux[DS,T],Ctx]) {
+    def profile(limit: Int = 10, toCache: List[RDD[_]],
+                acc: Boolean = false, spark: SparkSession, ssc: StreamingContext)(implicit accumulate: Accumulate[DS,T]): Unit = {
+      val dstream = if (acc) result.flat.acc.dstream else result.flat.dstream
+      toCache.foreach { rdd => rdd.cache.count }
+      var counter: Int = 0
+      var time = currentTimeMillis()
+      var done: Boolean = false
+      var totalTime: Long = 0
+      dstream.foreachRDD { rdd =>
+        if (!done) {
+          counter += 1
+          val count = rdd.count
+          val currentTime = currentTimeMillis()
+          val interval = currentTime - time
+          totalTime += interval
+//          println(s"$counter - $totalTime ($interval) ($count)")
+          time = currentTime
+          if (counter == limit) {println(s"$counter - $totalTime ($interval) ($count)"); done = true}
+        }
+      }
+      ssc.start()
+      while(!done) { java.lang.Thread.sleep(100) }
+      ssc.stop()
+      spark.stop()
     }
   }
 
@@ -103,12 +137,10 @@ package object slender extends types with Serializable {
     }
   }
 
-  def rddToDStream[T:ClassTag](rdd: RDD[T], n: Int = 5, rep: Int = 1)(implicit ssc: StreamingContext): DStream[T] = {
+  def rddToDStream[T:ClassTag](rdd: RDD[T], n: Int = 5, ssc: StreamingContext): DStream[T] = {
     val rddWithIds: RDD[(T,Long)] = rdd.zipWithUniqueId
     val queue = new mutable.Queue[RDD[T]]
-    (0 until rep).foreach { _ =>
-      (0 until n).map(i => rddWithIds.filter(_._2 % n == i)).foreach { r => queue.enqueue(r.map(_._1)) }
-    }
+    (0 until n).map(i => rddWithIds.filter(_._2 % n == i)).foreach { r => queue.enqueue(r.map(_._1)) }
     ssc.queueStream(queue, true)
   }
 

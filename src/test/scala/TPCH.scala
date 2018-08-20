@@ -69,16 +69,16 @@ class TpchLocal(sampleName: String = "10_customers")(implicit spark: SparkSessio
 
 }
 
-class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: SparkSession, ssc: StreamingContext) {
-
-  private val rdds = new TpchRdds(sampleName)
-
-  lazy val customer = rddToDStream(rdds.customer, n)
-  lazy val orders = rddToDStream(rdds.orders, n)
-  lazy val lineitem = rddToDStream(rdds.lineitem, n)
-  lazy val part = rddToDStream(rdds.part, n)
-  lazy val partSupp = rddToDStream(rdds.partSupp, n)
-  lazy val supplier = rddToDStream(rdds.supplier, n)
-  lazy val nation = rddToDStream(rdds.nation, n)
-  lazy val region = rddToDStream(rdds.region, n)
-}
+//class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: SparkSession, ssc: StreamingContext) {
+//
+//  private val rdds = new TpchRdds(sampleName)
+//
+//  lazy val customer = rddToDStream(rdds.customer, n)
+//  lazy val orders = rddToDStream(rdds.orders, n)
+//  lazy val lineitem = rddToDStream(rdds.lineitem, n)
+//  lazy val part = rddToDStream(rdds.part, n)
+//  lazy val partSupp = rddToDStream(rdds.partSupp, n)
+//  lazy val supplier = rddToDStream(rdds.supplier, n)
+//  lazy val nation = rddToDStream(rdds.nation, n)
+//  lazy val region = rddToDStream(rdds.region, n)
+//}

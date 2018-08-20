@@ -194,7 +194,27 @@ This groups $X$ by the first element of its key and creates a key-nested collect
 \end{split}
 \end{equation*}
 
-\textit{(explanation of why key-nesting makes sense here, may want to focus on semantics of further joins etc instead of keeping track of multiplicity)}
+While this boolean value may seem redundant, and thus this representation may seem to offer no benefit over the value-nested representation: $\coll{\K_1}{(\coll{\K_2}{R})}$, it actually offers a key semantic benefit. It allows us to keep track of values of type $\K_1$ whose nested collections become empty when updating inputs to a query. Using the example above, suppose we receive an update to $X$:
+\begin{equation*}
+\dX = \{(\pair{b}{d} \mapsto -3\}
+\end{equation*}
+
+This translates to updating the key-nested collection $\pair{b}{\{d \mapsto 3\}}$:
+\begin{equation*}
+ \pair{b}{\{d \mapsto -3, d \mapsto 3\}} = \pair{b}{\{\}}
+ \end{equation*}
+However the entry $\pair{b}{\{\}} \mapsto true$ remains in the output, indicating that the inner collection keyed by $b$ exists but is empty.
+Letting $group^v(X)$ be the value-nested representation of $group(X)$:
+\begin{equation*}
+group^v(X) = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}, b \mapsto \{d \mapsto 3\}\}
+\end{equation*}
+When we update this with $\{b \mapsto \{d \mapsto 3\}\}$, we gets
+\begin{equation*}
+group^v(X) = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}, b \mapsto \{d \mapsto 0\}\} = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}\}
+\end{equation*}
+
+And so $b$ disappears from the top-level of our output entirely. 
+
 
 We recognise that this being the only way to construct key-nested collections is quite restrictive. In fact, in earlier work \cite{draftpaper}, the variant of the NRC used did not include this construct, but instead used a more general construct $toK$, which would box arbitrary sub-queries of ring type. Unfortunately, although this allowed for a more general query language, the queries written in this way proved highly impractical to implement within Spark. Appendix \ref{groupvstok} contains a discussion on this for the interested reader. Despite this, we will see in section \ref{} that even with this restriction we are still able to express a wide range of quite complex queries.
 
@@ -212,40 +232,31 @@ As with ring expressions, we also have tupling and projection.
 In this section we introduce several variants of a familiar syntactic construction, the for-comprehension, which will allow many queries to be written more naturally.
 
 Let $X$ be a finite collection of type $\coll{\K}{\R}$, $r_1$ be a ring expression of type $\R_1$, and $x$ be a variable of type $\K$. Our basic for-comprehension syntax is thus defined as:
-
 \begin{equation*}
- \For{x}{X} \Collect{r_1} := sum(X * \{x => r_1\})
- \end{equation*}
- 
- It is helpful to think of this as iterating over the key-value pairs $\pair{k}{r}$ in $X$, calculating the value of $r_1$ for each key $k$, and aggregating the result of multiplying this with $r$. For example, the query:
-
-\begin{equation*} 
-X : Bag(Int) \\
- \For{x}{X} \Collect{x > 2} = sum(X * \{x => x > 2\})
+\For{x}{X} \Collect{r_1} := sum(X * \{x => r_1\})
 \end{equation*}
-
+It is helpful to think of this as iterating over the key-value pairs $\pair{k}{r}$ in $X$, calculating the value of $r_1$ for each key $k$, and aggregating the result of multiplying this with $r$. For example, with $X: \Bag{\Int}$, the query:
+\begin{equation*} 
+\For{x}{X} \Collect{x > 2} = sum(X * \{x => x > 2\})
+\end{equation*}
 calculates the aggregate count of the keys in $X$ which are greater than 2, since:
-
 \begin{equation*}
 \begin{split}
 (X*\{x => x > 2\})(y) &= X(y)*true = X(y)\textrm{, if } y > 2 \\
  &= X(y)*false = 0\textrm{, otherwise.}
 \end{split}
 \end{equation*}
-
 We now add a variant of this which enables filtering collections with a natural syntax. With $p(x)$ a predicate expression:
 \begin{equation*}
- \ForIf{x}{X}{p(x)} \Collect{x > 2} := sum(X * \{x => r_1 \cdot p(x) \})
+\ForIf{x}{X}{p(x)} \Collect{x > 2} := sum(X * \{x => r_1 \cdot p(x) \})
 \end{equation*}
-
 Hence, we can instead write the above query as:
-
 \begin{equation*}
 \begin{split}
- \ForIf{x}{X}{x > 2} \Collect{1} &= sum(X * \{x => 1 \cdot (x > 2) \}) \\
- &=sum(X * \{x => x > 2) \}
- \end{split}
- \end{equation*}
+\ForIf{x}{X}{x > 2} \Collect{1} &= sum(X * \{x => 1 \cdot (x > 2) \}) \\
+&=sum(X * \{x => x > 2) \}
+\end{split}
+\end{equation*}
  
 These examples are quite limited in that they are only aggregations of a collection $X$. In order to transform $X$ more generally, we can use the singleton constructor. For example, consider the following query:
 \begin{equation*}

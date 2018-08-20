@@ -21,9 +21,9 @@ case class ExprOps[E:Expr](e: E) {
   def eval[R,Repr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr], tupler: DeepTupler[Repr,T]): T =
     tupler(evaluator(resolve(e),Map.empty))
 
-  def accEval[R,Repr,AccRepr,T]
-  (implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr],
-   acc: Accumulate[Repr,AccRepr], tupler: DeepTupler[AccRepr,T]): T = tupler(acc(evaluator(resolve(e), Map.empty)))
+//  def accEval[R,Repr,AccRepr,T]
+//  (implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr],
+//   acc: Accumulate[Repr,AccRepr], tupler: DeepTupler[AccRepr,T]): T = tupler(acc(evaluator(resolve(e), Map.empty)))
 
   def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
 

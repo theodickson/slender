@@ -9,7 +9,7 @@ trait SDStream[Self <: SDStream[Self]] { self: Self =>
 //  implicit def tag: ClassTag[T]
   def dstream: DStream[T]
   def map[S](f: DStream[T] => DStream[S]): SDStream.Aux[Self,S]
-  def acc[S](implicit accumulate: Accumulate[SDStream.Aux[Self,T],SDStream.Aux[AggDStream,S]]) = accumulate(self)
+  def acc(implicit accumulate: Accumulate[Self,T]): SDStream.Aux[AggDStream,T] = accumulate(self)
   def print: Unit = dstream.print
   def print(num: Int): Unit = dstream.print(num)
 }

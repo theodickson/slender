@@ -3,36 +3,39 @@ package slender
 import shapeless.syntax.singleton._
 import java.lang.System.nanoTime
 
-import org.apache.spark.streaming.{Milliseconds, Seconds}
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
 
 class TPCHDstreamTest extends SlenderSparkStreamingTest {
 
   import dsl._
-  val N = 10
+
   val batchDuration = Milliseconds(50)
-  val sampleName = "100000_customers"
-
-  val rdds = new TpchRdds(sampleName)
-  val dstreams = new TpchDstreams(sampleName, N)
-  val locals = new TpchLocal(sampleName)
-
-  lazy val customer = Bag(rdds.customer, "customer".narrow)
-  lazy val orders = Bag(rdds.orders, "orders".narrow)
-  lazy val lineitem = Bag(rdds.lineitem, "lineitem".narrow)
-  lazy val part = Bag(rdds.part, "part".narrow)
-  lazy val partSupp = Bag(rdds.partSupp, "partSupp".narrow)
-  lazy val supplier = Bag(rdds.supplier, "supplier".narrow)
-  lazy val nation = Bag(rdds.nation, "nation".narrow)
-  lazy val region = Bag(rdds.region, "region".narrow)
-
-  lazy val customerStreamed = Bag(dstreams.customer, "customer".narrow)
-  lazy val ordersStreamed = Bag(dstreams.orders, "orders".narrow)
-  lazy val lineitemStreamed = Bag(dstreams.lineitem, "lineitem".narrow)
-  lazy val partStreamed = Bag(dstreams.part, "part".narrow)
-  lazy val partSuppStreamed = Bag(dstreams.partSupp, "partSupp".narrow)
-  lazy val supplierStreamed = Bag(dstreams.supplier, "supplier".narrow)
-  lazy val nationStreamed = Bag(dstreams.nation, "nation".narrow)
-  lazy val regionStreamed = Bag(dstreams.region, "region".narrow)
+  val sampleName = "1000_customers"
+  val batchSizes = Seq(5,10,25)
+//  val rdds = new TpchRdds(sampleName)
+//  val dstreams = new TpchDstreams(sampleName, N)
+//  val locals = new TpchLocal(sampleName)
+//
+//  lazy val customer = Bag(rdds.customer, "customer".narrow)
+//  lazy val orders = Bag(rdds.orders, "orders".narrow)
+//  lazy val lineitem = Bag(rdds.lineitem, "lineitem".narrow)
+//  lazy val part = Bag(rdds.part, "part".narrow)
+//  lazy val partSupp = Bag(rdds.partSupp, "partSupp".narrow)
+//  lazy val supplier = Bag(rdds.supplier, "supplier".narrow)
+//  lazy val nation = Bag(rdds.nation, "nation".narrow)
+//  lazy val region = Bag(rdds.region, "region".narrow)
+//
+//  lazy val customerStreamed = Bag(dstreams.customer, "customer".narrow)
+//  lazy val ordersStreamed = Bag(dstreams.orders, "orders".narrow)
+//  lazy val lineitemStreamed = Bag(dstreams.lineitem, "lineitem".narrow)
+//  lazy val partStreamed = Bag(dstreams.part, "part".narrow)
+//  lazy val partSuppStreamed = Bag(dstreams.partSupp, "partSupp".narrow)
+//  lazy val supplierStreamed = Bag(dstreams.supplier, "supplier".narrow)
+//  lazy val nationStreamed = Bag(dstreams.nation, "nation".narrow)
+//  lazy val regionStreamed = Bag(dstreams.region, "region".narrow)
 
   val (c_custkey,c_name,c_nationkey) = Vars("C1","C2","C3")
   val (o_orderkey,o_custkey,o_orderdate) = Vars("O1","O2","O3")
@@ -43,10 +46,133 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
   val (n_nationkey,n_regionkey,n_name) = Vars("N1","N2","N3")
   val (r_regionkey,r_name) = Vars("R1", "R2")
 
-  object Q1 {
-    val inputs = List(rdds.lineitem, rdds.part, rdds.orders, rdds.customer)
+
+  def singleDStreamTest(test: (SparkSession,StreamingContext) => Unit): Unit = {
+    val spark = SparkSession.builder
+      .appName("test")
+      .config("spark.master", "local[1]")
+      .getOrCreate()
+
+    val ssc = {
+      val sc = spark.sparkContext
+      val out = new StreamingContext(sc,batchDuration)
+      out.checkpoint("_checkpoint")
+      out
+    }
+    test(spark,ssc)
+  }
+
+//  test("Table skews") {
+//    val spark = SparkSession.builder
+//      .appName("test")
+//      .config("spark.master", "local[1]")
+//      .getOrCreate()
+//    import spark.implicits._
+//    val sc = spark.sparkContext
+//    val rdds = new TpchRdds("10000_customers")(spark)
+//    val customer = rdds.customer.toDF("c_custkey", "c_name", "c_nationkey")
+//    customer.select("c_nationkey","c_custkey").distinct.groupBy("c_nationkey").count.describe("count").show
+//
+//    val lineitem = rdds.lineitem.toDF("l_orderkey","l_partkey","l_suppkey")
+//    lineitem.select("l_orderkey","l_partkey").distinct.groupBy("l_orderkey").count.describe("count").show
+//
+//    val orders = rdds.orders.toDF("o_orderkey","o_custkey","o_orderdate")
+//    orders.select("o_custkey","o_orderdate").distinct.groupBy("o_custkey").count.describe("count").show
+//    spark.stop()
+//  }
+//
+//  test("Group isolation test - lineitem") {
+//    def testGen(sampleName: String,
+//                batchSize: Int,
+//                shredded: Boolean,
+//                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+//      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+//      val rdds = new TpchRdds(sampleName)(spark)
+//      val dstream = rddToDStream(rdds.lineitem, batchSize, ssc)
+//      val lineitem = Bag(dstream, "lineitem".narrow)
+//      val query = Group(
+//        For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_orderkey,l_partkey)
+//      )
+//
+//      if (!shredded) query.eval.profile(batchSize,List(rdds.lineitem),spark,ssc)
+//      else query.shreddedEval.profile(batchSize,List(rdds.lineitem),acc,spark,ssc)
+//      println()
+//    }
+//    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+//    batchSizes.foreach { batchSize =>
+//      tests += testGen(sampleName,batchSize,false,false)
+//      tests += testGen(sampleName,batchSize,true,false)
+//      tests += testGen(sampleName,batchSize,true,true)
+//    }
+//    println(s"Query - group(lineitem). Dataset - $sampleName")
+//    tests.foreach(singleDStreamTest)
+//    println()
+//  }
+//
+//  test("Group isolation test - customer") {
+//    def testGen(sampleName: String,
+//                batchSize: Int,
+//                shredded: Boolean,
+//                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+//      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+//      val rdds = new TpchRdds(sampleName)(spark)
+//      val dstream = rddToDStream(rdds.customer, batchSize, ssc)
+//      val customer = Bag(dstream, "customer".narrow)
+//      val query = Group(
+//        For ((c_custkey,c_name,c_nationkey) <-- customer) Yield (c_nationkey,c_custkey)
+//      )
+//      if (!shredded) query.eval.profile(batchSize,List(rdds.lineitem),spark,ssc)
+//      else query.shreddedEval.profile(batchSize,List(rdds.lineitem),acc,spark,ssc)
+//      println()
+//    }
+//    val sampleName = "10000_customers"
+//    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+//    val batchSizes = Seq(5,10,25,50)
+//    batchSizes.foreach { batchSize =>
+//      tests += testGen(sampleName,batchSize,false,false)
+//      tests += testGen(sampleName,batchSize,true,false)
+//      tests += testGen(sampleName,batchSize,true,true)
+//    }
+//    println(s"Query - group(customer). Dataset - $sampleName")
+//    tests.foreach(singleDStreamTest)
+//    println()
+//  }
+//
+//  test("Group isolation test - orders") {
+//    def testGen(sampleName: String,
+//                batchSize: Int,
+//                shredded: Boolean,
+//                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+//      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+//      val rdds = new TpchRdds(sampleName)(spark)
+//      val dstream = rddToDStream(rdds.orders, batchSize, ssc)
+//      val orders = Bag(dstream, "orders".narrow)
+//      val query = Group(
+//        For ((o_orderkey,o_custkey,o_orderdate) <-- orders) Yield (o_custkey,o_orderdate)
+//      )
+//      if (!shredded) query.eval.profile(batchSize,List(rdds.lineitem),spark,ssc)
+//      else query.shreddedEval.profile(batchSize,List(rdds.lineitem),acc,spark,ssc)
+//      println()
+//    }
+//    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+//    batchSizes.foreach { batchSize =>
+//      tests += testGen(sampleName,batchSize,false,false)
+//      tests += testGen(sampleName,batchSize,true,false)
+//      tests += testGen(sampleName,batchSize,true,true)
+//    }
+//    println(s"Query - group(orders). Dataset - $sampleName")
+//    tests.foreach(singleDStreamTest)
+//    println()
+//  }
+
+  test("Q1") {
+
     /**Q1 with ONLY lineitem streamed*/
-    def apply[V,ID](lineitem: LiteralExpr[V,ID]) = {
+    def genQuery[V,ID](rdds: TpchRdds, lineitem: LiteralExpr[V,ID]) = {
+      val customer = Bag(rdds.customer, "customer".narrow)
+      val orders = Bag(rdds.orders, "orders".narrow)
+      val part = Bag(rdds.part, "part".narrow)
+
       val (orderKey0, partName0) = Vars("X1", "X2")
       val (partNames0, custKey0, orderDate0) = Vars("Y1", "Y2", "Y3")
       val (orderDate1, partNames1, custName0) = Vars("Z1", "Z2", "Z3")
@@ -72,295 +198,250 @@ class TPCHDstreamTest extends SlenderSparkStreamingTest {
       val query = Group(customerNameOrders)
       query
     }
+
+    def testGen(sampleName: String,
+                batchSize: Int,
+                shredded: Boolean,
+                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+
+      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+      val rdds = new TpchRdds(sampleName)(spark)
+      val inputs = List(rdds.lineitem, rdds.part, rdds.orders, rdds.customer)
+      val dstream = rddToDStream(rdds.lineitem, batchSize, ssc)
+      val lineitem = Bag(dstream, "lineitem".narrow)
+      val query = genQuery(rdds, lineitem)
+      if (!shredded) query.eval.profile(batchSize,inputs,spark,ssc)
+      else query.shreddedEval.profile(batchSize,inputs,acc,spark,ssc)
+      println()
+    }
+    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+    batchSizes.foreach { batchSize =>
+      tests += testGen(sampleName,batchSize,false,false)
+      tests += testGen(sampleName,batchSize,true,false)
+      tests += testGen(sampleName,batchSize,true,true)
+    }
+    println(s"Query - Q1. Dataset - $sampleName")
+    tests.foreach(singleDStreamTest)
+    println()
   }
 
-  object Q4 {
+  test("Q2") {
 
-    val inputs = List(rdds.orders, rdds.nation, rdds.region, rdds.customer)
+    /**Q2 with ONLY orders streamed*/
+    def genQuery[V,ID](rdds: TpchRdds, orders: LiteralExpr[V,ID]) = {
+      val custNames = Var("X")
+      val lineitem = Bag(rdds.lineitem, "lineitem".narrow)
+      val customer = Bag(rdds.customer, "customer".narrow)
+      val supplier = Bag(rdds.supplier, "supplier".narrow)
 
-    val (orderKeys0,custNames1,nationCustNames) = Vars("X1", "X2","X3")
+      //First join orders with lineitems on orderkey to get all pairs of custkey/suppkey
+      val custSuppliers = For ((__,o_custkey,__,__,l_suppkey) <-- orders.join(lineitem)) Yield (o_custkey,l_suppkey)
+      //Then join customer with the above to get the customers names, yielding all pairs of suppkey/custname.
+      //Then group this to get each supplier with its bag of customer names who have used it:
+      val inner = For ((__,c_name,__,l_suppkey) <-- customer.join(custSuppliers)) Yield (l_suppkey,c_name)
+      val supplierCustomers = Group(
+        For ((__,c_name,__,l_suppkey) <-- customer.join(custSuppliers)) Yield (l_suppkey,c_name)
+      )
+      //Finally join with supplier to get the suppliers names:
+      val query = For ((__,s_name,__,custNames) <-- supplier.join(supplierCustomers)) Yield (s_name,custNames)
+      query
+    }
 
-    val customerOrders = Group(
-      For ((o_orderkey,o_custkey,o_orderdate) <-- ordersStreamed) Yield (o_custkey,o_orderkey)
-    )
+    def testGen(sampleName: String,
+                batchSize: Int,
+                shredded: Boolean,
+                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
 
-    val nationCustomers = Group(
-      For ((c_custkey,orderKeys0,c_name,c_nationkey) <-- customerOrders.join(Collect(customer))) Yield (c_nationkey,(c_name,orderKeys0))
-    )
+      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+      val rdds = new TpchRdds(sampleName)(spark)
+      val inputs = List(rdds.lineitem, rdds.supplier, rdds.orders, rdds.customer)
+      val dstream = rddToDStream(rdds.orders, batchSize, ssc)
+      val orders = Bag(dstream, "orders".narrow)
+      val query = genQuery(rdds, orders)
+      if (!shredded) query.eval.profile(batchSize,inputs,spark,ssc)
+      else query.shreddedEval.profile(batchSize,inputs,acc,spark,ssc)
+      println()
+    }
+    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+    batchSizes.foreach { batchSize =>
+      tests += testGen(sampleName,batchSize,false,false)
+      tests += testGen(sampleName,batchSize,true,false)
+      tests += testGen(sampleName,batchSize,true,true)
+    }
+    println(s"Query - Q2. Dataset - $sampleName")
+    tests.foreach(singleDStreamTest)
+    println()
+  }
 
-//    val regionCustomers = Group(
-//      For((n_nationkey,n_regionkey,n_name,custNames0) <-- nation.join(nationCustomers)) Yield (n_regionkey,n_name,custNames0)
-//    )
+  test("Q3") {
+
+    /**Q3 with ONLY partSupp streamed*/
+    def genQuery[V,ID](rdds: TpchRdds, partSupp: LiteralExpr[V,ID]) = {
+      /**For each part, return the name, the names and nations of all suppliers who supply it,
+      * and the names and nations of all customers who've ordered it
+      * */
+
+      val (suppliers,customers) = Vars("SUPS","CUSTS")
+      val lineitem = Bag(rdds.lineitem, "lineitem".narrow)
+      val customer = Bag(rdds.customer, "customer".narrow)
+      val supplier = Bag(rdds.supplier, "supplier".narrow)
+      val part = Bag(rdds.part, "part".narrow)
+      val orders = Bag(rdds.orders, "orders".narrow)
+
+      //First join partSupp to suppliers and group to get partkeys and their bags of supplier names
+      val partSupp2 = For ((ps_partkey,ps_suppkey) <-- partSupp) Yield (ps_suppkey,ps_partkey)
+      val partSuppliers = Group(
+        For ((ps_suppkey,ps_partkey,s_name,s_nationkey) <-- partSupp2.join(supplier)) Yield (ps_partkey,(s_name,s_nationkey))
+      )
+
+      val partCustomerPairs = For ((__,l_partkey,__,o_custkey,__) <-- lineitem.join(orders)) Yield (l_partkey,o_custkey)
+      val partCustomers = Group(
+        For ((l_partkey,__,c_name,c_nationkey) <-- partCustomerPairs.join(customer)) Yield (l_partkey,(c_name,c_nationkey))
+      )
+
+      val query =
+        For (
+          (__,p_name,suppliers,customers) <-- part.join(partSuppliers.join(partCustomers))
+        ) Yield (p_name,suppliers,customers)
+
+      query
+    }
+
+    def testGen(sampleName: String,
+                batchSize: Int,
+                shredded: Boolean,
+                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+
+      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+      val rdds = new TpchRdds(sampleName)(spark)
+      val inputs = List(rdds.lineitem, rdds.supplier, rdds.orders, rdds.customer, rdds.part, rdds.partSupp)
+      val dstream = rddToDStream(rdds.partSupp, batchSize, ssc)
+      val partSupp = Bag(dstream, "partSupp".narrow)
+      val query = genQuery(rdds, partSupp)
+      if (!shredded) query.eval.profile(batchSize,inputs,spark,ssc)
+      else query.shreddedEval.profile(batchSize,inputs,acc,spark,ssc)
+      println()
+    }
+    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+    batchSizes.foreach { batchSize =>
+      tests += testGen(sampleName,batchSize,false,false)
+      tests += testGen(sampleName,batchSize,true,false)
+      tests += testGen(sampleName,batchSize,true,true)
+    }
+    println(s"Query - Q3. Dataset - $sampleName")
+    tests.foreach(singleDStreamTest)
+    println()
+  }
+
+//  test("Q4") {
 //
-//    val query = Group(
-//      For ((r_regionkey,r_name,nationCustNames) <-- region.join(regionCustomers)) Yield (r_name,nationCustNames)
-//    )
-
-  }
-
-  object Q5 {
-    val inputs = List(rdds.nation, rdds.region, rdds.customer)
-
-    val regionNations = For ((n_nationkey,n_regionkey,n_name) <-- nation) Yield (n_regionkey,n_nationkey)
-
-    val regionNameNations = Collect(
-      For ((n_regionkey,n_nationkey,r_name) <-- regionNations.join(region)) Yield (n_nationkey,r_name)
-    )
-
-    val customerNations = For ((c_custkey,c_name,c_nationkey) <-- customerStreamed) Yield (c_nationkey,c_name)
-
-    val regionCustomers = Group(
-        For ((__,c_name,r_name) <-- customerNations.join(regionNameNations)) Yield (r_name,c_name)
-    )
-  }
-
-  test("customer-count") {
-    dstreams.customer.profile(N, List(rdds.customer))
-  }
-
-  test("collect-test") {
-    val query = Collect(customer)
-    query.eval.printType
-  }
-
-  test("region-customers") {
-    import Q5._
-    regionCustomers.eval.dstream.profile(N, inputs)
-  }
-
-  test("region-customers-shredded") {
-    import Q5._
-    regionCustomers.shreddedEval.flat.dstream.profile(N, inputs)
-  }
-
-//  test("Q1-perf") {
-//    val query = Q1(lineitemStreamed)
-//    val stdResult = query.eval
-//    val ShreddedResult(flat,ctx) = query.shreddedEval
-//    println("Std evaluation profiling:")
-//    stdResult.dstream.profile(N, Q1.inputs)
-//    println
-//    println("Shredded evaluation profiling:")
-//    flat.dstream.profile(N, Q1.inputs)
+//    /**Q4 with ONLY orders streamed*/
+//    def genQuery[V,ID](rdds: TpchRdds, orders: LiteralExpr[V,ID]) = {
+//
+//      val (orderKeys0,custNames0,nationCustNames) = Vars("X1", "X2","X3")
+//      val nation = Bag(rdds.nation, "nation".narrow)
+//      val region = Bag(rdds.region, "region".narrow)
+//      val customer = Bag(rdds.customer, "customer".narrow)
+//
+//      val customerOrders = Group(
+//        For ((o_orderkey,o_custkey,o_orderdate) <-- orders) Yield (o_custkey,o_orderkey)
+//      )
+//
+//      val nationCustomers = Group(
+//        For ((c_custkey,orderKeys0,c_name,c_nationkey) <-- customerOrders.join(customer)) Yield (c_nationkey,c_name,orderKeys0)
+//      )
+//
+//      val regionCustomers = Group(
+//        For((n_nationkey,n_regionkey,n_name,custNames0) <-- nation.join(nationCustomers)) Yield (n_regionkey,(n_name,custNames0))
+//      )
+//
+//      val query = For ((r_regionkey,r_name,nationCustNames) <-- region.join(regionCustomers)) Yield (r_name,nationCustNames)
+////      region.join(regionCustomers)
+////
+////      val query = Group(
+////        For ((r_regionkey,r_name,nationCustNames) <-- region.join(regionCustomers)) Yield (r_name,nationCustNames)
+////      )
+//      query
+//
+//      //regionCustomers
+//
+//    }
+//
+//    def testGen(sampleName: String,
+//                batchSize: Int,
+//                shredded: Boolean,
+//                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+//
+//      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+//      val rdds = new TpchRdds(sampleName)(spark)
+//      val inputs = List(rdds.orders, rdds.nation, rdds.region, rdds.customer)
+//      val dstream = rddToDStream(rdds.orders, batchSize, ssc)
+//      val orders = Bag(dstream, "orders".narrow)
+//      val query = genQuery(rdds, orders)
+//      query.shreddedEval//.printType
+////      if (!shredded) query.eval.profile(batchSize,inputs,spark,ssc)
+////      else query.shreddedEval.profile(batchSize,inputs,acc,spark,ssc)
+//      println()
+//    }
+//    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+//    batchSizes.foreach { batchSize =>
+//      tests += testGen(sampleName,batchSize,false,false)
+//      tests += testGen(sampleName,batchSize,true,false)
+//      tests += testGen(sampleName,batchSize,true,true)
+//    }
+//    println(s"Query - Q4. Dataset - $sampleName")
+//    tests.foreach(singleDStreamTest)
+//    println()
 //  }
 
-  test("Q4") {
-    import Q4._
-    nationCustomers.eval.dstream.profile(N, inputs)
+  test("Q5") {
+
+    /**Q5 with ONLY customer streamed*/
+    def genQuery[V,ID](rdds: TpchRdds, customer: LiteralExpr[V,ID]) = {
+
+      val (custName0,regionName0) = Vars("X1","X2")
+      val nation = Bag(rdds.nation, "nation".narrow)
+      val region = Bag(rdds.region, "region".narrow)
+
+      val regionNations = For ((n_nationkey,n_regionkey,n_name) <-- nation) Yield (n_regionkey,n_nationkey)
+
+      val regionNameNations = Collect(
+        For ((n_regionkey,n_nationkey,r_name) <-- regionNations.join(region)) Yield (n_nationkey,r_name)
+      )
+
+      val customerNations = For ((c_custkey,c_name,c_nationkey) <-- customer) Yield (c_nationkey,c_name)
+
+      val query = Group(
+          For ((__,custName0,regionName0) <-- customerNations.join(regionNameNations)) Yield (regionName0,custName0)
+      )
+      query
+    }
+
+    def testGen(sampleName: String,
+                batchSize: Int,
+                shredded: Boolean,
+                acc: Boolean): ((SparkSession,StreamingContext) => Unit) = (spark: SparkSession, ssc: StreamingContext) => {
+
+      println(s"batchSize = $batchSize, shredded = $shredded, acc = $acc")
+      val rdds = new TpchRdds(sampleName)(spark)
+      val inputs = List(rdds.nation, rdds.region, rdds.customer)
+      val dstream = rddToDStream(rdds.customer, batchSize, ssc)
+      val customer = Bag(dstream, "customer".narrow)
+      val query = genQuery(rdds, customer)
+      if (!shredded) query.eval.profile(batchSize,inputs,spark,ssc)
+      else query.shreddedEval.profile(batchSize,inputs,acc,spark,ssc)
+      println()
+    }
+    val tests = new collection.mutable.ArrayBuffer[DStreamTest]
+    batchSizes.foreach { batchSize =>
+      tests += testGen(sampleName,batchSize,false,false)
+      tests += testGen(sampleName,batchSize,true,false)
+      tests += testGen(sampleName,batchSize,true,true)
+    }
+    println(s"Query - Q5. Dataset - $sampleName")
+    tests.foreach(singleDStreamTest)
+    println()
   }
-
-  test("Q4-shredded") {
-    import Q4._
-    nationCustomers.shreddedEval.flat.acc.dstream.profile(N, inputs)
-  }
-
-
-  test("Group std") {
-    val query = Group(Group(Group(Group(Group(Group(lineitemStreamed))))))
-    query.eval.dstream.profile(N, List(rdds.lineitem))
-  }
-
-//  test("Group cost") {
-//    val groupByOrderKey = Group(
-//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_orderkey,l_partkey,l_suppkey)
-//    )
-//    groupByOrderKey.eval.profile("orderkey", List(rdds.lineitem))
-//
-//    val groupByPartKey = Group(
-//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_partkey,l_orderkey,l_suppkey)
-//    )
-//    groupByPartKey.eval.profile("partkey", List(rdds.lineitem))
-//
-//    val groupBySuppKey = Group(
-//      For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem) Yield (l_suppkey,l_orderkey,l_partkey)
-//    )
-//    groupBySuppKey.eval.profile("suppkey", List(rdds.lineitem))
-//  }
-
-  test("Group shredded") {
-    val query = Group(Group(Group(Group(Group(Group(lineitemStreamed))))))
-    query.shreddedEval.flat.dstream.profile(N, List(rdds.lineitem))
-  }
-
-  test("Q1") {
-    val streamed = Q1(lineitemStreamed)
-    streamed.eval.dstream.profile(N, Q1.inputs)
-  }
-
-  test("Q1-shredded-inc") {
-    val query = Q1(lineitemStreamed)
-    val ShreddedResult(flat,ctx) = query.shreddedEval
-    flat.dstream.profile(N, Q1.inputs)
-//    flat.print
-//    ctx.head.print
-//    ctx.tail.head.print
-//    ssc.start
-//    ssc.awaitTermination()
-//    ssc.stop(true)
-  }
-//
-//  test("Q1-shredded-acc") {
-//    val query = Q1(lineitemStreamed)
-//    val ShreddedResult(flat,ctx) = query.shreddedEval
-//    //flat.printType; ctx.printType
-//    flat.acc.print
-//    ctx.head.acc.print
-//    ctx.tail.head.acc.print
-//    ssc.start
-//    ssc.awaitTermination()
-//    //ssc.stop(true)
-//  }
-//  object Q2 {
-//    /**For each supplier, return the name and the names of all customers who have used them*/
-//
-//    val custNames = Var("X")
-//    //First join orders with lineitems on orderkey to get all pairs of custkey/suppkey
-//    val custSuppliers = For ((__,o_custkey,__,__,l_suppkey) <-- orders.join(lineitem)) Yield (o_custkey,l_suppkey)
-//    //Then join customer with the above to get the customers names, yielding all pairs of suppkey/custname.
-//    //Then group this to get each supplier with its bag of customer names who have used it:
-//    val inner = For ((__,c_name,__,l_suppkey) <-- customer.join(custSuppliers)) Yield (l_suppkey,c_name)
-//    val supplierCustomers = Group(
-//      For ((__,c_name,__,l_suppkey) <-- customer.join(custSuppliers)) Yield (l_suppkey,c_name)
-//    )
-//    //Finally join with supplier to get the suppliers names:
-//    val query = For ((__,s_name,__,custNames) <-- supplier.join(supplierCustomers)) Yield (s_name,custNames)
-//  }
-//
-//  test("Q2") {
-//    import Q2._
-//    query.shreddedReport("Q2")
-//  }
-//
-//  object Q3 {
-//    /**For each part, return the name, the names and nations of all suppliers who supply it,
-//      * and the names and nations of all customers who've ordered it
-//      * */
-//
-//    val (suppliers,customers) = Vars("SUPS","CUSTS")
-//    //First join partSupp to suppliers and group to get partkeys and their bags of supplier names
-//    val partSupp2 = For ((ps_partkey,ps_suppkey) <-- partSupp) Yield (ps_suppkey,ps_partkey)
-//    val partSuppliers = Group(
-//      For ((ps_suppkey,ps_partkey,s_name,s_nationkey) <-- partSupp2.join(supplier)) Yield (ps_partkey,(s_name,s_nationkey))
-//    )
-//
-//    val partCustomerPairs = For ((__,l_partkey,__,o_custkey,__) <-- lineitem.join(orders)) Yield (l_partkey,o_custkey)
-//    val partCustomers = Group(
-//      For ((l_partkey,__,c_name,c_nationkey) <-- partCustomerPairs.join(customer)) Yield (l_partkey,(c_name,c_nationkey))
-//    )
-//
-//    val query =
-//      For (
-//        (__,p_name,suppliers,customers) <-- part.join(partSuppliers.join(partCustomers))
-//      ) Yield (p_name,suppliers,customers)
-//
-//  }
-//
-//  test("Q3") {
-//    import Q3._
-//    query.shreddedReport("Q3")
-//  }
-
-  //  object Q4 {
-  //    /**
-  //      * For ((c_name, c_orders)) <-- Q1 //c_name: String, c_orders: Map[(timestamp,Map[string,int]),Int]
-  //      * (o_orderdate,o_parts) <-- c_orders //o_orderdate: Timestamp, o_parts: Map[String,Int]
-  //      * (p_name,l_qty) <-- o_parts) //p_name: String, l_qty: Int
-  //      * yield ((c_name,p_name,getMonth(o_orderdate)),l_qty) //(custName,partName,month),qty
-  //      * .reduceByKey(_ + _)
-  //      *
-  //      * So this is:
-  //      * Yield all triples of customername,partname,month, with the value for each the number of times they ordered
-  //      * that part in that month.
-  //      * NB. we cannot do this the way the it is in the paper and also do shredded evaluation as we cannot do lookups.
-  //      * However, if we do it directly from the tables we never create any inner collections so shredded evaluation would
-  //      * be no different to normal evaluation anyway.
-  //      *
-  //      *
-  //      */
-  //
-  //    val (c_name,c_orders,o_parts) = Vars("W1","W2","W3")
-  //    val getMonth = (t: Timestamp) => t.toLocalDateTime.getMonth.toString
-  //
-  //    val query =
-  //      For ((c_name,c_orders) <-- Q1.query) Collect ( //LiteralExpr(Q1.query.shreddedEval.nested,"Q1")
-  //        For ((o_orderdate,o_parts) <-- c_orders) Collect (
-  //          For (p_name <-- o_parts) Yield (c_name,p_name,getMonth $ o_orderdate)
-  //        )
-  //      )
-  //  }
-  //
-  //  test("Q4") {
-  //    import Q4._
-  //    query.report("Q4")
-  //  }
-  //
-  //  object Q5 {
-  //    /**
-  //      * for ((p_name,suppliers,customers) <-- Q3; //p_name: String, suppliers: Map[(String,Int),Int]
-  //      *     (c_name,c_nationkey) <-- customers; //c_name: String, c_nationkey: Int
-  //      *     if suppliers.forall { case (_,s_nationkey) => c_nationkey != s_nationkey }
-  //      *     //if for all suppliers of the part, they are from a different nation to the customer:
-  //      *     //yield the part name
-  //      *     yield (p_name,1) (reduceByKey)
-  //      *
-  //      *  First note that this requires the suppliers and customers to be bags of name,nationkey pairs not just
-  //      *  names which is how Q3 is actually written.
-  //      *
-  //      *  What this does is, for each part in the output of Q3, iterate over the customers, for each customer which is
-  //      *  in a different nation to every supplier for that part, yield the partname.
-  //      *  The output is a simple bag of part names, but the values represent then number of times it was ordered
-  //      *  by a customer not from a nation which has a supplier for that part.
-  //      *
-  //      *  Again as this uses fromK (in order to access the boxed collections of suppliers and customers created in Q3)
-  //      *  it cannot be shreddedEval'd as it stands.
-  //      *
-  //      *
-  //      */
-  //
-  //    val (supps,custs) = Vars("S","C")
-  //    val f = (c_nationkey: Int, suppliers: Map[String::Int::HNil,Int]) =>
-  //      suppliers.forall { case ((_::s_nationkey::HNil),_) => c_nationkey != s_nationkey }
-  //
-  //    val query =
-  //      For ((p_name,supps,custs) <-- Q3.query) Collect (
-  //        For (((c_name,c_nationkey) <-- custs) If f.$(c_nationkey,supps)) Yield p_name
-  //        )
-  //  }
-  //
-  //  test("Q5") {
-  //    import Q5._
-  //    query.report("Q5")
-  //  }
-
-  //  test("Q6") {
-  //    /**
-  //      * For ((c_name,_) <-- Customer //for each customer
-  //      * Yield (c_name, //yield the customer's name,
-  //      * for ((s_name,customers2) <-- Q2; //and for each supplier_name and bag of customer names from Q2
-  //      *      (c_name2 <- customers2 if c_name2 == c_name) //for each customer in the bag matching the top-most custmoer
-  //      *      yield s-name //yield the supplier name
-  //      *
-  //      * So this creates a Bag[(custname,[Bag[supplierName]])] which is just a reversal of Q2
-  //      *
-  //      * Again this uses fromK and also it does nested iteration....
-  //      */
-  //  }
-  //
-  //  test("Q7") {
-  //    /**
-  //      * For (n <- Nation)
-  //      * Yield (n.name,
-  //      *        for ((p_name,suppliers,customers) <-- Q3
-  //      *        if suppliers.exists (equals nationkey) &&
-  //      *           customers.forall (notequal nationkey)
-  //      *           yield p_name)
-  //      *
-  //      * So this creates a Bag[(nationName,Bag[partName])] where the parts are all those which
-  //      * have a supplier in that nation but had no customers in that nation.
-  //      * fromK, nested iteration here too.
-  //      */
-  //  }
-
 
 
   //    test("Q1 value-nested") {

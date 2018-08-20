@@ -1,0 +1,53 @@
+\chapter{Experimental results}
+
+In this section we discuss the experiments we performed to ascertain the performance benefits of shredding. First we discuss the testing setup and introduce the dataset used. Then we describe the experiments done and discuss their results. These results show that queries can be executed up to 3.7 times faster using shredding, but that not all queries are sped up by shredding.
+
+\section{Setup}
+
+Unfortunately, access to a distributed computing cluster was not secured, which made testing of the framework on static queries difficult, as without significant parallelisation, it would have been hard to test the load-balancing benefits of shredding. However, even without parallelisation, the incrementalisation benefits would be achievable, and so it was decided to test on streamed queries using DStreams.
+
+The machine we use has 8GB 1600Mhz DDR3 Ram, a 2.6GHZ Intel Core i5 processor and runs Mac OS X 10.11.6. The queries are compiled using Scala 2.11.12 and are run on a local instance of Spark 2.3.0. 
+
+The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business?s products, orders, customers and suppliers. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of the customers, and then sampling the other tables based on this sample of customers. I.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
+
+\section{Isolated testing of group operator}
+
+\begin{table}[]
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+               &             & \multicolumn{3}{l|}{Processing time (seconds) \textit{(speedup)}} \\ \hline
+Query          & nested-size & reg          & shred-inc           & shred-acc           \\ \hline
+group-lineitem & 3.93        & 18.3         & 4.38 \textit{(4.18\texttimes)}        & 6.74 \textit{(2.72\texttimes)}        \\ \hline
+group-customer & 400         & 9.20         & 6.92 \textit{(1.33\texttimes)}        & 8.72 \textit{(1.06\texttimes)}        \\ \hline
+group-orders   & 14.8        & 15.1         & 9.05 \textit{(1.67\texttimes)}        & 11.1 \textit{(1.36\texttimes}        \\ \hline
+\end{tabular}
+\caption{Test results of isolated group queries}
+\label{groupresults}
+\end{table}
+
+First we test the performance of shredding the group operator in isolation. This is so we can directly assess the benefits of being able to avoid recomputation of the construction of nested collections without the additional overhead of joins which other operators will introduce into the query. We will test this operator across a variety of tables with different distributions of keys, in order to see how performance relates to the size of nested collections. For each query, we will compare three alternative processing methods:
+
+\begin{itemize}
+\item{Regular key-nested evaluation. This will involve recomputation with each batch in the DStream, and therefore will have an accumulated output.}
+\item{Shredded evaluation. As this does not involve recomputation, the output will be incremental.}
+\item{Shredded evaluation with accumulation. This will be shredded evaluation, with the output explicitly accumulated after application of the group operator.}
+\end{itemize}
+
+The idea here is that although we expect shredding without accumulation to be the quickest processing method, it is in some sense not comparable to the regular key-nested evaluation, since in order to compute the full result the RDDs in the DStream need to be aggregated. However, we note that the penalty of this aggregation is dependent on how the output is to be used. If it is being saved in permanent storage, i.e. a database on-disk, whether this aggregation actually incurs a significant cost depends on the update primitives available.
+
+We use a sample based on 10000 randomly chosen customers.
+
+Figure \ref{groupresults} shows the results of this isolated testing of group. The queries are described fully in appendix \ref{queries} but we illustrate the \textit{group-lineitem} query here:
+\vs\begin{lstlisting}
+Group(
+  For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem)
+    Yield (l_orderkey,l_partkey)
+)
+\end{lstlisting}\vs
+
+This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{\Int \times \coll{\Int}{\Int}}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order.
+
+Firstly, it is notable that indeed shredding is quicker in every case, and further that the accumulated method while slower than incremental shredding is faster than regular evaluation. This is at least evidence that avoiding the recomputation of the inner collections in the shredded versions is beneficial.
+
+However, it offers significant benefit in the query \textit{group-lineitem}. The others show less than a 2x gain in speed. This seems to be related to the size of the inner collections created. As the mean size of inner collection increases, the speed decreases relative to standard evaluation. It is hard to say exactly why this is happening but may be to do with overheads involved in computing the dictionary. Especially in our low-parallelism environment, any such overheads would not be offset by the load-balancing benefit we'd otherwise expect from such large inner collections.
+

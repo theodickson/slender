@@ -12,13 +12,13 @@ import scala.reflect.ClassTag
   * If the output is an incremental DStream, it will use a stateful mapping to efficiently aggregate the value for each key,
   * if it is a collection. If it is a distributed single ring value, it will just aggregate all values.
   */
-trait Accumulate[-In, +Out] extends (In => Out) with Serializable
+trait Accumulate[In <: SDStream[In], T] extends (SDStream.Aux[In,T] => AggDStream.Aux[T]) with Serializable
 
 object Accumulate extends LowPriorityAccumulateImplicits {
 
   implicit def incrementalCollection[K:ClassTag,V:ClassTag]
-  (implicit ring: Ring[V]): Accumulate[IncDStream.Aux[(K,V)],AggDStream.Aux[(K,V)]] =
-    new Accumulate[IncDStream.Aux[(K,V)],AggDStream.Aux[(K,V)]] {
+  (implicit ring: Ring[V]): Accumulate[IncDStream,(K,V)] =
+    new Accumulate[IncDStream, (K,V)] {
     def apply(v1: IncDStream.Aux[(K,V)]): AggDStream.Aux[(K,V)] = {
       val mappingFunction: (K,Option[V],State[V]) => Unit = (_,value,state) => {
         val previous = state.getOption.getOrElse(ring.zero)
@@ -33,8 +33,8 @@ object Accumulate extends LowPriorityAccumulateImplicits {
   }
 
   implicit def incrementalValue[R:ClassTag]
-  (implicit ring: Ring[R]): Accumulate[IncDStream.Aux[R],AggDStream.Aux[R]] =
-    new Accumulate[IncDStream.Aux[R],AggDStream.Aux[R]] {
+  (implicit ring: Ring[R]): Accumulate[IncDStream,R] =
+    new Accumulate[IncDStream,R] {
       def apply(v1: IncDStream.Aux[R]): AggDStream.Aux[R] = {
         val mappingFunction: (Unit,Option[R],State[R]) => Unit = (_,value,state) => {
           val previous = state.getOption.getOrElse(ring.zero)
@@ -55,6 +55,8 @@ object Accumulate extends LowPriorityAccumulateImplicits {
 }
 
 trait LowPriorityAccumulateImplicits {
-  implicit def identity[T]: Accumulate[T,T] = new Accumulate[T,T] { def apply(v1: T): T = v1 }
+  implicit def identity[T]: Accumulate[AggDStream,T] = new Accumulate[AggDStream,T] {
+    def apply(v1: AggDStream.Aux[T]): AggDStream.Aux[T] = v1
+  }
 }
 

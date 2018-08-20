@@ -12,11 +12,11 @@
 \contentsline {subsection}{\numberline {2.1.2}Key types}{8}
 \contentsline {section}{\numberline {2.2}Expressions}{8}
 \contentsline {subsection}{\numberline {2.2.1}Ring expressions}{9}
-\contentsline {subsection}{\numberline {2.2.2}Key expressions}{12}
+\contentsline {subsection}{\numberline {2.2.2}Key expressions}{13}
 \contentsline {section}{\numberline {2.3}For-comprehension syntax}{13}
-\contentsline {section}{\numberline {2.4}Incremental updates to queries}{14}
-\contentsline {section}{\numberline {2.5}The shredding transformation}{16}
-\contentsline {subsection}{\numberline {2.5.1}Output type of the shredding transformation}{16}
+\contentsline {section}{\numberline {2.4}Incremental updates to queries}{15}
+\contentsline {section}{\numberline {2.5}The shredding transformation}{17}
+\contentsline {subsection}{\numberline {2.5.1}Output type of the shredding transformation}{17}
 \contentsline {subsection}{\numberline {2.5.2}Formal definition of shredding}{18}
 \contentsline {chapter}{\numberline {3}Implementation of the DSL}{21}
 \contentsline {section}{\numberline {3.1}Representing abstract syntax trees}{21}
@@ -40,3 +40,9 @@
 \contentsline {subsection}{\numberline {5.2.2}Distributive operations}{43}
 \contentsline {subsection}{\numberline {5.2.3}Group}{44}
 \contentsline {section}{\numberline {5.3}Shredded evaluation of DStream queries}{45}
+\contentsline {chapter}{\numberline {6}Experimental results}{47}
+\contentsline {section}{\numberline {6.1}Setup}{47}
+\contentsline {section}{\numberline {6.2}Isolated testing of group operator}{48}
+\contentsline {chapter}{\numberline {7}Conclusion}{50}
+\contentsline {section}{\numberline {7.1}Summary of contributions}{50}
+\contentsline {section}{\numberline {7.2}Limitations and future work}{51}

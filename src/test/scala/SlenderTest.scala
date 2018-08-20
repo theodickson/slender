@@ -43,21 +43,14 @@ trait SparkTestImplicits {
 }
 trait SlenderSparkTest extends SlenderTest with SparkTestImplicits {
   Logger.getLogger("org").setLevel(Level.ERROR)
-  implicit val spark = SparkSession.builder
-    .appName("test")
-    .config("spark.master", "local[1]")
-    .getOrCreate()
-
-  implicit val sc = spark.sparkContext
-
   //def printRdd[T](rdd: RDD[T]): Unit = rdd.take(10).foreach(println)
 }
 
 trait SlenderSparkStreamingTest extends SlenderSparkTest {
   def batchDuration: Duration
-  implicit lazy val ssc = {
-    val out = new StreamingContext(sc,batchDuration)
-    out.checkpoint("_checkpoint")
-    out
-  }
+//  implicit lazy val ssc = {
+//    val out = new StreamingContext(sc,batchDuration)
+//    out.checkpoint("_checkpoint")
+//    out
+//  }
 }

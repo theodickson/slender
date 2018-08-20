@@ -295,6 +295,16 @@ object Dot {
 
 object Join {
 
+  implicit def mapRddJoin[
+  K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[Map[K::K1, R1], RDD[(K :: K2, R2)], RDD[(K :: K12, O)]] =
+    new Join[Map[K::K1, R1], RDD[(K::K2, R2)], RDD[(K :: K12, O)]] {
+      def apply(v1: Map[K::K1,R1], v2: RDD[(K :: K2, R2)]): RDD[(K :: K12, O)] = {
+        val bmap = v1.map { case (k::k1,r1) => (k,(k1,r1)) }
+        v2.flatMap { case (k::k2,r2) => bmap.get(k).map { case (k1,r1) => (k::prepend(k1,k2),dot(r1,r2)) } }
+      }
+    }
+
   implicit def rddMapJoin[
   K: ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
   ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[RDD[(K :: K1, R1)], Map[K::K2, R2], RDD[(K :: K12, O)]] =
@@ -339,15 +349,42 @@ object Join {
       }
     }
 
-  implicit def dstreamRDDJoin[
-  DS <: SDStream[DS],K:ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
-  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[SDStream.Aux[DS,(K :: K1, R1)], RDD[(K :: K2, R2)], SDStream.Aux[DS,(K :: K12, O)]] =
-    new Join[SDStream.Aux[DS,(K :: K1, R1)], RDD[(K :: K2, R2)], SDStream.Aux[DS,(K :: K12, O)]] {
-      def apply(v1: SDStream.Aux[DS,(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): SDStream.Aux[DS,(K :: K12, O)] = {
-        val left = v1.map(_.map { case (k :: k1, r1) => (k, (k1, r1)) })
-        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
-        left.map(_.transform { rdd =>
-          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
+//  //doesnt broadcast agg dstreams
+//  implicit def dstreamRDDJoin[
+//    K:ClassTag, K1 <: HList, K2 <: HList, K12 <: HList, R1, R2, O
+//  ](implicit dot: Dot[R1, R2, O], prepend: Prepend.Aux[K1, K2, K12]): Join[AggDStream.Aux[(K :: K1, R1)], RDD[(K :: K2, R2)], AggDStream.Aux[(K :: K12, O)]] =
+//    new Join[AggDStream.Aux[(K :: K1, R1)], RDD[(K :: K2, R2)], AggDStream.Aux[(K :: K12, O)]] {
+//      def apply(v1: AggDStream.Aux[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): AggDStream.Aux[(K :: K12, O)] = {
+//        val left = v1.map(_.map { case (k :: k1, r1) => (k, (k1, r1)) })
+//        val right = v2.map { case (k :: k2, r2) => (k, (k2, r2)) }
+//        left.map(_.transform { rdd =>
+//          rdd.join(right).map { case (k, ((k1, r1), (k2, r2))) => ((k :: (prepend(k1, k2))), dot(r1, r2)) }
+//        })
+//      }
+//    }
+//
+//  //only broadcasts inc dstreams
+//  implicit def dstreamRDDJoinBC[
+//    K:ClassTag, K1 <: HList, K2 <: HList, R1:ClassTag, R2, O:ClassTag
+//  ](implicit join: Join[Map[K::K1,R1],RDD[(K::K2,R2)],RDD[O]]): Join[IncDStream.Aux[(K :: K1, R1)], RDD[(K :: K2, R2)], IncDStream.Aux[O]] =
+//    new Join[IncDStream.Aux[(K :: K1, R1)], RDD[(K :: K2, R2)], IncDStream.Aux[O]] {
+//      def apply(v1: IncDStream.Aux[(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): IncDStream.Aux[O] = {
+//        v1.map(_.transform { rdd =>
+//          val asMap: Map[K::K1,R1] = rdd.collectAsMap.toMap
+//          join(asMap, v2)
+//        })
+//      }
+//    }
+
+  //blanket broadcaster
+  implicit def dstreamRDDJoinBC[
+  DS <: SDStream[DS],K:ClassTag, K1 <: HList, K2 <: HList, R1:ClassTag, R2, O:ClassTag
+  ](implicit join: Join[Map[K::K1,R1],RDD[(K::K2,R2)],RDD[O]]): Join[SDStream.Aux[DS,(K :: K1, R1)], RDD[(K :: K2, R2)], SDStream.Aux[DS,O]] =
+    new Join[SDStream.Aux[DS,(K :: K1, R1)], RDD[(K :: K2, R2)], SDStream.Aux[DS,O]] {
+      def apply(v1: SDStream.Aux[DS,(K :: K1, R1)], v2: RDD[(K :: K2, R2)]): SDStream.Aux[DS,O] = {
+        v1.map(_.transform { rdd =>
+          val asMap: Map[K::K1,R1] = rdd.collectAsMap.toMap
+          join(asMap, v2)
         })
       }
     }
@@ -446,7 +483,7 @@ object Group {
 
   //In order to group a dstream, we must produce the cumulative version first and group this.
   implicit def DStreamGroup2[DS <: SDStream[DS],K1:ClassTag,K2:ClassTag,R]
-  (implicit ring: Ring[R], acc: Accumulate[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::K2::HNil,R)]]):
+  (implicit ring: Ring[R], acc: Accumulate[DS,(K1::K2::HNil,R)]):
     Group[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::Map[K2,R]::HNil,Boolean)]] =
     new Group[SDStream.Aux[DS,(K1::K2::HNil,R)],AggDStream.Aux[(K1::Map[K2,R]::HNil,Boolean)]] {
 
@@ -469,7 +506,7 @@ object Group {
 
   //In order to group a dstream, we must produce the cumulative version first and group this.
   implicit def DStreamGroup3[DS <: SDStream[DS],K1:ClassTag,K2:ClassTag,K3:ClassTag,R]
-  (implicit ring: Ring[R], acc: Accumulate[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::K2::K3::HNil,R)]]):
+  (implicit ring: Ring[R], acc: Accumulate[DS,(K1::K2::K3::HNil,R)]):
   Group[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] =
     new Group[SDStream.Aux[DS,(K1::K2::K3::HNil,R)],AggDStream.Aux[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]] {
 
