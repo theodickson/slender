@@ -9,6 +9,7 @@
 \usepackage{textcomp}
 \usepackage{lmodern}
 \usepackage{pdfpages}
+\usepackage{url}
 
 \lstset{language=Scala, upquote=true, columns=fullflexible, basicstyle=\ttfamily, keywordstyle=\bfseries, breaklines=true, breakatwhitespace=false}
 %input macros (i.e. write your own macros file called mymacros.tex 
@@ -77,21 +78,19 @@
 \include{incrementalisation}
 \include{results}
 \include{conclusion}
-\appendix
-%\include{appendix1}
 %\include{examples}
 
 %now enable appendix numbering format and include any appendices
-%\appendix
-%\include{appendix1}
-%\include{appendix2}
+\appendix
+\include{appendix1}
+\include{appendix2}
 
 %next line adds the Bibliography to the contents page
-%\addcontentsline{toc}{chapter}{Bibliography}
+\addcontentsline{toc}{chapter}{References}
 %uncomment next line to change bibliography name to references
-%\renewcommand{\bibname}{References}
-%\bibliography{refs}        %use a bibtex bibliography file refs.bib
-%\bibliographystyle{plain}  %use the plain bibliography style
+\renewcommand{\bibname}{References}
+\bibliography{refs}        %use a bibtex bibliography file refs.bib
+\bibliographystyle{plain}  %use the plain bibliography style
 
 \end{document}
 

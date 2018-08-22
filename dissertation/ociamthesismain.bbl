@@ -1,9 +1,76 @@
-\begin{thebibliography}{1}
+\begin{thebibliography}{10}
 
-\bibitem{Einstein}
-Albert Einstein.
-\newblock {Zur Elektrodynamik bewegter K{\"o}rper}. ({German}) [{On} the
-  electrodynamics of moving bodies].
-\newblock {\em Annalen der Physik}, 322(10):891--921, 1905.
+\bibitem{cats}
+Cats Contributors.
+\newblock {Cats}.
+\newblock \url{https://github.com/typelevel/cats}.
+
+\bibitem{tpch}
+The Transaction Processing~Performance Council.
+\newblock {TPC-H Decision Support Benchmark}.
+\newblock \url{http://www.tpc.org/tpch/}.
+
+\bibitem{parquet}
+Apache~Software Foundation.
+\newblock {Apache Parquet}.
+\newblock \url{https://parquet.apache.org/}.
+
+\bibitem{grust2009ferry}
+Torsten Grust, Manuel Mayr, Jan Rittinger, and Tom Schreiber.
+\newblock Ferry: database-supported program execution.
+\newblock In {\em Proceedings of the 2009 ACM SIGMOD International Conference
+  on Management of data}, pages 1063--1066. ACM, 2009.
+
+\bibitem{algebird}
+Twitter Inc.
+\newblock {Algebird: Abstract Algebra for Scala}.
+\newblock \url{https://github.com/twitter/algebird}.
+
+\bibitem{lindley2012row}
+Sam Lindley and James Cheney.
+\newblock Row-based effect types for database integration.
+\newblock In {\em Proceedings of the 8th ACM SIGPLAN workshop on Types in
+  language design and implementation}, pages 91--102. ACM, 2012.
+
+\bibitem{melnik2010dremel}
+Sergey Melnik, Andrey Gubarev, Jing~Jing Long, Geoffrey Romer, Shiva
+  Shivakumar, Matt Tolton, and Theo Vassilakis.
+\newblock Dremel: interactive analysis of web-scale datasets.
+\newblock {\em Proceedings of the VLDB Endowment}, 3(1-2):330--339, 2010.
+
+\bibitem{musicpowerlaw}
+Nicol{\'a}s Mongiardino~Koch and Ignacio~M Soto.
+\newblock Let the music be your master: Power laws and music listening habits.
+\newblock {\em Musicae Scientiae}, 20(2):193--206, 2016.
+
+\bibitem{spire}
+Erik Osheim and Tom Switzer.
+\newblock {Spire}.
+\newblock \url{https://github.com/non/shapeless}.
+
+\bibitem{shapeless}
+Miles Sabin.
+\newblock {Shapeless: generic programming for Scala}.
+\newblock \url{https://github.com/milessabin/shapeless}.
+
+\bibitem{van2001simulation}
+Jan Van~den Bussche.
+\newblock Simulation of the nested relational algebra by the flat relational
+  algebra, with an application to the complexity of evaluating powerset algebra
+  expressions.
+\newblock {\em Theoretical Computer Science}, 254(1-2):363--377, 2001.
+
+\bibitem{spark}
+Matei Zaharia, Mosharaf Chowdhury, Michael~J Franklin, Scott Shenker, and Ion
+  Stoica.
+\newblock Spark: Cluster computing with working sets.
+\newblock {\em HotCloud}, 10(10-10):95, 2010.
+
+\bibitem{dstream}
+Matei Zaharia, Tathagata Das, Haoyuan Li, Timothy Hunter, Scott Shenker, and
+  Ion Stoica.
+\newblock Discretized streams: Fault-tolerant streaming computation at scale.
+\newblock In {\em Proceedings of the Twenty-Fourth ACM Symposium on Operating
+  Systems Principles}, pages 423--438. ACM, 2013.
 
 \end{thebibliography}

@@ -8,7 +8,7 @@ Unfortunately, access to a distributed computing cluster was not secured, which 
 
 The machine we use has 8GB 1600Mhz DDR3 Ram, a 2.6GHZ Intel Core i5 processor and runs Mac OS X 10.11.6. The queries are compiled using Scala 2.11.12 and are run on a local instance of Spark 2.3.0. 
 
-The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business?s products, orders, customers and suppliers. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of the customers, and then sampling the other tables based on this sample of customers. I.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
+The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business's products, orders, customers and suppliers. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of the customers, and then sampling the other tables based on this sample of customers. I.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
 
 \section{Isolated testing of group operator}
 
@@ -37,7 +37,7 @@ The idea here is that although we expect shredding without accumulation to be th
 
 We use a sample based on 10000 randomly chosen customers.
 
-Figure \ref{groupresults} shows the results of this isolated testing of group. The queries are described fully in appendix \ref{queries} but we illustrate the \textit{group-lineitem} query here:
+Figure \ref{groupresults} shows the results of this isolated testing of group. The queries are described fully in Appendix \ref{queries} but we illustrate the \textit{group-lineitem} query here:
 \vs\begin{lstlisting}
 Group(
   For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem)
@@ -77,7 +77,7 @@ Q4    & 25         & 14.1      & 10.2 (1.38)     & 13.6 (1.04)     \\ \hline
 
 We now present the test result for a set of complete queries, which create outputs with varying levels of nesting, and requiring varying numbers of joins. Note that as per the limitation discussed in ref{}, each query only streams one input table. The rest of the inputs are static RDDs.
 
-The queries are detailed in Appendix \ref{}, but here we illustrate \textit{Q1}, showing how it was written using the DSL:
+The queries are detailed in Appendix \ref{queries}, but here we illustrate \textit{Q1}, showing how it was written using the DSL:
 \vs\begin{lstlisting}
 val partOrders = For((l_orderkey, l_partkey, __) <-- lineitem)
                         Yield( l_partkey, l_orderkey)

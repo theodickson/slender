@@ -1,6 +1,6 @@
 \chapter{Incremental Evaluation of DSL Queries} \label{incrementalisation}
 
-In this chapter we discuss how the DSL was extended to evaluate queries on Spark DStreams, an abstraction for a sequence of RDDs which constitute batches of a single collection. We explain how we leverage the delta expressions derived in \ref{} to efficiently evaluate most expressions involving DStreams, and how we evaluate group expressions by recomputing the output with each new batch.
+In this chapter we discuss how we extend the DSL to evaluate queries on Spark DStreams, an abstraction for a sequence of RDDs which constitute batches of a single collection. We explain how we leverage the delta expressions derived in Section \ref{deltas} to efficiently evaluate most expressions involving DStreams, and how we evaluate group expressions by recomputing the output with each new batch.
 
 We then show how recomputation is avoided when shredding is applied, as the dictionaries produced by shredding are not key-nested and so retain the distributive property over their keys.
 
@@ -13,11 +13,10 @@ Access to this sequence of RDDs is controlled by a \lin{DStream[(String,Int)]}, 
 
 \section{Implementing algebraic operators for DStreams}
 
-In order to be able to evaluate queries with DStream inputs, we only need to implement the algebraic operators for DStream operands.  This is because the \lin{Eval} interface is agnostic to the type of the underlying dataset - to evaluate a given node it only needs to be able to evaluate its children and have available an instance of the relevant operator interface. For example, when multiplying two input collections of type \lin{DStream[(K,V)]}, it would just need to be able to evaluate a \lin{LiteralExpr[DStream[(K,V)]]} and then evaluating the outer \lin{MultiplyExpr} would just require an instance of \lin{Multiply[DStream[(K,V)],DStream[(K,V)],O]}.
+In order to be able to evaluate queries with DStream inputs, we only need to implement the algebraic operators for DStream operands.  This is because the \lin{Eval} interface is agnostic to the type of the underlying dataset - to evaluate a node it only needs to be able to evaluate its children and be provided an instance of the relevant operator interface to apply to these results. For example, when multiplying two input collections of type \lin{DStream[(K,V)]}, it would first able to evaluate a \lin{LiteralExpr[DStream[(K,V)]]}. Then, evaluating the outer \lin{MultiplyExpr} would just require an instance of \lin{Multiply[DStream[(K,V)],DStream[(K,V)],O]}.
 
-However, we must make sure that the implementations of the operators respect the delta expressions derived in section \ref{}, as each RDD in a DStream represents a delta update to the collection represented by the previous RDDs. To enable reasoning about DStreams in this way, we introduce some notation.
-\vs
-Let $X$ be a \lin{DStream[(K,R)]}. Then:
+However, we must make sure that the implementations of the operators respect the delta expressions derived in Section \ref{deltas}, as each RDD in a DStream represents a delta update to the collection represented by the previous RDDs. To enable reasoning about DStreams in this way, we introduce some notation.
+\par \noindent Let $X$ be a \lin{DStream[(K,R)]}. Then:
 \begin{equation*}
 \begin{split}
 &X = [\pair{t_1}{x_1}, \pair{t_2}{x_2}, \dots, \pair{t_n}{x_n}] \textrm{ for some $n \in \mathbb{N}$, where:} \\
@@ -25,7 +24,7 @@ Let $X$ be a \lin{DStream[(K,R)]}. Then:
 &t_i: \prim{Timestamp} \textrm{ is the time that batch $x_i$ was received.}
 \end{split}
 \end{equation*}
-We will assume that, according to the incrementalisation formalism introduced in \ref{}, the $x_i$ represent partitions of a single collection $X': \coll{\K}{\R}$. This logical collection can be computed by summing the $x_i$ using the addition operator already implemented for RDDs:
+We will assume that the $x_i$ represent partitions of a single collection $X': \coll{\K}{\R}$. This logical collection can be computed by summing the $x_i$ using the addition operator already implemented for RDDs:
 \begin{equation*}
 X' = x_1 + x_2 + \dots + x_n
 \end{equation*}
@@ -43,13 +42,18 @@ We need:
 \begin{equation*}
 y_i = \delta_X(Y^{i-1})
 \end{equation*}
-
 That is, each RDD $y_i$ in the output must be the correct delta update for the collection represented by the previous RDDs, with respect to the input collection $X$.
 
 \subsection{Linear operations}
-For the linear operations $+$, $-$ and $sum$ it is enough to apply the operations to the constituent RDDs of a DStream. For example, for addition, suppose we have two DStreams $X,Y$. Since the delta rule is $\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)$, then the delta update to $X^{i-1} + Y^{i-1}$ is $x_i + y_i$. Hence when we add $X$ and $Y$ we need to produce the DStream consisting of the RDD elements added elementwise. This and negation are captured with a new \lin{Ring} instance:
+For the linear operations $+$ and $-$ it is enough to apply the operations element-wise to the constituent RDDs of a DStream.
+
+For addition, suppose we have two DStreams $X$ and $Y$. Since the delta rule is $\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)$, then the delta update to $X^{i-1} + Y^{i-1}$ is $x_i + y_i$. Hence when we add $X$ and $Y$ we need to produce the DStream consisting of the RDD elements added element-wise.
+
+For negation, since $\delta_X(-r_1) = -\delta_X(r_1)$, then the delta update to $X^{i-1}$ with respect to $X$ is $-\delta_X(X^{i-1}) = -x_i$. Hence this is also a case of applying the operator element-wise.
+
+These two operators are captured with a new \lin{Ring} instance:
 \vs\begin{lstlisting}
-implicit def DStreamRing[K,R](implicit rdd: Ring[RDD[(K,R)]]) =
+implicit def DStreamRing[K,R](implicit ring: Ring[RDD[(K,R)]]) =
   new Ring[DStream[(K,R)]] {  
     def add(x1: DStream[(K,R)], x2: DStream[(K,R)]) =
       x1.transformWith(x2, ring.add)
@@ -57,13 +61,12 @@ implicit def DStreamRing[K,R](implicit rdd: Ring[RDD[(K,R)]]) =
       x1.transform(ring.negate)
   }
 \end{lstlisting}\vs
-This \lin{Ring} instance recursively requires an instance of \lin{Ring} for the underlying RDDs of type \lin{RDD[(K,R)]}. It then applies the corresponding operations elementwise to the RDDs in the input DStream(s) to achieve the output DStreams as described above.
-
+Here we use the DStream methods \lin{transform} and \lin{transformWith}. The former takes a function \lin{RDD[T] => RDD[U]} which it applies to each RDD in the stream, and the later takes a second DStream and a function \lin{(RDD[T],RDD[T1]) => RDD[U]}, which it applies to each pair in sequence of pairs of RDDs produced by zipping together the two DStreams. Thus by providing these functions with the \lin{add} and \lin{negate} operators from the implicitly provided instance of  \lin{Ring} for the RDDs, we achieve the element-wise application of the operators.
 \subsection{Distributive operations}
 The distributive operations $*$, $\cdot$ and $join$ will all need to be implemented by joining the underlying RDDs in some way, in order to pair matching elements (and drop elements with keys not existing in both collections). Unfortunately however, the \lin{join} method for DStreams is not fit for our purposes here, as it only joins two DStreams element-wise. To see the problem, suppose we have two DStreams:
 \begin{lstlisting}
-X: DStream[T] = [X_1,X_2]  //X_1,X_2: RDD[T]
-Y: DStream[T] = [Y_1,Y_2] //Y_1,Y_2: RDD[T]
+X: DStream[T] = [X_1,X_2] 
+Y: DStream[T] = [Y_1,Y_2]
 \end{lstlisting}
 Then the \lin{join} method works as follows:
 \begin{lstlisting}
@@ -77,19 +80,25 @@ join(X',Y') &= join((X_1 + X_2),(Y_1 + Y_2)) \\
 &= join(X_1,Y_1) + join(X_1,Y_2) + join(X_2,Y_1) + join(X_2,Y_2)
 \end{split}
 \end{equation*}
-
-Therefore we can see that this is a stateful operation, since later batches (e.g. $X_2$) must be joined with earlier batches ($Y_1$). Unfortunately, this has meant we have not been able to implement these operations for two DStream operands. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
+Therefore we can see that this is a stateful operation, since later batches must be joined with earlier batches (e.g. $join(X_1,Y_2)$). Unfortunately, this has meant we have not been able to implement these operations for two DStream operands. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
 \vs\begin{lstlisting}
 val left: DStream[T]
 val right: RDD[T]
 val joined = left.transform { _.join(right) }
 \end{lstlisting}\vs
-
-For example, for multiplication on two collections \lin{X: DStream[(K,R1)], Y: RDD[(K,R2)]}, this calculates the output as:
+For example, for multiplication on two collections \lin{X: DStream[(K,R1)], Y: RDD[(K,R2)]}, we can use this technique to generate instances of \lin{Multiply} between a DStream and an RDD as follows:
+\vs\begin{lstlisting}
+ implicit def DStreamRddMultiply[K,R1,R2,O]
+  (implicit dot: Dot[R1,R2,O]) = new Multiply[DStream[(K,R1)], RDD[(K,R2)], DStream[(K,O)]] {
+    def apply(v1: DStream[(K,R1)], v2: RDD[(K,R2)]): DStream[(K,O)] = v1.transform { rdd =>
+      rdd.join(v2).map { case (k,(r1,r2)) => (k,dot(r1,r2)) }
+    }
+  }
+\end{lstlisting}\vs
+Where we can see that this calculates the output as:
 \vs\begin{lstlisting}
 X*Y = [x1*Y, x2*Y, ..., xn*Y]
 \end{lstlisting}\vs
-
 We can show that this is the correct incrementalisation by considering the delta expression:
 \begin{equation*}
 \begin{split}
@@ -100,22 +109,24 @@ We can show that this is the correct incrementalisation by considering the delta
 	  &= \Delta X*Y
 \end{split}
 \end{equation*}
-Hence $\dX(X^{i-1}*Y) = x_i*Y$, as required.
+Hence $\dX(X^{i-1}*Y) = x_i*Y$, as required. We use in this that $\delta_X(Y) = 0$ since $Y$ is an RDD and so not dependent on $X$.
 
 \subsection{Group}
 The $group$ operator, not being distributive or linear, is not possible to incrementalise in the efficient way we have incrementalised the other operators. We cannot just apply $group$ to each batch and output the resulting DStream. This can be seen by inspecting the form of the its delta expression:
 \begin{equation*}
 \dX(group(r)) = group(r + \dX(r)) - group(r)
 \end{equation*}
-which clearly is not an efficiently incrementalisation - this delta is computed by first computing the update to the operand $r$, then computing group for the entire updated collection and subtracting the previous output. If we were to apply this rule directly to the DStream \lin{X = [x1,x2,x3]}, we would need to compute the output DStream as:
+This is clearly is not an efficiently incrementalisation - this delta is computed by first computing the update to the operand $r$, then computing group for the entire updated collection and subtracting the previous output. If we were to apply this rule directly to the DStream \lin{X = [x1,x2,x3]}, we would need to compute the output DStream as:
 \vs\begin{lstlisting}
-group(X) = [group(x1),group(x1+x2)-group(x1),group(x1+x2+x3)-group(x1+x2)]
+group(X) = [
+  group(x1),group(x1+x2)-group(x1),group(x1+x2+x3)-group(x1+x2)
+]
 \end{lstlisting}\vs
 However, we will make a slight optimisation. Instead of returning a DStream representing a partitioning of the result, we will return one which represents the accumulated result. That is, the batch output at time $t_i$ represents the entire result up to $t_i$. In other words, we will implement our operator such that:
 \vs\begin{lstlisting}
 group(X) = [group(x1),group(x1+x2),group(x1+x2+x3)]
 \end{lstlisting}\vs
-Which avoids the potentially expensive subtraction. To do this, we first compute the accumulated DStream:
+This avoids the potentially expensive subtraction. To do this, we first compute the accumulated DStream:
 \vs\begin{lstlisting}
 Xacc = [x1, x1+x2, x1+x2+x3]
 \end{lstlisting}
@@ -123,8 +134,7 @@ And then we apply the RDD implementation of group to the individual RDDs element
 
 
 \section{Shredded evaluation of DStream queries}
-
-Given that we have implemented the operators in our calculus for DStreams, shredded evaluation of DStream queries is obtained largely ?for free?. This is because for all operators except group, which actually constructs the dictionaries which comprise the shredding contexts, shredded evaluation is datatype-agnostic. It just has to be be able to recursively shred and evaluate its arguments, and as long as the operator itself is implemented for the flat outputs it receives, it can then be applied to those outputs.
+Given that we have implemented the operators in our calculus for DStreams, shredded evaluation of DStream queries needs only one additional piece of code. This is because for all operators except group, which actually constructs the dictionaries which comprise the shredding contexts, shredded evaluation is datatype-agnostic. It just has to be be able to recursively shred and evaluate its arguments, and as long as the operator itself is implemented for the flat outputs it receives, it can then be applied to those outputs.
 
 However, for group, we must provide an implementation of \lin{GroupShredder} for DStreams in order to be able to construct DStream-typed dictionaries. This will be a key feature of our DSL. In constrast to normal evaluation of the group operator on a DStream input, which requires accumulating the input, \lin{GroupShredder} will be able to incrementally produce a flat output and updates to the dictionary without any such accumulation. 
 
@@ -132,22 +142,18 @@ First, to incrementally compute the flat output, we use the same logic as for RD
 \vs\begin{lstlisting}
 val flatIn: DStream[((K1F,K2F),RF)]
 val flatOut: DStream[((K1F,Label),Int)] = flatIn.transform { rdd =>
-rdd.map { case ((k1f,k2f),rf) => (k1f,1) }
-  .reduceByKey(_ + _)
-  .map { case (k1,r) => ((k1,Label(k1)),r) }
+  rdd.map { case ((k1f,_),_) => ((k1f,Label(k1f)),true).distinct }
 }
 \end{lstlisting}\vs
+Thus the output is a sequence of valid flat outputs for each batch, and thus a valid partitioning of the overall output since there is no key-nesting in these flat outputs.
 
-Thus the output is a sequence of valid flat outputs for each batch, and thus a valid partitioning of the overall output since there is no key-nesting used.
-
-Then, to incrementally compute the dictionary, we can again use the same logic as for RDDs:
+\vs Then, to incrementally compute the dictionary, we can again use the same logic as for RDDs:
 \vs\begin{lstlisting}
 val flatIn: DStream[((K1F,K2F),RF)]
-val dict: DStream[(Label,Map[K2F,RF]) = flatIn.map { case ((k1f,k2f),rf) =>
-  (Label(k1f),Map(k2f -> rf))
+val dict: DStream[(Label,Map[K2F,RF]) = flatIn.transform { rdd =>
+  rdd.map { case ((k1f,k2f),rf) => (Label(k1f),Map(k2f -> rf))
 }
 \end{lstlisting}\vs
 
-Where again, this constitutes a valid partitioning of the dictionary since the collections are value-nested and so will combine properly upon addition, in contrast to key-nested collections which cannot be combined this way.
-
-Therefore, since $group$ is the only construct in the calculus which triggered accumulation (and therefore recomputation of all downstream operators with each batch), we can now incrementalise any query written in this DSL efficiently by shredding it. In the next section we test the practical benefits of this approach.
+Again, this constitutes a valid partitioning of the dictionary since the collections are value-nested and so will combine properly upon addition, in contrast to key-nested collections which cannot be combined this way.
+Therefore, using shredding, we can indeed efficiently incrementalise the evaluation of queries which construct key-nested collections. In the next section we test the practical benefits of this approach.

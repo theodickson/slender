@@ -46,7 +46,7 @@ In this way, we can use collections themselves as multiplicities. For example, a
 
 \subsection{Key types} {
 
-For keys, the base types are the $\prim{Dom}$ types. These are the types of the active domain of the database. When using Apache Spark for example, this constitutes all serializable Scala data types \cite{}. In a typical relational database this would be much more restricted, to types such as INT, FLOAT, VARCHAR, TIMESTAMP, and so on. 
+For keys, the base types are the $\prim{Dom}$ types. These are the types of the active domain of the database. When using Apache Spark for example, this constitutes all serializable Scala data types. In a typical relational database this would be much more restricted, to types such as INT, FLOAT, VARCHAR, TIMESTAMP, and so on. 
 
 The type $[\R]$ (the boxed ring type) offers ring types for use as keys while retaining the view of their ring structure, thus marking the places where shredding can be performed. For example, a collection of type $\coll{(\K_1,[\coll{\K_2}{\R}])}{\prim{Int}}$ maps a pair of two key types, $\K_1$ and the boxed ring type, $[\coll{\K_2}{\R}]$ to a multiplicity of $\prim{Int}$ type. This is what we call \textit{key nesting}. 
 
@@ -272,12 +272,12 @@ Here, the logic to group is expressed by a nested iteration, filtered by a predi
 The naive way to implement the evaluation of such a query would lead to physically performing this nested iteration, which is clearly very inefficient compared to implementing it with a grouping primitive. Further, in Spark, nested iteration of RDDs is not supported at all.
 Thus, without a dedicated optimiser to examine these queries and detect when nested iterations filtered by predicated correspond to grouping or other primitives, it is not possible evaluate such queries in Spark.
 
-Hence it was decided to forego this operator in favour of the explicit $group$ operator which can be directly evaluated using the \lin{groupBy} method on an RDD, as we will see in chapter  \ref{evaluation}.
-Despite this, we will see in chapter \ref{results} that even with this restriction we are still able to express a wide range of quite complex queries. 
+Hence it was decided to forego this operator in favour of the explicit $group$ operator which can be directly evaluated using the \lin{groupBy} method on an RDD, as we will see in Chapter \ref{evaluation}.
+Despite this, we will see in Chapter \ref{results} that even with this restriction we are still able to express a wide range of quite complex queries. 
 
 }
 
-\section{Incremental updates to queries} {
+\section{Incremental updates to queries} { \label{deltas}
 
 \begin{figure}
 \begin{equation*}
@@ -448,7 +448,7 @@ For $join$, the first element of the key is similarly the intersection of contex
 
 Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shredded, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$.
 
-We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in chapters \ref{evaluation} and \ref{incrementalisation} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
+We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in Chapters \ref{evaluation} and \ref{incrementalisation} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
 
 
 

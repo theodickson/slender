@@ -2,51 +2,61 @@ This is BibTeX, Version 0.99d (TeX Live 2017)
 Capacity: max_strings=100000, hash_size=100000, hash_prime=85009
 The top-level auxiliary file: ociamthesismain.aux
 A level-1 auxiliary file: abstract.aux
-A level-1 auxiliary file: chapter1.aux
-A level-1 auxiliary file: chapter2.aux
-A level-1 auxiliary file: conclusions.aux
-A level-1 auxiliary file: appendix1.aux
-A level-1 auxiliary file: appendix2.aux
+A level-1 auxiliary file: introduction.aux
+A level-1 auxiliary file: nrc.aux
+A level-1 auxiliary file: dsl.aux
+A level-1 auxiliary file: evaluation.aux
+A level-1 auxiliary file: incrementalisation.aux
+A level-1 auxiliary file: results.aux
+A level-1 auxiliary file: conclusion.aux
 The style file: plain.bst
 Database file #1: refs.bib
-You've used 1 entry,
+Warning--I didn't find a database entry for "draftpaper"
+Warning--I didn't find a database entry for "caseclass"
+Warning--I didn't find a database entry for "compilerasts"
+Warning--I didn't find a database entry for "patternmatch"
+Warning--I didn't find a database entry for "scalalist"
+Warning--I didn't find a database entry for "implicitresolution"
+Warning--I didn't find a database entry for "implicitclass"
+You've used 13 entries,
             2118 wiz_defined-function locations,
-            512 strings with 4246 characters,
-and the built_in function-call counts, 317 in all, are:
-= -- 32
-> -- 7
-< -- 0
-+ -- 3
-- -- 2
-* -- 24
-:= -- 58
-add.period$ -- 3
-call.type$ -- 1
-change.case$ -- 4
+            585 strings with 6263 characters,
+and the built_in function-call counts, 4358 in all, are:
+= -- 430
+> -- 203
+< -- 3
++ -- 81
+- -- 68
+* -- 266
+:= -- 706
+add.period$ -- 42
+call.type$ -- 13
+change.case$ -- 73
 chr.to.int$ -- 0
-cite$ -- 1
-duplicate$ -- 11
-empty$ -- 28
-format.name$ -- 2
-if$ -- 62
+cite$ -- 13
+duplicate$ -- 155
+empty$ -- 360
+format.name$ -- 68
+if$ -- 936
 int.to.chr$ -- 0
-int.to.str$ -- 1
-missing$ -- 1
-newline$ -- 8
-num.names$ -- 2
-pop$ -- 2
+int.to.str$ -- 13
+missing$ -- 7
+newline$ -- 68
+num.names$ -- 26
+pop$ -- 98
 preamble$ -- 1
-purify$ -- 3
+purify$ -- 60
 quote$ -- 0
-skip$ -- 7
+skip$ -- 132
 stack$ -- 0
-substring$ -- 30
-swap$ -- 1
-text.length$ -- 0
+substring$ -- 245
+swap$ -- 43
+text.length$ -- 3
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 4
+type$ -- 52
 warning$ -- 0
-while$ -- 4
-width$ -- 2
-write$ -- 13
+while$ -- 42
+width$ -- 15
+write$ -- 136
+(There were 7 warnings)
