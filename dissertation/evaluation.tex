@@ -1,4 +1,4 @@
-\chapter{Evaluation of DSL queries}
+\chapter{Evaluation of DSL Queries} \label{evaluation}
 
 In this chapter we describe how we implemented the evaluation of the ASTs. First, we implement the algebraic operators in our calculus for local Scala collections and Spark RDDs. Due to the polymorphic nature of these operators and the static type system of Scala, simple recursive functions are not suitable. Instead, drawing on the techniques used by similar Scala libraries, we create a system of typeclasses and implicit resolution.
 

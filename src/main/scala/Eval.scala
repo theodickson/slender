@@ -1,9 +1,6 @@
 package slender
 
-import org.apache.spark.rdd.RDD
 import shapeless.{::, HList, HNil}
-
-import scala.reflect.ClassTag
 
 trait Eval[-E,+T] extends ((E,Namespace) => T) with Serializable
 
@@ -16,14 +13,6 @@ object Eval {
   implicit def VariableEval[T]: Eval[TypedVariable[T],T] = instance {
     case (tv,bvs) => bvs(tv.name).asInstanceOf[T]
   }
-
-  implicit def CollectExprRddEval[E,K:ClassTag,R:ClassTag](implicit eval: Eval[E,RDD[(K,R)]]): Eval[CollectExpr[E],Map[K,R]] = instance {
-    case (CollectExpr(e),vars) => eval(e,vars).collectAsMap().toMap
-  }
-
-//    instance {
-//    case (CollectExpr(e),vars) => eval(e,vars).collectAsMap()
-//  }
 
   implicit def UnusedVariableEval: Eval[UnusedVariable,Any] = instance { (_,_) => null }
 

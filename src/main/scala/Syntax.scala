@@ -1,7 +1,3 @@
-/** Refactor.
-  * MakeKeyRingPair - do I need it?
-  * Pair case classes in general - still needed?
-  */
 package slender
 
 import org.apache.spark.rdd.RDD
@@ -11,81 +7,18 @@ import shapeless.syntax.SingletonOps
 import scala.reflect.runtime.universe.{Type, TypeTag, WeakTypeTag, typeTag}
 
 case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr.One)
+
 case class KeyRingPair[K:Expr, R:Expr](k: K, r: R)
 
 case class ExprOps[E:Expr](e: E) {
 
-  def hlistEval[R,Repr](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr]): Repr =
-    evaluator(resolve(e),Map.empty)
-
   def eval[R,Repr,T](implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr], tupler: DeepTupler[Repr,T]): T =
     tupler(evaluator(resolve(e),Map.empty))
 
-//  def accEval[R,Repr,AccRepr,T]
-//  (implicit resolve: Resolver[E,R], evaluator: Eval[R,Repr],
-//   acc: Accumulate[Repr,AccRepr], tupler: DeepTupler[AccRepr,T]): T = tupler(acc(evaluator(resolve(e), Map.empty)))
-
-  def evalType[T:TypeTag, R](implicit resolve: Resolver[E,R], evaluator: Eval[R,T]): Type = typeTag[T].tpe
-
-  def shreddedEval[T,R,C <: HList](implicit shredResolve: ShreddedResolver[E,R], eval: ShreddedEval[R,T,C]): ShreddedResult[T,C] =
+  def shreddedEval[T,R,C <: HList]
+  (implicit shredResolve: ShreddedResolver[E,R], eval: ShreddedEval[R,T,C]): ShreddedResult[T,C] =
     eval(shredResolve(e),Map.empty)
-  
-  def shreddedResolve[R](implicit shredResolve: ShreddedResolver[E,R]): R = shredResolve(e)
 
-  def resolve[T](implicit resolver: Resolver[E,T]): T = resolver(e)
-  def isEvaluable[T](implicit canEval: Perhaps[Eval[E,_]]) = canEval.value.isDefined
-  def isResolvable[T](implicit canResolve: Perhaps[Resolver[E,_]]): Boolean = canResolve.value.isDefined
-
-  def report[R,T](name: String)(implicit resolve: Resolver[E,R], eval: Eval[R,RDD[T]], tag: WeakTypeTag[RDD[T]]): Unit = {
-    val result = eval(resolve(e),Map.empty)
-    val resultType = prettyType(result)
-    val resultString = result.dataToString
-    val rep = s"""
-Query: $name
-Output type: $resultType
-Output sample:
-
-$resultString
-
-      """
-    println(rep)
-  }
-
-  def shreddedReport[R,T,RS,TS,C <: HList](name: String)
-                               (implicit resolve: Resolver[E,R], eval: Eval[R,RDD[T]], tag: WeakTypeTag[RDD[T]],
-                                shreddedResolve: ShreddedResolver[E,RS],
-                                shreddedEval: ShreddedEval[RS,RDD[TS],C],
-                                tag2: WeakTypeTag[RDD[TS]],
-                                tag3: WeakTypeTag[C]): Unit = {
-    val result = eval(resolve(e),Map.empty)
-    val resultType = prettyType(result)
-    val resultString = result.dataToString
-
-    val shreddedResult = shreddedEval(shreddedResolve(e),Map.empty)
-    val flatResultType = prettyType(shreddedResult.flat)
-    val flatSample = shreddedResult.flat.dataToString
-    val ctxType = prettyType(shreddedResult.ctx)
-    val rep = s"""
-Query: $name
-Output type: $resultType
-Output sample:
-
-$resultString
-
-Shredded output type: $flatResultType
-Shredded context type: $ctxType
-Shredded output sample:
-
-$flatSample
-
-      """
-    println(rep)
-  }
-
-//  def ===[K1:Expr](k1: K1) = EqualsPredicate(e, k1)
-//  def =!=[K1:Expr](k1: K1) = NotExpr(EqualsPredicate(e, k1))
-//  def >[K1:Expr](k1: K1) = Predicate(e, k1, _ > _, ">")
-//  def <[K1:Expr](k1: K1) = Predicate(e, k1, _ < _, "<")
   def -->[R:Expr](r: R): KeyRingPair[E,R] = KeyRingPair(e,r)
 
   def +[R1:Expr](expr1: R1) = AddExpr(e,expr1)
@@ -132,8 +65,8 @@ object MakeExpr extends Priority1MakeExprImplicits {
 
   implicit def intMakeExpr: MakeExpr[Int,LiteralExpr[Int,Int]] = instance { i => LiteralExpr(i,i) }
 
-  implicit def hconsMakeExpr[H, HE, T <: HList, TE <: HList](implicit makeH: MakeExpr[H,HE], makeT: MakeExpr[T,TE]):
-  MakeExpr[H::T,HE::TE] = new MakeExpr[H::T,HE::TE] {
+  implicit def hconsMakeExpr[H, HE, T <: HList, TE <: HList]
+  (implicit makeH: MakeExpr[H,HE], makeT: MakeExpr[T,TE]): MakeExpr[H::T,HE::TE] = new MakeExpr[H::T,HE::TE] {
     def apply(v1: H::T) = v1 match {
       case h :: t => makeH(h) :: makeT(t)
     }
@@ -216,30 +149,3 @@ trait Syntax {
       new Variable[a3.T] { val name = a3.narrow }
     )
 }
-
-
-//case class NestedForComprehensionBuilder[
-//V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
-//](builder1: ForComprehensionBuilder[V1,R1,P1], builder2: ForComprehensionBuilder[V2,R2,P2]) {
-//  //todo - this works but takes forever to compile. Perhaps a more elegant and general solution might be quicker,
-//  //otherwise can it.
-//  def Collect[T, R3 <: Expr]
-//  (r3: T)(implicit make: MakeExpr[T, R3]) = {
-//    val made = make(r3)
-//    builder1._collect(builder2._collect(made))
-//  }
-//
-//  def Yield[T, K <: Expr, R3 <: Expr]
-//  (r3: T)(implicit make: MakeKeyRingPair[T, K, R3]) = {
-//    val made = make(r3)
-//    builder1._collect(builder2._collect(SngExpr(made.k, made.r)))
-//  }
-//}
-
-
-//def apply[
-//V1 <: Expr, V2 <: Expr, R1 <: Expr, R2 <: Expr, P1 <: Expr, P2 <: Expr
-//](vrp1: VariableRingPredicate[V1,R1,P1],
-//vrp2: VariableRingPredicate[V2,R2,P2]): NestedForComprehensionBuilder[V1, V2, R1, R2, P1, P2] = {
-//  NestedForComprehensionBuilder(ForComprehensionBuilder(vrp1), ForComprehensionBuilder(vrp2))
-//}

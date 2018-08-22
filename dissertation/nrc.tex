@@ -1,19 +1,19 @@
-\chapter{Nested Relational Calculus}
+\chapter{Nested Relational Calculus} \label{nrc}
 
-In this chapter we explain the variant of the Nested Relational Calculus used in this work.
-First we explain how its semantics allow arbitrary nesting of collections, and introduce the core algebraic operators, showing how they enable a wide range of queries. Then we introduce some syntactic constructions which allow us to more naturally express nested queries. We explain the two forms that nested queries can take (key nesting and value nesting), and why the former is preferable semantically but not efficiently parallelised or incrementalised. Next we introduce the delta expressions for each operator, and show that while most operators incrementalise efficiently due to their algebraic properties, others must be recomputed with each update. Finally we provide a full description of the shredding transformation, and show how it allows us to simulate the semantics of a single key-nested query with a sequence of value-nested queries, thus retaining the performance benefits of value-nesting.
+In this chapter we explain the variant of the nested relational calculus used in this work.
+First we explain how its semantics allow arbitrary nesting of collections, and introduce the core algebraic operators, showing how they enable a wide range of queries. Then we introduce some syntactic constructions which allow us to more naturally express nested queries. We explain the two forms that nested queries can take (key-nested and value-nested), and why the former is preferable semantically but not efficiently parallelised or incrementalised. Next we introduce the delta expressions for each operator, and show that while most operators incrementalise efficiently due to their algebraic properties, others must be recomputed with each update. Finally we provide a full description of the shredding transformation, and show how it allows us to simulate the semantics of a single key-nested query with a set of value-nested queries, thus retaining the performance benefits of value-nesting.
 
 
 \section{Type system} {
 
-In order to apply the shredding operation outlined in the previous chapter, we introduce a variant of the Nested Relational Calculus (NRC) which uses \textit{generalised multiset semantics}. As opposed to a regular multiset, or \textit{bag}, in which each element in a set is associated with an integer value, in our generalised multiset semantics we model collections by mappings $ \coll{\K}{\R} $ where values can be of any type which admits a ring structure $ (\R,0_\R,+_\R,-_\R,1_\R,*_\R) $. In the following we will show the two key properties of these semantics. Firstly, that they admit nesting of collections to arbitrary depth, and secondly, that they give rise to the potential for efficient incrementalisation and parallelisation since the majority of the operators we will introduce are distributive ring operations.
+In order to apply the shredding operation outlined in the previous chapter, we introduce a variant of the nested relational calculus which uses \textit{generalised multiset semantics}. As opposed to a regular multiset, or \textit{bag}, in which each element in a set is associated with an integer value, in our generalised multiset semantics we model collections by mappings $ \coll{\K}{\R} $ where values can be of any type which admits a ring structure $ (\R,0_\R,+_\R,-_\R,1_\R,*_\R) $. In the following we will show the two key properties of these semantics. Firstly, that they admit nesting of collections to arbitrary depth, and secondly, that they give rise to the potential for efficient incrementalisation and parallelisation since the majority of the operators we will introduce are distributive ring operations.
 
 Figure \ref{nrctypes} formally describes the type system that enables these semantics, using an inductive definition.
 
 \begin{figure}
 \begin{equation*}
 \begin{aligned}
-\R := \prim{Int} \OR \R \times  \R \OR \coll{\K}{\R} \\
+\R := \prim{Int} \OR \prim{Bool} \OR \R \times  \R \OR \coll{\K}{\R} \\
 \K := \prim{Dom} \OR  [\R]  \OR \prim{Label} \\
 \end{aligned}
 \qquad
@@ -27,7 +27,7 @@ Figure \ref{nrctypes} formally describes the type system that enables these sema
 It will also be useful to introduce the notation $\Bag{\K} := \coll{\K}{\prim{Int}}$, for collections with integer multiplicity.
 
 \subsection{Ring types} {
-The base case of our ring type is the integers, which of course admits the ring structure $(\mathbb{Z},0,+,-,1,*)$. Note that it is trivial to extend this calculus to other primitive types admitting a ring structure, such as the real numbers, but for brevity we omit these. We also note that with just integers, we can easily model booleans by representing false as 0 and true as any positive integer, since then integer multiplication models the boolean AND and integer addition models boolean OR. This will be useful later when developing a construct which can filter collections.
+The base cases of our ring type are the integers and the booleans. Integers admit the ring structure $(\mathbb{Z},0,+,-,1,*)$, and booleans the structure $(\mathbb{B}, false,OR,NOT,true,AND)$. Note that it is trivial to extend this calculus to other primitive types admitting a ring structure, such as the real numbers, but for brevity we omit these. 
 
 The first of our inductive cases is the product type $\R \times \R$. A product of two ring types $\R_1$ and $\R_2$ trivially admits a ring structure by pairing the 0 and 1 elements and applying the operations of $\R_1$ and $\R_2$ element-wise. Although in practice we will be able to use tuples of any arity, in this formalism we only define operations for a pair, as higher arities are isomorphic to nesting products within the second element.
 
@@ -36,11 +36,11 @@ The second and crucial inductive case is the collection type $\coll{\K}{\R}$, wh
 \begin{equation*}
 \begin{split}
 & (X+Y)(k)  = X(k) +_\R Y(k) \\
-& (X*Y)(k) = X(k) \times_\R Y(k)
+& (X*Y)(k) = X(k) *_\R Y(k)
 \end{split}
 \end{equation*}
 
-If $\R$ is an $\prim{Int}$, so that $X,Y: \Bag{\K}$, then we can see that $+$ corresponds to bag union. We can also see that $\times$ is join-like - a key will only have non-zero value in the resulting collection if it has non-zero value in each of $X$ and $Y$.
+If $\R$ is an $\prim{Int}$, so that $X,Y: \Bag{\K}$, then we can see that $+$ corresponds to bag union. We can also see that $*$ is join-like - a key will only have non-zero value in the resulting collection if it has non-zero value in each of $X$ and $Y$.
 
 In this way, we can use collections themselves as multiplicities. For example, a collection of type $\coll{\K_1}{(\coll{\K_2}{\R})}$ associates a collection of type $\coll{\K_2}{\R}$ to each key of type ${\K_1}$. This is what we call \textit{value} or \textit{ring} nesting and is the first way to obtain nested collections.
 
@@ -48,7 +48,7 @@ In this way, we can use collections themselves as multiplicities. For example, a
 
 For keys, the base types are the $\prim{Dom}$ types. These are the types of the active domain of the database. When using Apache Spark for example, this constitutes all serializable Scala data types \cite{}. In a typical relational database this would be much more restricted, to types such as INT, FLOAT, VARCHAR, TIMESTAMP, and so on. 
 
-The type $[\R]$ (the \textit{boxed ring} type) offers ring types for use as keys while retaining the view of their ring structure, thus marking the places where shredding can be performed. For example, a collection of type $\coll{(\K_1,[\coll{\K_2}{\R}])}{\prim{Int}}$ maps a pair of two key types, $\K_1$ and the boxed ring type, $[\coll{\K_2}{\R}]$ to a multiplicity of $\prim{Int}$ type. This is what we call \textit{key nesting}. 
+The type $[\R]$ (the boxed ring type) offers ring types for use as keys while retaining the view of their ring structure, thus marking the places where shredding can be performed. For example, a collection of type $\coll{(\K_1,[\coll{\K_2}{\R}])}{\prim{Int}}$ maps a pair of two key types, $\K_1$ and the boxed ring type, $[\coll{\K_2}{\R}]$ to a multiplicity of $\prim{Int}$ type. This is what we call \textit{key nesting}. 
 
 The $\prim{Label}$ type represents places we have applied shredding, in order to replace key-nested collections with labels. For example, in a query which produces a result of type  $\coll{(\K_1,[\coll{\K_2}{\R}])}{\prim{Int}}$, we would expect shredding to instead produce a result of type 
 $\coll{(\K_1,\prim{Label})}{\prim{Int}}$, along with a dictionary of type $\coll{\prim{Label}}{(\coll{\K_2}{\R})}$. Note that both of these types do not contain key-nested collections. Instead our dictionary uses value-nesting. This will be crucial to how we efficiently incrementalise such shredded queries.
@@ -71,17 +71,17 @@ r := \ & c \OR X \OR \langle r_1, r_2 \rangle \OR \proj{r}{i} \OR \\
 \label{nrcexprs}
 \end{figure}
 
-Figure \ref{nrcexprs} introduces the constructions that define valid expressions in our calculus. In this section we explain these and discuss their algebraic properties.
+Figure \ref{nrcexprs} introduces the constructions that define the valid expressions in our calculus. In this section we explain these and discuss their algebraic properties.
 
 \subsection{Ring expressions} {
-The base expressions of ring type are constants and input collections, denoted by $c$ and $X$ respectively. Constants will be of $\prim{Int}$ type in this restricted formalism, but in practice can be of any numeric type or other primitive type admitting a ring structure. Input collections are datasets of type $\coll{\K}{\R}$, where $\K$ is any valid key type and $\R$ any valid ring type. For example, in our motivating example, the input collection \textit{ratings} is of type $\coll{Artist \times Track}{\prim{Int}}$. We also have a standard tupling operator denoted by $\langle , \rangle$ and can project such product types using the notation $\proj{r}{i}$.
+The base expressions of ring type are constants and input collections, denoted by $c$ and $X$ respectively. Constants will be of $\prim{Int}$ or $\prim{Bool}$ type in this restricted formalism, but in practice can be of any numeric type or other primitive type admitting a ring structure. Input collections are datasets of type $\coll{\K}{\R}$, where $\K$ is any valid key type and $\R$ any valid ring type. For example, in our motivating example, the input collection \textit{ratings} is of type $\coll{(Artist \times Track)}{\prim{Int}}$. We also have a standard tupling operator denoted by $\langle , \rangle$ and can project such product types using the notation $\proj{r}{i}$.
 
 Next we have $+$, $-$, and $\ast$, the algebraic operators defined by the ring structure of $\R$. It will be important when discussing incrementalisation and parallelisation to note that  $\ast$ is distributive with respect to $+$:
 \[
 a*(b + c) = a*b + a*c.
 \]
 
-The dot product is a generalised multiplication operator which accepts any two arguments of ring type. It is defined recursively as:
+The dot product ($\cdot$) is a generalised multiplication operator which accepts any two arguments of ring type. It is defined using $*$ as follows:
 \begin{equation*}
 \begin{split}
 & \textrm{If } X: \prim{Int}, \ Y: \prim{Int}\textrm{, then } X \cdot Y = X * Y \\ \\
@@ -91,12 +91,10 @@ The dot product is a generalised multiplication operator which accepts any two a
 & (X \cdot Y)(\langle k_1, k_2 \rangle) = X(k_1) \cdot Y(k_2)\textrm{, for all }k_1,k_2: \K
 \end{split}
 \end{equation*}
-
 This operation can natively implement certain useful operations. For example, the dot product of $\Bag{\K_1}$ and $\Bag{\K_2}$ produces their cartesian product.
 
 The dot product is distributive:
-
-\begin{equation*}
+\vs\begin{equation*}
 \begin{split}
 & \textrm{If } X: \prim{Int}, \ Y: \prim{Int}\textrm, \ Z: \Int: \\
 &X \cdot (Y + Z) = X * (Y + Z) = X*Y + X*Z = X \cdot Y + X \cdot Z \\ \\
@@ -107,9 +105,7 @@ The dot product is distributive:
 &= (X \cdot Y)(k_1) + (X \cdot Z)(k_2) 
 \end{split}
 \end{equation*}
-\vs
-It also allows us to extend the native ring multiplication operation to collections of the same key type but differing ring types, as follows:
-
+It also allows us to extend the native ring multiplication operation to collections of the same key type but differing ring types, by defining the output value of each key as the dot product of the values of the key in each input collection:
 \begin{equation*}
 \begin{split}
 & X: \coll{\K}{\R_1}, \ Y: \coll{\K}{\R_2} \\
@@ -117,11 +113,9 @@ It also allows us to extend the native ring multiplication operation to collecti
 & (X*Y)(k) = X(k) \cdot Y(k)
 \end{split}
 \end{equation*}
-
 We will see how this extension to multiplication allows us to define a for-comprehension construct with very natural semantics.
 
-Although the $*$ operator can be described as join-like when used on collections, it performs this join on the entire key, and so is not general enough to model many typical joins. Thus we introduce a separate join operator, which only operates on collections, and joins only on the first element of a product-typed key. It is defined as follows:
-
+Note that when applied to collections, $*$ operator can be described as join-like. This is because a key will only be present (i.e. have non-zero value) in the output collection if it has non-zero value in both of the input collections. However, since it performs this join on the entire key, it is not general enough to model many useful joins. Thus we introduce a separate join operator, which only operates on collections, and joins only on the first element of a product-typed key. It is defined as follows:
 \begin{equation*}
 \begin{split}
 & X: \coll{(\K,\K_1)}{\R_1},  Y: \coll{(\K,\K_2)}{\R_2} \\
@@ -129,10 +123,9 @@ Although the $*$ operator can be described as join-like when used on collections
 & join(X, Y)(\langle k, \langle k_1, k_2 \rangle \rangle) = X(\langle k, k_1 \rangle) \cdot Y(\langle k, k_2 \rangle)
 \end{split}
 \end{equation*}
+We can see that this is a join as a key $\langle k, \langle k_1, k_2 \rangle \rangle$ will only be non-zero in the output if $\langle k, k_1 \rangle$ is non-zero in $X$ and $\langle k, k_1 \rangle$ is non-zero in $Y$. It is general enough to model all inner joins if we re-order the elements (or columns) of the key such that the element(s) we wish to join on constitute the first element of the key and the other columns are nested within the second element. 
 
-We can see that this is a join as a key $\langle k, \langle k_1, k_2 \rangle \rangle$ will only be non-zero in the output if $\langle k, k_1 \rangle$ is non-zero in $X$ and $\langle k, k_1 \rangle$ is non-zero in $Y$. It is general enough to model all inner-joins if we re-order the elements (or columns) of the key such that the element(s) we wish to join on constitute the first element of the key and the other columns are nested within the second element. 
-
-The $join$ operator is also distributive:
+\noindent The $join$ operator is also distributive:
 \begin{equation*}
 \begin{split}
 &X: \coll{(\K,\K_1)}{\R_1},  \ Y: \coll{(\K,\K_2)}{\R_2}, \ Z: \coll{(\K,\K_2)}{\R_2} \\
@@ -142,7 +135,7 @@ The $join$ operator is also distributive:
 \end{split}
 \end{equation*}
 
-The sum operator is another which is used in our for-comprehension construct, and is defined as follows: 
+The sum operator is another which will be used in the for-comprehension construct, and is defined as follows: 
 \begin{equation*}
 \begin{split}
  & X: \coll{\K}{\R} \\
@@ -150,42 +143,35 @@ The sum operator is another which is used in our for-comprehension construct, an
  & sum(X) = \sum_{k: K} X(k)
 \end{split}
 \end{equation*}
- 
 It is only defined for collection types, and, for example, when applied to a bag returns its aggregate count.
  
-The predicate operator $p(k)$ encapsulates any function accepting a key and returning an integer in the set $\{0,1\}$, thus modelling a boolean output. We will see how it enables us to do things such as filter collections.
+\vs The predicate operator $p(k)$ encapsulates any function accepting a key and returning a boolean. We will see how it enables us to do things such as filter collections.
  
-The \textit{singleton} constructor is $sng$. With $k: \K$ and $r: \R$, $sng(k,r)$ constructs a collection of type $\coll{\K}{\R}$ with the single element $k  \mapsto r$. We will see how this combines with our for-comprehension construct to create nested collections.
+\vs The \textit{singleton} constructor is $sng$. With $k: \K$ and $r: \R$, $sng(k,r)$ constructs a collection of type $\coll{\K}{\R}$ with the single element $k  \mapsto r$. We will see how this combines with our for-comprehension construct to create nested collections.
  
-The infinite mapping $\{x => r\}$ allows us to express functions from key types to value types as collections of infinite domain, where the key is a variable expression $x$ and the value is a ring expression $r$ which may use the variables introduced in $x$. When such an expression is multiplied with a finite collection, the variable expression is bound to each of the keys in the finite collection in order to produce a concrete result.
+\vs The infinite mapping $\{x => r\}$ allows us to express functions from key types to value types as collections of infinite domain, where the key is a variable expression $x$ and the value is a ring expression $r$ which may use the variables introduced in $x$. When such an expression is multiplied with a finite collection, the variable expression is bound to each of the keys in the finite collection in order to produce a concrete result.
 
 The following example shows us how this allows transformations of finite collections:
 
-Let $k_1,k_2: K$ be variables. Let $X: \Bag{\K \times \K}$, $p(\langle k_1, k_2 \rangle) = k_1 == k_2$. \\
-Let $Y = X * \{\langle k_1, k_2 \rangle => p(\langle k_1, k_2 \rangle)\}$. Applying the definition of *, and assuming $k_1,k_2$ are in the domain of $X$: \\
+\noindent Let $k_1,k_2: K$ be variables. Let $X: \Bag{\K \times \K}$. Let $p(\langle k_1, k_2 \rangle) = k_1 == k_2$ be the predicate comparing $k_1$ and $k_2$ for equality. \\
+Let $Y = X * \{\langle k_1, k_2 \rangle => p(\langle k_1, k_2 \rangle)\}$. \\ Applying the definition of *, and assuming $k_1,k_2$ are in the domain of $X$: \\
 \begin{equation*}
 \begin{split}
 Y(\langle k_1, k_2 \rangle) &= X(\pair{k_1}{k_2}) \cdot 1 = X(\pair{k_1}{k_2})\textrm{, if } k_1 == k_2 \\
 &= X(\pair{k_1}{k_2}) \cdot 0 = 0\textrm{, otherwise}
 \end{split}
 \end{equation*}
-
 Hence $Y$ is X filtered to only those keys whose first and second elements are equal.
 
-Outside of the domain of the finite collection, the value of the infinite mapping is not relevant since even if we calculated it, it would be multiplied with zero. Hence it it useful to think of multiplication in this context as binding the variable expression in the infinite mapping to each key in the domain of the finite mapping and in order to produce a new value with is combined using dot product with the original value in the finite mapping.
-
-The last ring-typed construct is group, and is the operator which constructs key-nested collections. It is defined on collections with keys of pair type, as follows:
-
+\vs The last ring-typed construct is group, and is the operator which constructs key-nested collections. It is defined on collections with keys of pair type, as follows:
 \begin{equation*}
 \begin{split}
 &X: \coll{\K_1 \times \K_2}{\R} \\
 &group(X): \coll{\K_1 \times [\coll{\K_2}{\R}]}{\prim{Bool}} \\
-&group(X)(\pair{k_1}{k_2'}) = true \iff k_2' = \sum_{\pair{k_1'}{k_2} \mapsto r : k_1' = k_1} {k_2 \mapsto r} 
+&group(X)(\pair{k_1}{k_2'}) = true \iff k_2' = \sum_{(\pair{k_1'}{k_2} \mapsto r) \in X : \ k_1' = k_1} {\{k_2 \mapsto r\}} 
 \end{split}
 \end{equation*}
-
-This groups $X$ by the first element of its key and creates a key-nested collection mapping the second elements of the key to their values. For example:
-
+This creates a key in the output for each unique first element of the key in the input. These keys are paired with the boxed collection of all of the second elements they appear with in the input. In this way it is a grouping of the input by the first element of the key. For example:
 \begin{equation*}
 \begin{split}
 &X: \Bag{\prim{String}\times \prim{String}} \\
@@ -193,12 +179,10 @@ This groups $X$ by the first element of its key and creates a key-nested collect
 &group(X) = \{\langle a, \{b \mapsto 1, c \mapsto 2\} \rangle \mapsto true, \langle b, \{d \mapsto 3 \} \rangle \mapsto true \}
 \end{split}
 \end{equation*}
-
-While this boolean value may seem redundant, and thus this representation may seem to offer no benefit over the value-nested representation: $\coll{\K_1}{(\coll{\K_2}{R})}$, it actually offers a key semantic benefit. It allows us to keep track of values of type $\K_1$ whose nested collections become empty when updating inputs to a query. Using the example above, suppose we receive an update to $X$:
+While this boolean value may seem redundant, and thus this representation may seem to offer no benefit over the value-nested representation $\coll{\K_1}{(\coll{\K_2}{R})}$, it actually offers a key semantic benefit. It allows us to keep track of values of type $\K_1$ whose nested collections become empty when updating inputs to a query. Using the example above, suppose we receive an update to $X$:
 \begin{equation*}
 \dX = \{(\pair{b}{d} \mapsto -3\}
 \end{equation*}
-
 This translates to updating the key-nested collection $\pair{b}{\{d \mapsto 3\}}$:
 \begin{equation*}
  \pair{b}{\{d \mapsto -3, d \mapsto 3\}} = \pair{b}{\{\}}
@@ -208,25 +192,15 @@ Letting $group^v(X)$ be the value-nested representation of $group(X)$:
 \begin{equation*}
 group^v(X) = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}, b \mapsto \{d \mapsto 3\}\}
 \end{equation*}
-When we update this with $\{b \mapsto \{d \mapsto 3\}\}$, we gets
+When we update this with $\{b \mapsto \{d \mapsto 3\}\}$, we get:
 \begin{equation*}
 group^v(X) = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}, b \mapsto \{d \mapsto 0\}\} = \{a \mapsto \{b \mapsto 1, c  \mapsto 2\}\}
 \end{equation*}
-
 And so $b$ disappears from the top-level of our output entirely. 
 
-
-We recognise that this being the only way to construct key-nested collections is quite restrictive. In fact, in earlier work \cite{draftpaper}, the variant of the NRC used did not include this construct, but instead used a more general construct $toK$, which would box arbitrary sub-queries of ring type. Unfortunately, although this allowed for a more general query language, the queries written in this way proved highly impractical to implement within Spark. Appendix \ref{groupvstok} contains a discussion on this for the interested reader. Despite this, we will see in section \ref{} that even with this restriction we are still able to express a wide range of quite complex queries.
-
-}
-
 \subsection{Key expressions} {
-
-The base key expressions are either constants, denoted $c$, or variables, denoted $x$, which are strictly those introduced as the keys of an infinite mapping.
-
-As with ring expressions, we also have tupling and projection. 
+The base key expressions are either constants, denoted $c$, or variables, denoted $x$, which are strictly those introduced as the keys of an infinite mapping. As with ring expressions, we also have tupling and projection. 
 }
-
 
 \section{For-comprehension syntax} {
 In this section we introduce several variants of a familiar syntactic construction, the for-comprehension, which will allow many queries to be written more naturally.
@@ -257,7 +231,6 @@ Hence, we can instead write the above query as:
 &=sum(X * \{x => x > 2) \}
 \end{split}
 \end{equation*}
- 
 These examples are quite limited in that they are only aggregations of a collection $X$. In order to transform $X$ more generally, we can use the singleton constructor. For example, consider the following query:
 \begin{equation*}
 \begin{split}
@@ -265,35 +238,42 @@ These examples are quite limited in that they are only aggregations of a collect
 &Y = \For{\pair{k_1}{k_2}}{X} \Collect{sng(\pair{k_2}{k_1}, 1)}
 \end{split}
 \end{equation*}
-
- Then $Y$ is $X$ but with the pairs reversed. To see how this works, let?s examine the translation of $Y$ into basic syntax:
- 
+Then $Y$ is $X$ but with the pairs reversed. To see how this works, let's examine the translation of $Y$ into basic syntax: 
 \[ Y = sum(X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}) \]
-
-The inner expression $X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}$ iterates over $X$ and and maps each key $\pair{k_1}{k_2}$ to its original value, multiplied by $sng(\pair{k_2}{k_1},1)$. Thus, suppose $X = \{\pair{a}{b} \mapsto 1, \pair{c}{d} \mapsto 2\}$, then: \\
-
-$X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\} = \{(a,b) \mapsto \{(b,a) \mapsto 1\}, (c,d) \mapsto \{(d,c) \mapsto 2\}\}$ \\
-
-Then the sum outside this simply aggregates all of the values via bag union, to produce the single collection: \\
-
-$\{(b,a) \mapsto 1, (d,c) \mapsto 2\}$ \\
-
-Which is indeed $X$ with the elements of the keys reversed.
-
-We encapsulate this construct with the following variant of our for-comprehension: 
-
+The inner expression $X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}$ iterates over $X$ and and maps each key $\pair{k_1}{k_2}$ to its original value, multiplied by $sng(\pair{k_2}{k_1},1)$. Thus, suppose $X = \{\pair{a}{b} \mapsto 1, \pair{c}{d} \mapsto 2\}$, then:
+\begin{equation*}
+X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\} = \{(a,b) \mapsto \{(b,a) \mapsto 1\}, (c,d) \mapsto \{(d,c) \mapsto 2\}\}
+\end{equation*}
+Then the sum outside this simply aggregates all of the values via bag union, to produce the single collection:
+\begin{equation*}
+\{(b,a) \mapsto 1, (d,c) \mapsto 2\}
+\end{equation*}
+Which is indeed $X$ with the elements of the keys reversed. We encapsulate this construct with the following variant of our for-comprehension: 
 \begin{equation*}
 \begin{split}
 \ForIf{x}{X}{p(x)} \Yield{k \mapsto r} &:= \ForIf{x}{X}{p(x)} \Collect{sng(k,r)} \\
 & \ = sum(X * \{x => sng(k,r \cdot p(x)) \})
 \end{split}
 \end{equation*}
+The $r$ is optional and defaults to 1. Thus, we can write the above query to reverse the elements in a product-type key as:
+\[\For{\pair{k_1}{k_2}}{X} \Yield{\pair{k_2}{k_1}}\]
+This is clearly a very natural syntax with which to manipulate collections corresponding to similar syntax in many programming languages.
+}
 
-The $r$ is optional and defaults to 1. Thus, we can write the above query to reverse the elements in a product-type key as: \\
+\section{Restricted construction of key-nested collections}
+The $group$ operator is the only way in this calculus to construct key-nested collections. We recognise that this is quite restrictive. In fact, in \cite{draftpaper}, the variant of the NRC used does not include this construct, but instead uses a more general construct $toK$ which boxes arbitrary sub-queries of ring type. Unfortunately, although this allows for a more general query language, the queries written in this way proved highly impractical to implement within Spark. For example, to express the grouping of a collection $X: \Bag{\K_1 \times \K_2}$ by the first element of the key, the following query would be used:
+\begin{equation*}
+\begin{split}
+&\For{\pair{k_1}{k_2}}{X} \\
+&\Yield{\pair{k_1}{toK(\ForIf{\pair{k_1'}{k_2'}}{X}{k_1 == k_1'} \Yield k_2')}}
+\end{split}
+\end{equation*}
+Here, the logic to group is expressed by a nested iteration, filtered by a predicate to test for equality of the inner key with the outer key.
+The naive way to implement the evaluation of such a query would lead to physically performing this nested iteration, which is clearly very inefficient compared to implementing it with a grouping primitive. Further, in Spark, nested iteration of RDDs is not supported at all.
+Thus, without a dedicated optimiser to examine these queries and detect when nested iterations filtered by predicated correspond to grouping or other primitives, it is not possible evaluate such queries in Spark.
 
-$\For{\pair{k_1}{k_2}}{X} \Yield{\pair{k_2}{k_1}}$ \\
-
-Which clearly gives us a very natural syntax with which to manipulate these collections.
+Hence it was decided to forego this operator in favour of the explicit $group$ operator which can be directly evaluated using the \lin{groupBy} method on an RDD, as we will see in chapter  \ref{evaluation}.
+Despite this, we will see in chapter \ref{results} that even with this restriction we are still able to express a wide range of quite complex queries. 
 
 }
 
@@ -320,18 +300,13 @@ Which clearly gives us a very natural syntax with which to manipulate these coll
 
 In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
 
-Figure \ref{deltaexprs} shows these expressions. The fact that the updates are modelled with addition allows us to exploit the algebraic properties of the operators to derive efficient delta expressions in the majority of cases. For example, we exploit the linearity of $+$ to derive the delta rule: \\
+Figure \ref{deltaexprs} shows these expressions. The fact that the updates are modelled with addition allows us to exploit the algebraic properties of the operators to derive efficient delta expressions in the majority of cases. For example, we exploit the linearity of $+$ to derive the delta rule:
+\[\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)\]
+since: 
+\[r_1^{new} + r_2^{new} = (r1 + \delta_X(r_1)) + (r2 + \delta_X(r_2)) = (r_1 + r_2) + (\delta_X(r_1) + \delta_X(r_2))\]
+Linearity is similarly used for $-$ and $sum$. These rules are efficient because they do not depend at all on $X$, only $\delta X$.
 
-$\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)$, \\
-
-since \\
-
-$(r1 + \delta_X(r_1)) + (r2 + \delta_X(r_2)) = (r_1 + r_2) + (\delta_X(r_1) + \delta_X(r_2))$. \\
-
-Linearity is similarly used for $-$ and $sum$. These rules are very efficient because they do not depend at all on the $X$, only $\delta X$.
-
-The slightly more complicated rules for multiplication, the dot product, and the join operator are a result of their distributivity. We illustrate the derivation of the rule for multiplication below:
-\vs
+\vs The slightly more complicated rules for multiplication, the dot product, and the join operator are a result of their distributivity. We illustrate the derivation of the rule for multiplication below:
 \begin{equation*}
 \begin{split}
 (r_1 + \delta_X(r_1))*(r_2 + \delta_X(r_2)) &= (r_1 + \delta_X(r_1))*r_2 + (r_1 + \delta_X(r_1))*\delta_X(r_2) \\
@@ -339,12 +314,9 @@ The slightly more complicated rules for multiplication, the dot product, and the
 \implies \delta_X(r_1*r_2) &= \delta_X(r_1)*r_2 + r_1*\delta_X(r_2) + \delta_X(r_1) * \delta_X(r_2)
 \end{split}
 \end{equation*}
-\vs
-This derivation is also valid for the dot product and join as it only uses the distributive property which they all share. While these rules are not quite as efficient as the rules for the linear operators, they are still much more efficient than re-computing. This is because the terms that do depend on an input collection, e.g. $\delta_X(r_1) * r_2$, will constitute a join in practice between an update and only one of the input collections. Since the updates are in general small compared to the size of the input collections, these joins will be much more efficient that the cost of the original join between the two input collections.
+This derivation is also valid for the dot product and join operator as it only uses the distributive property which they all share. While these rules are not quite as efficient as the rules for the linear operators, they are still much more efficient than re-computing. This is because the terms that do depend on an input collection, e.g. $\delta_X(r_1) * r_2$, will constitute a join in practice between an update and only one of the input collections. Since the updates are in general small compared to the size of the input collections, these joins will be much more efficient that the cost of the original join between the two input collections.
 
-Unfortunately, we can see that the expressions for $sng$ and $group$ are not efficient - they do require recomputation This is because they both can construct key-nested collections. But, unlike our other operators which are either linear, or distribute over $+$, the construction of key-nested collections is neither.
-
-Fortunately, in the case of $sng$, if the key-typed argument is unaffected by the update, so that $e^{new} = e^{old} = e$, the delta expression simplifies as follows:
+\vs Unfortunately, we can see that the expressions for $sng$ and $group$ are not efficient - they do require recomputation. In the case of $sng$, this is because if the key-typed argument is affected by the update, the singleton collection must be fully reconstructed. However, if it is unaffected by the update, so that $e^{new} = e^{old} = e$, the delta expression simplifies as follows:
 \begin{equation*}
 \begin{split}
 sng(e^{new},r) + sng(e^{new},\delta_X(r)) - sng(e^{old},r) &= sng(e,r) + sng(e,\delta_X(r)) - sng(e,r) \\
@@ -353,13 +325,13 @@ sng(e^{new},r) + sng(e^{new},\delta_X(r)) - sng(e^{old},r) &= sng(e,r) + sng(e,\
 \end{equation*}
 which is an efficient incrementalisation. In practice, usage of $sng$ will largely be confined to the for/yield construction where the yielded key is a variable expression, and so will be unaffected by updates to input collections. 
 
-For $group$, there is no such special case, but we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over $+$.
+For $group$, this is because the construction of key-nested collections is fundamentally not distributive or linear. Thus, the only way to compute an updated output is to compute the updated input, apply $group$ to this, and substract the previous output. However, we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over addition.
 	
 }
 
 \section{The shredding transformation} {
 
-Here we define the shredding transformation. As previously described, when we shred a query, we produce both a flat version of the query, in which all key-nested collections have been replaced by labels, and the shredding context, a structure containing the dictionaries defining the labels appearing in the flat query. Therefore shredding consists of two separate transformations - the flattening of the query, which we will denote $(\cdot)^F$, and the derivation of the shredding context, which we will denote $(\cdot)^\Gamma$.
+In this section we define the shredding transformation. As previously described, when we shred a query, we produce both a flat version of the query, in which all key-nested collections have been replaced by labels, and the shredding context, a structure containing the dictionaries defining the labels appearing in the flat query. Therefore shredding consists of two separate transformations - the flattening of the query, which we will denote $(\cdot)^F$, and the derivation of the shredding context, which we will denote $(\cdot)^\Gamma$.
 
 \subsection{Output type of the shredding transformation} {
 
@@ -393,9 +365,9 @@ It will be useful to first examine how shredding works at the type level. Figure
 
 The type returned by $(\cdot)^F$ is straightforward - it is recursively defined to simply replace all boxed ring types with the $Label$ type, and it does nothing to primitive types.
 
-The type returned by of $(\cdot)^\Gamma$ slightly more complicated. The base cases of our primitive types contain no key-nested collections and so their context is empty, which is represented by the $\prim{Unit}$ type. Product types have a context consisting of the contexts of their elements, in a matching structure. Collections also have tupled shredding contexts, the first element for the context of it?s key and the second for its value.
+The type returned by of $(\cdot)^\Gamma$ slightly more complicated. The base cases of our primitive types contain no key-nested collections and so their context is empty, which is represented by the $\prim{Unit}$ type. Product types have a context consisting of the contexts of their elements, in a matching structure. Collections also have tupled shredding contexts, the first element for the context of it's key and the second for its value.
 
-The interesting case is the boxed ring type $[\R]$. Here the shredding context will consist of two parts - first the dictionary defining the flattened boxed value, and second it recursively contains this value?s shredding context. This represents the fact that shredding proceeds recursively - for a boxed collection $\coll{\K}{\R}$ either the key or the value may contain further key-nested collections and so it is shredded to produce the collection $\coll{\K^F}{\R^F}$ before producing the dictionary defining the inner labels. Otherwise, we would only be able to derive the benefits of shredding for inner collections nested only at one level and not at arbitrary depth.
+The interesting case is the boxed ring type $[\R]$. Here the shredding context will consist of two parts - first the dictionary defining the flattened boxed value, and second it recursively contains this value's shredding context. This represents the fact that shredding proceeds recursively - for a boxed collection $\coll{\K}{\R}$ either the key or the value may contain further key-nested collections and so it is shredded to produce the collection $\coll{\K^F}{\R^F}$ before producing the dictionary defining the inner labels. Otherwise, we would only be able to obtain the benefits of shredding for inner collections nested only at one level and not at arbitrary depth.
 
 An important thing to note about these definitions is that the structure of the shredding context is fully defined by the type of the shredded query, and additionally mirrors the output type of the shredded query. This has two important benefits: Firstly, as we will show when defining the transformations themselves on our calculus constructs, this allows contexts to be combined when performing operations on shredded queries. For example, if we add two shredded queries, we need to element-wise perform union on their contexts. Secondly, it means that it is unambiguous as to which dictionary corresponds to which labels in the flat output.
 
@@ -458,11 +430,9 @@ The definition of $(\cdot)^\G$, given in Figure \ref{contextdef}, is much more i
 
 The derivations for pairs, $sng$ and infinite mappings are straightforward - we construct the shredding context by simply pairing the contexts of the constituent parts. Sum is also straightforward - since summing a collection removes the keys, we only need the context for the values, so return the second part of the input context only.
 
-For the other operators, it is a little more complicated, as they require combining the corresponding dictionaries.
+For the other operators, it is a little more complicated, as they require combining the corresponding dictionaries. For example, when adding two shredded collections, the two dictionaries for each boxed ring type must be added together to produce a dictionary containing the definitions for the key-nested collections from both collections. This is represented with the union operator.
 
-For example, when adding two shredded collections, the two dictionaries for each boxed ring type must be added together to produce a dictionary containing the definitions for the key-nested collections from both collections. This is represented with the union operator.
-
-For the dot product, we represent the derivation of the shredding context with the operation:
+For the dot product, we represent the derivation of the shredding context with the operation $\odot$, defined as:
 \begin{equation*}
 \begin{split}
 &r_1: \coll{\K_1}{\R_1}\textrm{, }r_2: \coll{\K_2}{\R_2} \\
@@ -472,13 +442,13 @@ For the dot product, we represent the derivation of the shredding context with t
 
 This operation, according to the definition of the dot product, pairs the contexts of the keys of the operands and is recursively applied to the values.
 
-For multiplication, the key's context is the intersection of the two operands key contexts, since keys will only appear in the output if they appear in both inputs. The value?s context, according to the definition of multiplication, is derived again using the $\odot$ operation as the value of the result is the dot product of the values.
+For multiplication, the key's context is the intersection of the two operands key contexts, since keys will only appear in the output if they appear in both inputs. The value's context, according to the definition of multiplication, is derived again using the $\odot$ operation as the value of the result is the dot product of the values.
 
 For $join$, the first element of the key is similarly the intersection of contexts, and the second element of the key pairs the context of the second elements of the inputs. Again, as the value is computed as the dot product of the input values, we use the $\odot$ operation to compute the context of the vaue.
 
-Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shred, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$.
+Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shredded, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$.
 
-We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in sections \ref{} and \ref{} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
+We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in chapters \ref{evaluation} and \ref{incrementalisation} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
 
 
 

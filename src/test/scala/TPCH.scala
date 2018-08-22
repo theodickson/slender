@@ -4,7 +4,6 @@ import java.sql.Timestamp
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession) {
 
@@ -51,34 +50,3 @@ class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession
     .as[(Int,String)].rdd//.productsToHlists
 
 }
-
-class TpchLocal(sampleName: String = "10_customers")(implicit spark: SparkSession) {
-
-  private val rdds = new TpchRdds(sampleName)
-
-  private def toLocalCollection[T](rdd: => RDD[T]): LiteralExpr[Map[T,Int],String] = LiteralExpr(rdd.collect.map(t => (t,1)).toMap,"")
-
-  lazy val customer = toLocalCollection(rdds.customer)
-  lazy val orders = toLocalCollection(rdds.orders)
-  lazy val lineitem = toLocalCollection(rdds.lineitem)
-  lazy val part = toLocalCollection(rdds.part)
-  lazy val partSupp = toLocalCollection(rdds.partSupp)
-  lazy val supplier = toLocalCollection(rdds.supplier)
-  lazy val nation = toLocalCollection(rdds.nation)
-  lazy val region = toLocalCollection(rdds.region)
-
-}
-
-//class TpchDstreams(sampleName: String, n: Int, rep: Int = 1)(implicit spark: SparkSession, ssc: StreamingContext) {
-//
-//  private val rdds = new TpchRdds(sampleName)
-//
-//  lazy val customer = rddToDStream(rdds.customer, n)
-//  lazy val orders = rddToDStream(rdds.orders, n)
-//  lazy val lineitem = rddToDStream(rdds.lineitem, n)
-//  lazy val part = rddToDStream(rdds.part, n)
-//  lazy val partSupp = rddToDStream(rdds.partSupp, n)
-//  lazy val supplier = rddToDStream(rdds.supplier, n)
-//  lazy val nation = rddToDStream(rdds.nation, n)
-//  lazy val region = rddToDStream(rdds.region, n)
-//}

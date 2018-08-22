@@ -2,47 +2,50 @@
 \contentsline {section}{\numberline {1.1}Problem statement}{1}
 \contentsline {section}{\numberline {1.2}Motivating example}{2}
 \contentsline {section}{\numberline {1.3}Shredding}{3}
-\contentsline {subsection}{\numberline {1.3.1}Related work}{4}
-\contentsline {subsection}{\numberline {1.3.2}Automating shredding}{4}
-\contentsline {section}{\numberline {1.4}Contributions}{4}
-\contentsline {section}{\numberline {1.5}Structure of the text}{5}
-\contentsline {chapter}{\numberline {2}Nested Relational Calculus}{6}
-\contentsline {section}{\numberline {2.1}Type system}{6}
-\contentsline {subsection}{\numberline {2.1.1}Ring types}{7}
-\contentsline {subsection}{\numberline {2.1.2}Key types}{8}
-\contentsline {section}{\numberline {2.2}Expressions}{8}
-\contentsline {subsection}{\numberline {2.2.1}Ring expressions}{9}
-\contentsline {subsection}{\numberline {2.2.2}Key expressions}{13}
-\contentsline {section}{\numberline {2.3}For-comprehension syntax}{13}
-\contentsline {section}{\numberline {2.4}Incremental updates to queries}{15}
-\contentsline {section}{\numberline {2.5}The shredding transformation}{17}
-\contentsline {subsection}{\numberline {2.5.1}Output type of the shredding transformation}{17}
-\contentsline {subsection}{\numberline {2.5.2}Formal definition of shredding}{18}
-\contentsline {chapter}{\numberline {3}Implementation of the DSL}{21}
-\contentsline {section}{\numberline {3.1}Representing abstract syntax trees}{21}
-\contentsline {section}{\numberline {3.2}Implementing natural syntax}{24}
-\contentsline {subsection}{\numberline {3.2.1}The \lstinline {Expr} typeclass}{25}
-\contentsline {subsection}{\numberline {3.2.2}Implementing for-comprehension syntax}{27}
-\contentsline {subsection}{\numberline {3.2.3}Implicit conversion of literal values}{28}
-\contentsline {section}{\numberline {3.3}DSL overview}{28}
-\contentsline {chapter}{\numberline {4}Evaluation of DSL queries}{29}
-\contentsline {section}{\numberline {4.1}Implementing algebraic operators}{29}
-\contentsline {subsection}{\numberline {4.1.1}The Ring typeclass}{31}
-\contentsline {subsection}{\numberline {4.1.2}Further operators}{32}
-\contentsline {section}{\numberline {4.2}The Eval interface}{34}
-\contentsline {subsection}{\numberline {4.2.1}Simplified presentation}{34}
-\contentsline {subsection}{\numberline {4.2.2}Extending to infinite mappings and variables}{36}
-\contentsline {section}{\numberline {4.3}Evaluating shredded queries}{38}
-\contentsline {chapter}{\numberline {5}Incrementalising queries}{41}
-\contentsline {section}{\numberline {5.1}DStreams}{41}
-\contentsline {section}{\numberline {5.2}Implementing algebraic operators for DStreams}{42}
-\contentsline {subsection}{\numberline {5.2.1}Linear operations}{43}
-\contentsline {subsection}{\numberline {5.2.2}Distributive operations}{43}
-\contentsline {subsection}{\numberline {5.2.3}Group}{44}
-\contentsline {section}{\numberline {5.3}Shredded evaluation of DStream queries}{45}
-\contentsline {chapter}{\numberline {6}Experimental results}{47}
-\contentsline {section}{\numberline {6.1}Setup}{47}
-\contentsline {section}{\numberline {6.2}Isolated testing of group operator}{48}
-\contentsline {chapter}{\numberline {7}Conclusion}{50}
-\contentsline {section}{\numberline {7.1}Summary of contributions}{50}
-\contentsline {section}{\numberline {7.2}Limitations and future work}{51}
+\contentsline {subsection}{\numberline {1.3.1}Automating shredding}{4}
+\contentsline {subsection}{\numberline {1.3.2}Related work}{5}
+\contentsline {section}{\numberline {1.4}Contributions}{5}
+\contentsline {section}{\numberline {1.5}Structure of the text}{6}
+\contentsline {chapter}{\numberline {2}Nested Relational Calculus}{7}
+\contentsline {section}{\numberline {2.1}Type system}{7}
+\contentsline {subsection}{\numberline {2.1.1}Ring types}{8}
+\contentsline {subsection}{\numberline {2.1.2}Key types}{9}
+\contentsline {section}{\numberline {2.2}Expressions}{9}
+\contentsline {subsection}{\numberline {2.2.1}Ring expressions}{10}
+\contentsline {subsection}{\numberline {2.2.2}Key expressions}{14}
+\contentsline {section}{\numberline {2.3}For-comprehension syntax}{14}
+\contentsline {section}{\numberline {2.4}Restricted construction of key-nested collections}{15}
+\contentsline {section}{\numberline {2.5}Incremental updates to queries}{16}
+\contentsline {section}{\numberline {2.6}The shredding transformation}{18}
+\contentsline {subsection}{\numberline {2.6.1}Output type of the shredding transformation}{18}
+\contentsline {subsection}{\numberline {2.6.2}Formal definition of shredding}{20}
+\contentsline {chapter}{\numberline {3}Implementation of the DSL}{22}
+\contentsline {section}{\numberline {3.1}Representing abstract syntax trees}{22}
+\contentsline {section}{\numberline {3.2}Implementing natural syntax}{25}
+\contentsline {subsection}{\numberline {3.2.1}Operator syntax}{25}
+\contentsline {subsubsection}{\numberline {3.2.1.1}The \lstinline {Expr} typeclass}{26}
+\contentsline {subsection}{\numberline {3.2.2}For-comprehension syntax}{29}
+\contentsline {subsection}{\numberline {3.2.3}Implicit conversion of literal values}{30}
+\contentsline {section}{\numberline {3.3}DSL overview}{30}
+\contentsline {chapter}{\numberline {4}Evaluation of DSL Queries}{31}
+\contentsline {section}{\numberline {4.1}Implementing algebraic operators}{31}
+\contentsline {subsection}{\numberline {4.1.1}The Ring typeclass}{33}
+\contentsline {subsection}{\numberline {4.1.2}Further operators}{35}
+\contentsline {section}{\numberline {4.2}The Eval interface}{36}
+\contentsline {subsection}{\numberline {4.2.1}Simplified presentation}{37}
+\contentsline {subsection}{\numberline {4.2.2}Extending to infinite mappings and variables}{38}
+\contentsline {section}{\numberline {4.3}Evaluating shredded queries}{40}
+\contentsline {chapter}{\numberline {5}Incremental Evaluation of DSL Queries}{43}
+\contentsline {section}{\numberline {5.1}DStreams}{43}
+\contentsline {section}{\numberline {5.2}Implementing algebraic operators for DStreams}{44}
+\contentsline {subsection}{\numberline {5.2.1}Linear operations}{45}
+\contentsline {subsection}{\numberline {5.2.2}Distributive operations}{45}
+\contentsline {subsection}{\numberline {5.2.3}Group}{46}
+\contentsline {section}{\numberline {5.3}Shredded evaluation of DStream queries}{47}
+\contentsline {chapter}{\numberline {6}Experimental results}{49}
+\contentsline {section}{\numberline {6.1}Setup}{49}
+\contentsline {section}{\numberline {6.2}Isolated testing of group operator}{50}
+\contentsline {section}{\numberline {6.3}Complete queries}{52}
+\contentsline {chapter}{\numberline {7}Conclusion}{54}
+\contentsline {section}{\numberline {7.1}Summary of contributions}{54}
+\contentsline {section}{\numberline {7.2}Limitations and future work}{55}

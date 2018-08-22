@@ -2,7 +2,7 @@
 
 \section{Problem statement} {
 
-Apache Spark \cite{spark} is an open-source framework for in-memory distributed processing of data sets. Since its initial release in 2014 it has quickly become one of the most popular frameworks for large-scale data analysis, owing largely to its user-friendly functional APIs (offered in Scala, Python, R and SQL) and impressive out-of-the-box performance. A number of domain-specific libraries (such as for machine learning and graph processing) have further enabled its wide adoption in industry.
+Apache Spark \cite{spark} is an open-source framework for in-memory distributed processing of datasets. Since its initial release in 2014 it has quickly become one of the most popular frameworks for large-scale data analysis, owing largely to its user-friendly functional APIs (offered in Scala, Python, R and SQL) and impressive out-of-the-box performance. A number of domain-specific libraries, such as for machine learning and graph processing, have further enabled its wide adoption in industry.
 
 Although Spark can transform collections of arbitrary types, it can exhibit severe performance problems when processing nested data (i.e. data with inner collections). Data of this type is commonplace, for example nested formats such as JSON and XML, or graphs in the adjacency list format. In particular, distributed processing of such data where the nested collections have skewed cardinalities leads to load imbalance amongst the machines in the cluster. At best, load imbalance causes inefficient use of resources. At worst, machines with the heaviest loads can run out of memory, causing slowdowns when results spill to the disk, and eventually total program failure when disk space runs out as well. Crucially, heavily skewed data is surprisingly common, owing to the power-law dynamics which govern many naturally occurring phenomena, especially social networks and other graph-like structures.
 
@@ -14,25 +14,17 @@ Spark unfortunately does not offer any tools to deal with these performance issu
 
 \section{Motivating example} {
 
-To demonstrate this issue, let us consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are stored using the following structure of case classes:
-
-\begin{lstlisting}
-
+To demonstrate this issue, let us consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are processed using the following structure of case classes:
+\vs\begin{lstlisting}
 case class Rating(artist: Artist, track: Track, value: Int)
 case class Artist(id: Long, name: String)
 case class Track(id: Long,  title: String)
-
-\end{lstlisting}
-
-The full dataset can therefore be processed in Spark via an \lstinline{RDD[Rating]}. The streaming service wishes to calculate for each artist, the set of their tracks that have been rated in the past day and for each track its aggregate rating. They wish to store this data in nested form so that it can efficiently provide the results for an endpoint in the service's public API which provides these track ratings for requested artists. Therefore they wish to calculate this result as an \lstinline{RDD[(Artist,Map[Track,Int])]}. 
-
-The following spark query is the standard way to compute this:
-
-\begin{lstlisting}
-
+\vs\end{lstlisting}
+The full dataset can therefore be processed in Spark via an \lstinline{RDD[Rating]}. The streaming service wishes to compute a new dataset containing, for every artist, the set of their tracks that have been rated in the past month and for each track its aggregate rating. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute an \lstinline{RDD[(Artist,Map[Track,Int])]}. The following spark query is the standard way to compute this:
+\vs\begin{lstlisting}
 val ratings: RDD[Rating] //the input set of ratings
 val trackRatingsByArtist: RDD[(Artist,Map[Track,Int])] =
-  rating.groupBy(_.artist) //group by artist
+  ratings.groupBy(_.artist) //group by artist
     .map { case (artist,ratings) => //for each artist
       (artist, //return the artist
        ratings.map { case Rating(_,track,value) => (track,value) } 
@@ -40,55 +32,54 @@ val trackRatingsByArtist: RDD[(Artist,Map[Track,Int])] =
 	.toMap //and aggregate the total ratings for each track
 	)
     }
-
-\end{lstlisting}
-
-Firstly, this query is likely to exhibit severe load-balancing issues. Since a small number of artists are likely to represent a large proportion of ratings, the initial \lstinline{groupBy} in the query will likely create an extremely skewed \lstinline{RDD} by collecting every rating for a given artist into the same row. 
+\end{lstlisting}\vs
+Firstly, this query is likely to exhibit severe load-balancing issues. This is because the initial grouping by artist will aggregate every rating for a given artist into a single row. However, due to the natural power-law dynamics of things like music popularity \cite{}, a small number of artists will represent a large proportion of the ratings. In particular, there will probably be some artists with hundreds of thousands or even millions of track ratings in the past month. Thus, the workers which happen to contain such rows will be more likely to run out of memory, potentially crashing the query, and even if they don't, the imbalance will lead to some workers finishing further processing of the ratings far sooner than others, which is an inefficient use of resources.
 
 Secondly, this query cannot be \textit{efficiently incrementalised}. This means that its results cannot be updated with an efficient \textit{union} operation, given a new batch of data, without reprocessing the original output in any way. To demonstrate this, suppose that the music service instead wishes to calculate an up-to-date version of this dataset every hour, by processing an \lstinline{RDD} of the ratings for the last hour and combining this with the previous version. That is, we have:
-
-\begin{lstlisting}
+\vs\begin{lstlisting}
 val oldTrackRatingsByArtist: RDD[(Artist,Map[Track,Int])]
 val ratingsDelta: RDD[Rating]
-\end{lstlisting} 
-
+\end{lstlisting}\vs
 and then calculate the above query \textit{trackRatingsByArtist} just for the latest ratings:
-
-\begin{lstlisting}
+\vs\begin{lstlisting}
 val trackRatingsByArtistDelta: RDD[(Artist,Map[Track,Int])]
-\end{lstlisting}
-
+\end{lstlisting}\vs
 Then the RDD:
-
-\begin{lstlisting}
+\vs\begin{lstlisting}
 val oldTrackRatingsByArtist.union(trackRatingsByArtistDelta)
-\end{lstlisting}
-
+\end{lstlisting}\vs
 is not the correctly up-to-date version. It will include duplicate entries for each artist appearing in both the old version and the latest ratings. 
-
 }
 
 \section{Shredding} {
 
-Our approach is to transform such queries using a process called \textit{shredding}, which solves the two root causes of the problem. First, that Spark only parallelises processing at the top-level, and has no mechanism for distributing inner collections, which is the cause of load imbalance.  Second, that the construction of nested collections does not benefit from the algebraic property of distributivity, as we will see in section \cite{}, which is what prevents efficient incrementalisation.
+Our approach is to transform such queries using a process called \textit{shredding}, which solves the two root causes of the problem. First, Spark only parallelises processing at the top-level, and has no mechanism for distributing inner collections, which is the cause of load imbalance.  Second, the construction of nested collections does not benefit from the algebraic property of distributivity, as we will see in section \ref{}, which is what prevents efficient incrementalisation.
 
-Shredding does this by pinpointing the places in a query in which nested collections are constructed, and instead replacing them by unique defining labels. Hence, the principal output of a shredded query is flat, i.e. it contains no nested collections. Along with the flat output, the shredding transformation additionally produces a shredding context. This is a set of queries which compute the dictionaries defining the inner collections associated to each label. These dictionaries are implemented in such a way that the definitions of the labels can in fact be distributed as well as efficiently updated.
+Shredding does this by pinpointing the places in a query in which nested collections are constructed, and instead replacing them by unique defining labels. Hence, the principal output of a shredded query is flat - that is, ot contains no nested collections. Along with the flat output, the shredding transformation additionally produces a \textit{shredding context}. This is a set of queries which compute the dictionaries defining the inner collections associated to each label. These dictionaries are implemented in such a way that the definitions of the labels can in fact be distributed as well as efficiently updated.
 
-In our simple example above, the principal output would be an \lstinline{RDD[(Artist,Label)]} and the shredding context would contain a corresponding \lstinline{Dictionary[Label,Map[String,Int]]}. (We leave discussion of the implementation of the dictionary for later).
+In our simple example above, the principal output would be an \lstinline{RDD[(Artist,Label)]} and the shredding context would contain a corresponding \lstinline{Dictionary[Label, Map[String,Int]]}. (We leave discussion of the implementation of the dictionary for later).
 
-However, this shredded output comes with a tradeoff. When the nested collections defined by the dictionaries are needed, there is a cost to looking them up. Whether the tradeoff is beneficial overall will depend on how the structure of the input data, the type of query and how the output is consumed. In data with only minor skew, the lookup cost may not be worth a relatively small load-balancing benefit, whereas when the skew is more severe, it is more likely to have a measurable performance benefit.
+However, this shredded output comes with a tradeoff. When the nested collections defined by the dictionaries are needed, there is a cost to looking them up. Whether the tradeoff is beneficial overall will depend on the structure of the input data, the type of query and how the output is consumed. In data with only minor skew, the lookup cost may not be worth a relatively small load-balancing benefit, whereas when the skew is more severe, it is more likely to have a measurable performance benefit.
 
-It will also depend on whether the entire nested output is needed or just a small part. In the in the music service scenario for example, if each API request only needs the nested output for a small number of artists, the lookup costs in the system will be very small compared to the load-balancing benefits.
+It will also depend on whether the entire nested output is needed or just a small part. In the music service scenario for example, if each API request only needs the nested output for a small number of artists, the lookup costs in the system will be very small compared to the load-balancing benefits.
 
 With regard to incrementalised (or streamed) queries, the benefit of this tradeoff will be highly dependent on how frequently the output is consumed. For example, if the query is consumed very infrequently compared to how often it is updated, the more efficient updates may counteract even a very high lookup cost.
 
-\subsection{Related work} {}
-
 \subsection{Automating shredding} {
-In this work, we use a variant of the shredding transformation introduced in \cite{draftpaper}, which operates on queries written in variant of the Nested Relation Calculus (NRC). While it was shown that certain shredded queries can be processed up to 21.9x faster, the shredding transformation was applied manually. Although this demonstrated the validity of the approach, and provided a strict algorithmic process for manual query-rewriting, it does not truly solve the problem.
+In this work, we use a variant of the nested relational calculus (NRC) and shredding transformation introduced in \cite{draftpaper}). While it was shown that certain queries can be processed significantly faster using shredding, the shredding transformation was applied manually. Although this demonstrated the validity of the approach, and provided a strict algorithmic process for manual query-rewriting, it does not truly solve the problem.
 
 Therefore our goal is to implement the automatic shredding of queries without sacrificing the performance benefits demonstrated in \cite{draftpaper}. We aim to do this by providing a domain-specific language (DSL) in which users can express NRC queries with natural syntax, and then automatically evaluate them in Spark using the shredding transformation.
 }
+
+\subsection{Related work} {
+The problems presented by large and/or skewed nested collections in parallel environments have attracted significant attention, but efforts to tackle the issue have focussed largely on the way in which they are stored. An algorithm proposed by Dremel [32] (the record shredding and assembly algorithm) describes a columnar format which effectively stores arbitrarily nested collections in shredded form. This is the basis of the Parquet format [] developed by Apache for use in the Hadoop ecosystem, including with Spark.
+
+However, the Spark data processing model itself does not encompass any shredding primitives, and thus shredded records are re-assembled before any processing can occur. Thus shredding transformations for queries offer the possibility of operating on shredded data without the need for reassembly. That said, many of the popular proposals, such as [19] and [30], are aimed at underpinning language-integrated query systems rather than supporting the translation of arbitrary nested queries. To this end they are geared towards generating SQL queries and make use of SQL-specific primitives which is not compatible with our objective of translating Spark queries.
+
+Further, those that do propose more general, algebraic systems for translating queries, such as Van den Bussche [12], which shows that is is possible to evaluate nested queries over sets of flat queries, do not propose implementations of these proposals and so shredding remains relatively inaccessible to users of frameworks such as Spark. Therefore our goal of an end-to-end system for query shredding, encompassing both a proven algebraic transformation and a fully developed Scala implementation which integrates with Spark, would be a significant contribution to the field.		
+}
+
+
 
 }
 
@@ -97,14 +88,13 @@ Therefore our goal is to implement the automatic shredding of queries without sa
 The main contributions of this work are as follows:
 
 \begin{itemize}
-\item{We provide a Scala DSL which allows users to easily write NRC queries with natural syntax. Queries written in this way can be automatically evaluated, with or without the shredding transformation applied, with the full runtime safety guarantees of the Scala compiler.}
-\item{This DSL works with both local collections and Spark collections, and is easily extensible to other frameworks thanks to a clean, modular design based largely on the typeclass pattern.}
+\item{We provide a Scala DSL which allows users to easily write NRC queries with natural syntax. Queries written in this way can be automatically evaluated, with or without the shredding transformation applied, with the full runtime safety guarantees of the Scala compiler. This DSL works with both local collections and Spark collections, and is easily extensible to other frameworks thanks to a clean, modular design based largely on the typeclass pattern.}
 \item{We introduce an updated version of the NRC which enabled the automatic evaluation of queries in Spark, by replacing constructs which proved hard to translate to valid Spark code.}
-\item{\textit{(Novel technique for inferring type of variables in DSL)}}
+\item{We present a novel and generally applicable technique for inferring the types of variables within a Scala DSL at compile-time, thus avoiding the need to manually tag them. }
 \item{\textit{(summary of performance benefits)}}
 \end{itemize}
 }
 
 \section{Structure of the text} {
-The rest of the report proceeds as follows. In the first chapter, we introduce the variant of the NRC used in this work, and define the shredding transformation on queries written in this calculus. In the second chapter, we describe the basic implementation of the DSL - both how an appropriate representation for queries was designed and how various features of Scala allowed these queries to be generated with user-friendly syntax. In chapter 3, we demonstrate how the evaluation of these queries was achieved, both with and without shredding.  In chapter 4, we show how we extended the DSL to incrementally evaluate queries. In chapter 5 we provide some experimental results and discuss their significance. Finally, we provide some concluding remarks including possible directions for future work.
+The rest of the report proceeds as follows. In chapter \ref{nrc}, we introduce the variant of the NRC used in this work, and define the shredding transformation on queries written in this calculus. In chapter \ref{dsl}, we describe the basic implementation of the DSL - both how to appropriately represent queries and how to use various Scala features to allow these queries to be generated with user-friendly syntax. In chapter \ref{evaluation}, we demonstrate how to evaluate these queries, both with and without shredding.  In chapter \ref{incrementalisation}, we show how to extend the DSL to incrementally evaluate queries. In chapter \ref{results} we provide some experimental results and discuss their significance. Finally, we provide some concluding remarks including possible directions for future work.
 }

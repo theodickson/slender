@@ -97,10 +97,6 @@ trait Priority1ResolutionImplicits  {
   (implicit resolve: Resolver[R1,R2]): Resolver[SumExpr[R1],SumExpr[R2]] =
     Resolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
 
-  implicit def CollectResolver[R1,R2]
-  (implicit resolve: Resolver[R1,R2]): Resolver[CollectExpr[R1],CollectExpr[R2]] =
-    Resolver.instance { case CollectExpr(c) => CollectExpr(resolve(c)) }
-
   implicit def GroupResolver[R1,R2]
   (implicit resolve: Resolver[R1,R2]): Resolver[GroupExpr[R1],GroupExpr[R2]] =
     Resolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
@@ -108,10 +104,6 @@ trait Priority1ResolutionImplicits  {
   implicit def SngResolver[K,R,K1,R1]
   (implicit resolveK: Resolver[K,K1], resolveR: Resolver[R,R1]): Resolver[SngExpr[K,R],SngExpr[K1,R1]] =
     Resolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
-
-//  implicit def PredicateResolver[L,R,L1,R1,T1,T2]
-//  (implicit resolveL: Resolver[L,L1], resolveR: Resolver[R,R1]): Resolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
-//    Resolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
 
   implicit def ApplyExprResolver[K1,K2,T,U]
   (implicit resolve: Resolver[K1,K2]): Resolver[ApplyExpr[K1,T,U],ApplyExpr[K2,T,U]] =
@@ -154,9 +146,7 @@ object ShreddedResolver extends LowPriorityShreddedResolverImplicits {
 
 trait LowPriorityShreddedResolverImplicits {
 
-  //todo - for some reason with just an Induct method here that took a normal resolver, this was being used
-  //even in place of the specialised MultiplyinfShredded resolver, depsite attempts to control prioirty with scope.
-  //thus for now, just leave it as duplicated code.
+
   /**Resolver base cases - primitive expressions and typed variables don't need to resolve to anything.
     * Note - there is no resolver for untyped variables - they are 'resolved' by being bound.*/
   implicit def LiteralShreddedResolver[V,ID]: ShreddedResolver[LiteralExpr[V,ID],LiteralExpr[V,ID]] =
@@ -167,19 +157,23 @@ trait LowPriorityShreddedResolverImplicits {
 
   /**Standard inductive cases*/
   implicit def AddShreddedResolver[L, R, L1, R1]
-  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[AddExpr[L,R],AddExpr[L1,R1]] =
+  (implicit resolveL: ShreddedResolver[L,L1],
+   resolveR: ShreddedResolver[R,R1]): ShreddedResolver[AddExpr[L,R],AddExpr[L1,R1]] =
     ShreddedResolver.instance { case AddExpr(l,r) => AddExpr(resolveL(l),resolveR(r)) }
 
   implicit def MultiplyShreddedResolver[L, R, L1, R1]
-  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
+  (implicit resolveL: ShreddedResolver[L,L1],
+   resolveR: ShreddedResolver[R,R1]): ShreddedResolver[MultiplyExpr[L,R],MultiplyExpr[L1,R1]] =
     ShreddedResolver.instance { case MultiplyExpr(l,r) => MultiplyExpr(resolveL(l),resolveR(r)) }
 
   implicit def JoinShreddedResolver[L, R, L1, R1]
-  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
+  (implicit resolveL: ShreddedResolver[L,L1],
+   resolveR: ShreddedResolver[R,R1]): ShreddedResolver[JoinExpr[L,R],JoinExpr[L1,R1]] =
     ShreddedResolver.instance { case JoinExpr(l,r) => JoinExpr(resolveL(l),resolveR(r)) }
 
   implicit def DotShreddedResolver[L, R, L1, R1]
-  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[DotExpr[L,R],DotExpr[L1,R1]] =
+  (implicit resolveL: ShreddedResolver[L,L1],
+   resolveR: ShreddedResolver[R,R1]): ShreddedResolver[DotExpr[L,R],DotExpr[L1,R1]] =
     ShreddedResolver.instance { case DotExpr(l,r) => DotExpr(resolveL(l),resolveR(r)) }
 
   implicit def NotShreddedResolver[R1,R2]
@@ -194,21 +188,14 @@ trait LowPriorityShreddedResolverImplicits {
   (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[SumExpr[R1],SumExpr[R2]] =
     ShreddedResolver.instance { case SumExpr(c) => SumExpr(resolve(c)) }
 
-  implicit def CollectShreddedResolver[R1,R2]
-  (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[CollectExpr[R1],CollectExpr[R2]] =
-    ShreddedResolver.instance { case CollectExpr(c) => CollectExpr(resolve(c)) }
-
   implicit def GroupShreddedResolver[R1,R2]
   (implicit resolve: ShreddedResolver[R1,R2]): ShreddedResolver[GroupExpr[R1],GroupExpr[R2]] =
     ShreddedResolver.instance { case GroupExpr(c) => GroupExpr(resolve(c)) }
 
   implicit def SngShreddedResolver[K,R,K1,R1]
-  (implicit resolveK: ShreddedResolver[K,K1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[SngExpr[K,R],SngExpr[K1,R1]] =
+  (implicit resolveK: ShreddedResolver[K,K1],
+   resolveR: ShreddedResolver[R,R1]): ShreddedResolver[SngExpr[K,R],SngExpr[K1,R1]] =
     ShreddedResolver.instance { case SngExpr(k,r) => SngExpr(resolveK(k),resolveR(r)) }
-
-//  implicit def PredicateShreddedResolver[L,R,L1,R1,T1,T2]
-//  (implicit resolveL: ShreddedResolver[L,L1], resolveR: ShreddedResolver[R,R1]): ShreddedResolver[Predicate[L,R,T1,T2],Predicate[L1,R1,T1,T2]] =
-//    ShreddedResolver.instance { case Predicate(l,r,f,opS) => Predicate(resolveL(l),resolveR(r),f,opS) }
 
   implicit def ApplyExprShreddedResolver[K1,K2,T,U]
   (implicit resolve: ShreddedResolver[K1,K2]): ShreddedResolver[ApplyExpr[K1,T,U],ApplyExpr[K2,T,U]] =
@@ -217,6 +204,7 @@ trait LowPriorityShreddedResolverImplicits {
   implicit def HNilShreddedResolver: ShreddedResolver[HNil,HNil] = ShreddedResolver.nonShreddedResolver[HNil]
 
   implicit def HListShreddedResolver[H1, T1 <: HList, H2, T2 <: HList]
-  (implicit resolveH: ShreddedResolver[H1, H2], resolveT: ShreddedResolver[T1, T2]): ShreddedResolver[H1 :: T1, H2 :: T2] =
+  (implicit resolveH: ShreddedResolver[H1, H2],
+   resolveT: ShreddedResolver[T1, T2]): ShreddedResolver[H1 :: T1, H2 :: T2] =
     ShreddedResolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
 }

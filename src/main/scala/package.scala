@@ -60,11 +60,10 @@ package object slender extends types with Serializable {
 
   }
 
-  implicit class DStreamTestImplicits[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)])(implicit ring: Ring[V]) extends Serializable {
+  implicit class DStreamTestImplicits[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)])
+                                                            (implicit ring: Ring[V]) extends Serializable {
     def equalsRdd(rdd: RDD[(K,V)]): DStream[Boolean] = {
-//      val rddReduced = rdd.reduceByKey(ring.add).cache
       dstream.transform[Boolean] { rdd1: RDD[(K,V)] =>
-        //val reduced = r.reduceByKey(ring.add)
         rdd.reduceByKey(ring.add).fullOuterJoin(rdd1.reduceByKey(ring.add))
           .map { case (_,(r1Opt,r2Opt)) => ((),r1Opt.fold(false)(r1 => r2Opt.fold(false)(r2 => ring.equiv(r1,r2))))}
           .reduceByKey(_ && _).map(_._2)
@@ -99,9 +98,11 @@ package object slender extends types with Serializable {
     }
   }
 
-  implicit class ShreddedResultImplicits[DS <: SDStream[DS],T,Ctx <: HList](result: ShreddedResult[SDStream.Aux[DS,T],Ctx]) {
+  implicit class ShreddedResultImplicits[DS <: SDStream[DS],T,Ctx <: HList]
+  (result: ShreddedResult[SDStream.Aux[DS,T],Ctx]) {
     def profile(limit: Int = 10, toCache: List[RDD[_]],
-                acc: Boolean = false, spark: SparkSession, ssc: StreamingContext)(implicit accumulate: Accumulate[DS,T]): Unit = {
+                acc: Boolean = false, spark: SparkSession, ssc: StreamingContext)
+               (implicit accumulate: Accumulate[DS,T]): Unit = {
       val dstream = if (acc) result.flat.acc.dstream else result.flat.dstream
       toCache.foreach { rdd => rdd.cache.count }
       var counter: Int = 0
@@ -127,7 +128,8 @@ package object slender extends types with Serializable {
     }
   }
 
-  def dstreamEqualsRdd[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)], rdd: RDD[(K,V)])(implicit ring: Ring[V]): DStream[Boolean] = {
+  def dstreamEqualsRdd[K:ClassTag,V:ClassTag](dstream: DStream[(K,V)], rdd: RDD[(K,V)])
+                                             (implicit ring: Ring[V]): DStream[Boolean] = {
     val rddReduced = rdd.reduceByKey(ring.add).cache
     dstream.transform[Boolean] { rdd1: RDD[(K,V)] =>
       //val reduced = r.reduceByKey(ring.add)

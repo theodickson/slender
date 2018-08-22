@@ -1,4 +1,4 @@
-\chapter{Incrementalising queries}
+\chapter{Incremental Evaluation of DSL Queries} \label{incrementalisation}
 
 In this chapter we discuss how the DSL was extended to evaluate queries on Spark DStreams, an abstraction for a sequence of RDDs which constitute batches of a single collection. We explain how we leverage the delta expressions derived in \ref{} to efficiently evaluate most expressions involving DStreams, and how we evaluate group expressions by recomputing the output with each new batch.
 

@@ -115,6 +115,8 @@
 \vspace*{2ex}
     {\@degreedate}}
   \end{center}
+      \vspace*{2ex}
+      Word count: 9999
   \null\vfill
 \end{alwayssingle}}
 

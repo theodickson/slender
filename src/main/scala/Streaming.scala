@@ -2,11 +2,8 @@ package slender
 
 import org.apache.spark.streaming.dstream.DStream
 
-import scala.reflect.ClassTag
-
 trait SDStream[Self <: SDStream[Self]] { self: Self =>
   type T
-//  implicit def tag: ClassTag[T]
   def dstream: DStream[T]
   def map[S](f: DStream[T] => DStream[S]): SDStream.Aux[Self,S]
   def acc(implicit accumulate: Accumulate[Self,T]): SDStream.Aux[AggDStream,T] = accumulate(self)

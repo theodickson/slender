@@ -1,7 +1,3 @@
-/**Todo
-  * Simplify priorities if possible.
-  * Massive VariableNonTagger/VariableTagger appearance in logs
-  */
 package slender
 
 import shapeless.{::, HList, HNil}
@@ -20,9 +16,6 @@ object Tagger extends Priority2TaggingImplicits {
 }
 
 trait Priority0TaggingImplicits {
-  //The case that V1 <:< V and so actually tags to T takes precedence, hence this non-tager is here.
-//  implicit def VariableNonTagger[V <: UntypedVariable,V1 <: UntypedVariable,T]: Tagger[V,T,V1,V1] =
-//    Tagger.nonTagger[V,T,V1]
 
   implicit def VariableNonTagger[V,V1,T]:
     Tagger[Variable[V],T,Variable[V1],Variable[V1]] =
@@ -43,7 +36,8 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
     Tagger.instance { case AddExpr(l,r) => AddExpr(tagL(l), tagR(r)) }
 
   implicit def MultiplyTagger[V, T, L, R, L1, R1]
-  (implicit tagL: Tagger[V, T, L, L1], tagR: Tagger[V, T, R, R1]): Tagger[V, T, MultiplyExpr[L, R], MultiplyExpr[L1, R1]] =
+  (implicit tagL: Tagger[V, T, L, L1],
+   tagR: Tagger[V, T, R, R1]): Tagger[V, T, MultiplyExpr[L, R], MultiplyExpr[L1, R1]] =
     Tagger.instance { case MultiplyExpr(l,r) => MultiplyExpr(tagL(l), tagR(r)) }
 
   implicit def DotTagger[V, T, L, R, L1, R1]
@@ -99,7 +93,8 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   implicit def UnusedTagger1[V, T]: Tagger[V, T, UnusedVariable, UnusedVariable] =
     Tagger.nonTagger[V, T, UnusedVariable]
 
-  /** Binding base cases - primitive expressions don't need to tag anything, variables tag iff they are untyped variables
+  /** Binding base cases - primitive expressions don't need to tag anything, variables tag
+    * iff they are untyped variables
     * matching the type in the tager. (otherwise they use the low priority non-taging case)
     */
   implicit def LiteralTagger[V, T, V1,ID]: Tagger[V, T, LiteralExpr[V1,ID], LiteralExpr[V1,ID]] =
@@ -113,26 +108,3 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   (implicit tagR: Tagger[V, T, R, R1]): Tagger[V, T, InfiniteMappingExpr[K, R], InfiniteMappingExpr[K, R1]] =
     Tagger.instance { case InfiniteMappingExpr(k,v) => InfiniteMappingExpr(k,tagR(v)) }
 }
-
-//  implicit def InductiveTagger[
-//  V, T, E1,E2, Repr1 <: HList, Repr2 <: HList
-//  ]
-//  (implicit gen1: Generic.Aux[E1,Repr1], tag: Tagger[V, T, Repr1,Repr2],
-//   ev: Reconstruct[E1, Repr2, E2], gen2: Generic.Aux[E2, Repr2]):
-//  Tagger[V, T, E1, E2] = new Tagger[V, T, E1, E2] {
-//    def apply(v1: E1): E2 = gen2.from(tag(gen1.to(v1)))
-//  }
-//
-//  implicit def HNilTagger[V, T]: Tagger[V, T, HNil,HNil] =
-//    new Tagger[V,T,HNil,HNil] {
-//      def apply(v1: HNil) = v1
-//    }
-//
-//  implicit def HListTagger[V, T, H1, T1 <: HList, H2, T2 <: HList]
-//  (implicit tagH: Tagger[V, T, H1, H2], tagT: Tagger[V, T, T1, T2]):
-//  Tagger[V,T,H1 :: T1, H2 :: T2] = new Tagger[V,T,H1 :: T1, H2 :: T2] {
-//    def apply(v1: H1 :: T1) = v1 match {
-//      case h1 :: t1 => tagH(h1) :: tagT(t1)
-//    }
-//  }
-

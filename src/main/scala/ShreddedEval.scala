@@ -8,11 +8,8 @@ import scala.reflect.ClassTag
 
 case class Label[Expr,K1](value: K1) extends Serializable
 
-case class ShreddedResult[+Flat,+Ctx <: HList](flat: Flat, ctx: Ctx) {
-  def nested[N,Tupled](implicit lookup: Lookup[Flat,Ctx,N], tupler: DeepTupler[N,Tupled]) = tupler(lookup(flat,ctx))
-}
+case class ShreddedResult[+Flat,+Ctx <: HList](flat: Flat, ctx: Ctx)
 
-//todo - rename/redesign?
 trait GroupShredder[-In,+Out,+Dict,Expr] extends (In => (Out,Dict)) with Serializable
 
 object GroupShredder {
@@ -22,7 +19,6 @@ object GroupShredder {
     GroupShredder[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] =
     new GroupShredder[RDD[(K1::K2::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])],Expr] {
       def apply(v1: RDD[(K1::K2::HNil,R)]): (RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2,R])]) = {
-        //val labelled = v1.map { case ((k1::k2),r) => ((Label(k1)::k2,r)) }
         val grouped = group(v1)
         val flat = grouped.map { case (k1::_,i) => (k1::Label[Expr,K1](k1)::HNil,i) }
         val dict = grouped.map { case (k1::k2s::HNil,_) => (Label[Expr,K1](k1),k2s) }
@@ -31,11 +27,12 @@ object GroupShredder {
     }
 
   implicit def rdd3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr]
-  (implicit group: Group[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]]):
-  GroupShredder[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
-    new GroupShredder[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
-      def apply(v1: RDD[(K1::K2::K3::HNil,R)]): (RDD[(K1::Label[Expr,K1]::HNil,Boolean)],RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
-        //val labelled = v1.map { case ((k1::k2),r) => ((Label(k1)::k2,r)) }
+  (implicit group: Group[RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Map[K2::K3::HNil,R]::HNil,Boolean)]]) =
+    new GroupShredder[
+      RDD[(K1::K2::K3::HNil,R)],RDD[(K1::Label[Expr,K1]::HNil,Boolean)],
+      RDD[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr
+    ] {
+      def apply(v1: RDD[(K1::K2::K3::HNil,R)]) = {
         val grouped = group(v1)
         val flat = grouped.map { case (k1::_,i) => (k1::Label[Expr,K1](k1)::HNil,i) }
         val dict = grouped.map { case (k1::k2s::HNil,_) => (Label[Expr,K1](k1),k2s) }
@@ -43,10 +40,12 @@ object GroupShredder {
       }
     }
 
-  implicit def dstream2[K1:ClassTag,K2:ClassTag,R,Expr]:
-  GroupShredder[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] =
-    new GroupShredder[IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr] {
-      def apply(v1: IncDStream.Aux[(K1::K2::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2,R])]) = {
+  implicit def dstream2[K1:ClassTag,K2:ClassTag,R,Expr] =
+    new GroupShredder[
+      IncDStream.Aux[(K1::K2::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],
+      IncDStream.Aux[(Label[Expr,K1],Map[K2,R])],Expr
+    ] {
+      def apply(v1: IncDStream.Aux[(K1::K2::HNil,R)]) = {
 
         val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
         val dict = v1.map(_.map { case (k1::k2::HNil,r) => (Label[Expr,K1](k1),Map(k2 -> r))})
@@ -54,11 +53,13 @@ object GroupShredder {
       }
     }
 
-  implicit def dstream3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr]:
-  GroupShredder[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] =
-    new GroupShredder[IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr] {
-      def apply(v1: IncDStream.Aux[(K1::K2::K3::HNil,R)]): (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
-
+  implicit def dstream3[K1:ClassTag,K2:ClassTag,K3:ClassTag,R,Expr] =
+    new GroupShredder[
+      IncDStream.Aux[(K1::K2::K3::HNil,R)],IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],
+      IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])],Expr
+    ] {
+      def apply(v1: IncDStream.Aux[(K1::K2::K3::HNil,R)]):
+        (IncDStream.Aux[(K1::Label[Expr,K1]::HNil,Boolean)],IncDStream.Aux[(Label[Expr,K1],Map[K2::K3::HNil,R])]) = {
         val flat = v1.map(_.transform(_.map({ case (k1::_,_) => k1}).map(k1 => (k1::Label[Expr,K1](k1)::HNil,true))))
         val dict = v1.map(_.map { case (k1::k2::k3::HNil,r) => (Label[Expr,K1](k1),Map((k2::k3::HNil) -> r))})
         (flat,dict)
@@ -67,7 +68,8 @@ object GroupShredder {
 }
 
 
-trait ShreddedEval[-Expr,+Flat,+Ctx <: HList] extends ((Expr,Namespace) => ShreddedResult[Flat,Ctx]) with Serializable
+trait ShreddedEval[-Expr,+Flat,+Ctx <: HList]
+  extends ((Expr,Namespace) => ShreddedResult[Flat,Ctx]) with Serializable
 
 object ShreddedEval {
 
@@ -80,7 +82,8 @@ object ShreddedEval {
   }
 
   implicit def MultiplyShreddedEval[E1,E2,F1,F2,F,C1 <: HList,C2 <: HList,C <: HList]
-  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2], mult: Multiply[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
+  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2],
+   mult: Multiply[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
   ShreddedEval[MultiplyExpr[E1,E2],F,C] = instance {
     case (MultiplyExpr(e1,e2),bvs) => {
       val ShreddedResult(f1,c1) = eval1(e1,bvs)
@@ -90,7 +93,8 @@ object ShreddedEval {
   }
 
   implicit def DotShreddedEval[E1,E2,F1,F2,F,C1 <: HList,C2 <: HList,C <: HList]
-  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2], dot: Dot[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
+  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2],
+   dot: Dot[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
   ShreddedEval[DotExpr[E1,E2],F,C] = instance {
     case (DotExpr(e1,e2),bvs) => {
       val ShreddedResult(f1,c1) = eval1(e1,bvs)
@@ -100,7 +104,8 @@ object ShreddedEval {
   }
 
   implicit def JoinShreddedEval[E1,E2,F1,F2,F,C1 <: HList,C2 <: HList,C <: HList]
-  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2], join: Join[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
+  (implicit eval1: ShreddedEval[E1,F1,C1], eval2: ShreddedEval[E2,F2,C2],
+   join: Join[F1,F2,F], prepend: Prepend.Aux[C1,C2,C]):
   ShreddedEval[JoinExpr[E1,E2],F,C] = instance {
     case (JoinExpr(e1,e2),bvs) => {
       val ShreddedResult(f1,c1) = eval1(e1,bvs)
@@ -143,16 +148,5 @@ object ShreddedEval {
     instance { case (InfiniteMappingExpr(v,r),bvs) =>
       ShreddedResult((k: KT) => evalR(r,bvs ++ varBinder(v, k)), HNil)
     }
-
-  //todo - sng not needed if all sngs are inside inf mappings
-
-  //todo - all vars by defn inside inf mappings so they are not needed either
-
-  //todo - note this is all very simplified as For/Yield only reshapes now
-
-  //todo - predicate
-
-
-
 
 }

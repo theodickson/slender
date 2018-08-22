@@ -1,7 +1,6 @@
 package slender
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.dstream.DStream
 import shapeless._
 import shapeless.ops.hlist.Tupler
 
@@ -14,7 +13,6 @@ trait DeepGeneric[T] extends Serializable {
 object DeepGeneric extends Priority1DeepGenericImplicits {
 
   type Aux[T,Repr0] = DeepGeneric[T] { type Repr = Repr0 }
-  //todo - what happens with mixed data?
 
   def instance[T,Repr0](_to: T => Repr0,_from: Repr0 => T): DeepGeneric.Aux[T,Repr0] = new DeepGeneric[T] {
     type Repr = Repr0
@@ -38,14 +36,15 @@ object DeepGeneric extends Priority1DeepGenericImplicits {
 }
 
 trait Priority1DeepGenericImplicits extends Priority0DeepGenericImplicits {
-  implicit def hconsDataGeneric[H,T <: HList,HR,TR <: HList](implicit genH: DeepGeneric.Aux[H,HR], genT: DeepGeneric.Aux[T,TR]):
-  DeepGeneric.Aux[H :: T, HR::TR] =
+
+  implicit def hconsDataGeneric[H,T <: HList,HR,TR <: HList]
+  (implicit genH: DeepGeneric.Aux[H,HR], genT: DeepGeneric.Aux[T,TR]): DeepGeneric.Aux[H :: T, HR::TR] =
+
     new DeepGeneric[H :: T] {
       type Repr = HR :: TR
       def to(v1: H :: T): Repr = v1 match {
         case (h :: t) => genH.to(h) :: genT.to(t)
       }
-
       def from(v1: Repr): H :: T = v1 match {
         case (hr :: tr) => genH.from(hr) :: genT.from(tr)
       }
@@ -56,6 +55,7 @@ trait Priority1DeepGenericImplicits extends Priority0DeepGenericImplicits {
     def to(v1: HNil): Repr = HNil
     def from(v1: Repr): HNil = HNil
   }
+
 }
 
 trait Priority0DeepGenericImplicits {
@@ -75,7 +75,8 @@ object DeepTupler extends LowPriorityDeepTuplerImplicits {
     }
 
   implicit def pairDstreamDeepTupler[DS <: SDStream[DS],K,V,KT,VT]
-  (implicit kTupler: DeepTupler[K,KT], vTupler: DeepTupler[V,VT]): DeepTupler[SDStream.Aux[DS,(K,V)],SDStream.Aux[DS,(KT,VT)]] =
+  (implicit kTupler: DeepTupler[K,KT],
+            vTupler: DeepTupler[V,VT]): DeepTupler[SDStream.Aux[DS,(K,V)],SDStream.Aux[DS,(KT,VT)]] =
     new DeepTupler[SDStream.Aux[DS,(K,V)],SDStream.Aux[DS,(KT,VT)]] {
       def apply(v1: SDStream.Aux[DS,(K,V)]): SDStream.Aux[DS,(KT,VT)] =
         v1.map(_.map { case (k,v) => (kTupler(k),vTupler(v)) })

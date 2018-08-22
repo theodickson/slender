@@ -1,4 +1,4 @@
-\chapter{Experimental results}
+\chapter{Experimental results} \label{results}
 
 In this section we discuss the experiments we performed to ascertain the performance benefits of shredding. First we discuss the testing setup and introduce the dataset used. Then we describe the experiments done and discuss their results. These results show that queries can be executed up to 3.7 times faster using shredding, but that not all queries are sped up by shredding.
 
@@ -45,9 +45,65 @@ Group(
 )
 \end{lstlisting}\vs
 
-This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{\Int \times \coll{\Int}{\Int}}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order.
+This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{(\Int \times [\coll{\Int}{\Int}])}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order.
 
 Firstly, it is notable that indeed shredding is quicker in every case, and further that the accumulated method while slower than incremental shredding is faster than regular evaluation. This is at least evidence that avoiding the recomputation of the inner collections in the shredded versions is beneficial.
 
 However, it offers significant benefit in the query \textit{group-lineitem}. The others show less than a 2x gain in speed. This seems to be related to the size of the inner collections created. As the mean size of inner collection increases, the speed decreases relative to standard evaluation. It is hard to say exactly why this is happening but may be to do with overheads involved in computing the dictionary. Especially in our low-parallelism environment, any such overheads would not be offset by the load-balancing benefit we'd otherwise expect from such large inner collections.
+
+\section{Complete queries}
+
+\begin{table}[]
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+Query & \# batches & \multicolumn{3}{l|}{Time (seconds) (speedup)} \\ \hline
+      &            & reg       & shred-inc       & shred-acc       \\ \hline
+Q1    & 5          & 52.1      & 20.9 (2.5)      & 22.2 (2.3)      \\ \hline
+Q1    & 10         & 84.1      & 29.9 (2.8)      & 34.9 (2.4)      \\ \hline
+Q1    & 25         & 196       & 53.1 (3.7)      & 55.0 (3.6)      \\ \hline
+Q2    & 5          & 57.4      & 70.3 (0.82)     & 71.5 (0.80)     \\ \hline
+Q2    & 10         & 103       & 118 (0.87)      & 121 (0.85)      \\ \hline
+Q2    & 25         & 246       & 257 (0.96)      & 270 (0.91)      \\ \hline
+Q3    & 5          & 107       & 83.0 (1.29)     & 83.8 (1.28)     \\ \hline
+Q3    & 10         & 189       & 131 (1.44)      & 135 (1.40)      \\ \hline
+Q3    & 25         & 431       & 282 (1.53)      & 289 (1.49)      \\ \hline
+Q4    & 5          & 3.06      & 2.12 (1.44)     & 2.61 (1.17)     \\ \hline
+Q4    & 10         & 5.76      & 3.66 (1.57)     & 5.18 (1.11)     \\ \hline
+Q4    & 25         & 14.1      & 10.2 (1.38)     & 13.6 (1.04)     \\ \hline
+\end{tabular}
+\caption{Test results of complete queries.}
+\label{mainresults}
+\end{table}
+
+We now present the test result for a set of complete queries, which create outputs with varying levels of nesting, and requiring varying numbers of joins. Note that as per the limitation discussed in ref{}, each query only streams one input table. The rest of the inputs are static RDDs.
+
+The queries are detailed in Appendix \ref{}, but here we illustrate \textit{Q1}, showing how it was written using the DSL:
+\vs\begin{lstlisting}
+val partOrders = For((l_orderkey, l_partkey, __) <-- lineitem)
+                        Yield( l_partkey, l_orderkey)
+                        
+val orderPartNames = Group(
+   For ((__, orderKey0, partName0) <-- partOrders.join(part))
+     Yield (orderKey0, partName0)
+ )
+
+val customerOrders =
+  For ((__, partNames0, custKey0, orderDate0) <-- orderPartNames.join(orders))
+    Yield (custKey0, orderDate0, partNames0)
+
+
+val customerNameOrders = For (
+  (__, orderDate1, partNames1, custName0, __) <-- customerOrders.join(customer)
+) Yield (custName0, orderDate1, partNames1)
+
+val query = Group(customerNameOrders)
+\end{lstlisting}\vs
+
+For these more expensive queries, we use a dataset constructed as per the isolated testing of group, but using a random sample of 1000 customers as the basis rather than 10000. We again test three methods of evaluation, regular, shredded, and accumulated-shredded.
+
+The results are shown in figure \ref{mainresults}. For three out of four queries, shredding is faster, whether accumulated or not. Although in \textit{Q1}, it reaches 3.7 times faster than regular evaluation, for the other two it is not significantly faster. However, we highlight the very consistent pattern that shredding becomes faster relative to regular evaluation as the number of batches increases. This is a natural result of the fact that without shredding, recomputation is required with each batch, so each batch, no matter how small, triggers recomputation of the query for all previous batches.
+
+It is also worth noting that although accumulating the shredding result is consistently slower than not, the cost is marginal for most queries, and so in environments where this is necessary shredding should still be more efficient than regular evaluation.
+
+For \textit{Q2}, which shredding slows down, this is not necessarily surprising. Since we showed in the isolated testing of group that for some inputs, shredding group may only marginally speed it up, this could mean that the speed up is not worth the cost of creating and maintaining the dictionaries. However, it is notable that even for this query, the differential between regular and shredded evaluation lessens as the number of batches increases. It's possible that with sufficient batches shredding would indeed be faster, as recomputation costs began to outweigh the overheads of shredding.
 
