@@ -55,7 +55,7 @@ $\coll{(\K_1,\prim{Label})}{\prim{Int}}$, along with a dictionary of type $\coll
 
 }
 
-\section{Expressions}
+\section{Expressions} \label{nrcexprsection}
 
 \begin{figure}
 \begin{equation*}
@@ -258,6 +258,20 @@ Which is indeed $X$ with the elements of the keys reversed. We encapsulate this 
 The $r$ is optional and defaults to 1. Thus, we can write the above query to reverse the elements in a product-type key as:
 \[\For{\pair{k_1}{k_2}}{X} \Yield{\pair{k_2}{k_1}}\]
 This is clearly a very natural syntax with which to manipulate collections corresponding to similar syntax in many programming languages.
+
+\subsection{Example query} \label{examplequery}
+
+With the for-comprehension syntax, we can now express the query from the motivating example. The \lin{ratings} RDD can be represented by a $\Bag{\prim{User} \times \prim{Track} \times \prim{Date}}$, where the $\Int$ values are the rating given to the track by the given user on the given date. The association table is a $\Bag{\prim{Track} \times \prim{Artist}}$, where the values are all 1. Then the query is:
+\begin{equation*}
+\begin{split}
+&trackRatings = group(\For{\langle u,t,d \rangle}{ratings} \Yield{\pair{t}{d}}) \\
+&artistTrackRatingsFlat = join(trackArtists,trackRatingsByDate) \\
+&artistTrackRatings = group( \For{\langle t,\langle a,rs \rangle \rangle}{artistTrackRatingsFlat} \Yield{\langle a, \langle t,rs \rangle \rangle})
+\end{split}
+\end{equation*}
+
+Here, $trackRatings$ first projects the ratings to just the track and date, thus aggregating for each such pair the total rating. It then groups this by track, thus returning a $\coll{(\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}}$, representing the pairing of each track with its ratings for each date. Then this is joined with the track association table, which adds the artist to each key, producing a $\coll{(\prim{Track} \times (Artist \times [\Bag{\prim{Date}}]))}{\prim{Bool}}$. Finally, $artistTrackRatings$ reorders the elements of the key with a for/yield so that the artist is the first element, and finally applies group in order to produce the final
+$\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times \Bag{\prim{Date}})}{\prim{Bool}}])}{\prim{Bool}}$. This collection will have one key per artist, where the artist is the first element, and the collection of ratings for each track on each day is nested within the second element.
 }
 
 \section{Restricted construction of key-nested collections}

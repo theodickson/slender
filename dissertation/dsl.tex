@@ -1,12 +1,13 @@
 \chapter{Implementation of the DSL} \label{dsl}
 
-In this chapter we describe how a DSL was created in Scala which can express any query in our version of the Nested Relational Calculus, where the relations may be either local Scala collections or Spark RDDs.
+In this chapter we describe how we create a DSL which can express any query in our version of the Nested Relational Calculus, where the relations may be either local Scala collections or Spark RDDs. We use Scala rather than the other languages with Spark APIs due to its many features which are suited to the design of DSLs.
 
-We first explain why Scala was chosen as our language, with particular attention to the features which make it well-suited to the implementation of DSLs.
+First we show how and why the abstract syntax trees (ASTs) are implemented using Scala's polymorphic case classes and Shapeless HLists.
 
-Then we show how and why the abstract syntax trees (ASTs) were implemented using Scala's polymorphic case classes and Shapeless HLists.
+Then we describe the Scala features which enable these ASTs to be generated with syntax which closely matches that of the NRC.
 
-Finally we describe the techniques used to allow these ASTs to be generated with syntax which closely matches that of the NRC.
+Finally, we demonstrate its usage by expressing an example query.
+
 
 \section{Representing abstract syntax trees}
 
@@ -168,17 +169,21 @@ For example, suppose the compiler encounters the statement \lin{foo.bar(baz)} wh
 implicit class FooImplicits(foo: Foo) {
   def bar(baz: Baz) = ...
 }
-\end{lstlisting}\vs.
-
+\end{lstlisting}\vs
 Then the compiler will translate the statement \lin{foo.bar(baz)} into \lin{(new FooImplicits(foo)).bar(baz)}. This is commonly used to add methods to private classes, but can also be used to provide methods to all types conforming to some typeclass, by additionally requiring an instance of the typeclass implicitly to construct the implicit class. Our implicit class will thus be:
 \vs \begin{lstlisting}
 implicit class ExprOps[T](e: Expr)(implicit expr: Expr[T]) {
   def unary_- = NegateExpr(e)
   def +[T1](e1: T1)(implicit expr1: Expr[T1]) = AddExpr(e, e1)
-...
+  ...
 }
 \end{lstlisting} \vs
 Thus, objects will only be able to access these methods if they are of some type \lin{T} for which an instance of \lin{Expr[T]} can be provided implicitly, i.e. they are a valid expression type.
+
+We also use this typeclass to provide shorthand construction methods for \lin{SngExpr}, \lin{GroupExpr} and \lin{SumExpr}, for example:
+\begin{lstlisting}
+def Sng[K:Expr, R:Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
+\end{lstlisting}
 
 %We now illustrate the steps taken by the compiler to translate \lin{-LiteralExpr(1) * LiteralExpr(2)} into \lin{MultiplyExpr(NegateExpr(LiteralExpr(1)),LiteralExpr(2))}. First, it is desugared as previously described to:
 %\vs\begin{lstlisting}
@@ -232,5 +237,38 @@ And have this Scala expression generate the AST:
 DotExpr(LiteralExpr(1)::LiteralExpr(1)::HNil, LiteralExpr(2)::LiteralExpr(2)::HNil).
 \end{lstlisting}\vs
 As there is, for example, a one-to-one correspondence between integers, and literal expressions contains integers, or between tuples and \lin{HList}s, this is straightforward to implement with Scala's implicit conversions. The full implementation is again in Appendix \ref{codebase} in the file \textit{Syntax.scala}.
-\section{DSL overview}
+\section{Example usage}
+We will demonstrate the usage of the DSL by writing the query from the introduction, which we expressed in the calculus in Section \ref{examplequery}. First we turn the RDDs into instances of \lin{LiteralExpr}. This will involve ensuring each is an RDD of a pair, where the first element is the key and the second element the value. Tuples within either the key or value must be translated into HLists:
+\begin{lstlisting}
+val ratingsRdd: RDD[(Track,Date,Int)]
+val ratingsCollection = LiteralExpr(
+  ratingsRdd.map { case (track,date,value) =>
+    ((track::date::HNil),value)
+  }
+)
+
+val trackArtistsRdd: RDD[(Track,Artist)]
+val trackArtistsCollection = LiteralExpr(
+  ratingsCollection.map { case (track,artist) =>
+    (track::artist::HNil,1)
+  }
+)
+\end{lstlisting}
+Then we set up the variables to be used in the query, making sure to give each a unique string name:
+\begin{lstlisting}
+val user = Variable("user")
+val track = Variable("track")
+...
+\end{lstlisting} 
+Finally, we can proceed nearly identically to the abstract query:
+\begin{lstlisting}
+val trackRatings = Group(
+  For ((user,track,date) <-- ratings) Yield (track,date)
+)
+val artistTrackRatingsFlat = trackArtists.join(trackRatingsByDate)
+val artistTrackRatings = Group(
+  For (((track,(artist,ratings)) <-- artistTrackRatingsFlat)
+  Yield (artist,(track,ratings))
+)
+\end{lstlisting}
 

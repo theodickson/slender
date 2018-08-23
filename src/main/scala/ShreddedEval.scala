@@ -122,14 +122,6 @@ object ShreddedEval {
     }
   }
 
-  implicit def CollectExprRddShreddedEval[E,K:ClassTag,R:ClassTag,C <: HList]
-  (implicit eval: ShreddedEval[E,RDD[(K,R)],C]): ShreddedEval[CollectExpr[E],Map[K,R],C] = instance {
-    case (CollectExpr(e),vars) => {
-      val ShreddedResult(f,c) = eval(e,vars)
-      ShreddedResult(f.collectAsMap.toMap,c)
-    }
-  }
-
   implicit def GroupShreddedEval[InExpr,InFlat,InCtx <: HList,Flat,Dict]
   (implicit eval: ShreddedEval[InExpr,InFlat,InCtx], label: GroupShredder[InFlat,Flat,Dict,InExpr]):
   ShreddedEval[GroupExpr[InExpr],Flat,Dict::InCtx] = instance {
@@ -140,9 +132,6 @@ object ShreddedEval {
     }
   }
 
-  //note - this assume the RHS introduces no shredding context, i.e. its just used for something simple like
-  //reshaping and does not invovle other collections, inner fromKs or grouping or whatever.
-  //I think this works for now esp with how we've had to use a Group
   implicit def InfiniteMappingShreddedEval[K,R,KT,RT]
   (implicit evalK: Eval[K,KT], evalR: Eval[R,RT], varBinder: Binder[K,KT]): ShreddedEval[InfiniteMappingExpr[K,R],KT => RT,HNil] =
     instance { case (InfiniteMappingExpr(v,r),bvs) =>

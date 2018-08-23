@@ -1,10 +1,7 @@
 package slender
 
-import org.apache.spark.rdd.RDD
 import shapeless._
 import shapeless.syntax.SingletonOps
-
-import scala.reflect.runtime.universe.{Type, TypeTag, WeakTypeTag, typeTag}
 
 case class VariableRingPredicate[V:Expr, R:Expr, P:Expr](k: V, r: R, p: P = LiteralExpr.One)
 
@@ -110,8 +107,6 @@ trait Syntax {
   val __ = UnusedVariable()
 
   implicit def toExprOps[X,E](x: X)(implicit make: MakeExpr[X,E], expr: Expr[E]): ExprOps[E] = ExprOps(make(x))
-
-  def Collect[E:Expr](e: E): CollectExpr[E] = CollectExpr(e)
 
   def Sum[R:Expr](r: R): SumExpr[R] = SumExpr(r)
 

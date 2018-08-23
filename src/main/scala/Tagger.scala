@@ -60,10 +60,6 @@ trait Priority1TaggingImplicits extends Priority0TaggingImplicits {
   (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, SumExpr[R], SumExpr[R1]] =
     Tagger.instance { case SumExpr(c) => SumExpr(tag(c)) }
 
-  implicit def CollectTagger[V, T, R, R1]
-  (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, CollectExpr[R], CollectExpr[R1]] =
-    Tagger.instance { case CollectExpr(c) => CollectExpr(tag(c)) }
-
   implicit def GroupTagger[V, T, R, R1]
   (implicit tag: Tagger[V, T, R, R1]): Tagger[V, T, GroupExpr[R], GroupExpr[R1]] =
     Tagger.instance { case GroupExpr(c) => GroupExpr(tag(c)) }
@@ -103,7 +99,7 @@ trait Priority2TaggingImplicits extends Priority1TaggingImplicits {
   implicit def VariableTagger[V, T]: Tagger[Variable[V],T,Variable[V],TypedVariable[T]] =
     Tagger.instance { v1 => v1.tag[T] }
 
-  /** Special tager for inner infinite mappings - dont attempt to tag the key */
+  /** Special tagger for inner infinite mappings - dont attempt to tag the key */
   implicit def InfMappingTagger[V, T, K, R, R1]
   (implicit tagR: Tagger[V, T, R, R1]): Tagger[V, T, InfiniteMappingExpr[K, R], InfiniteMappingExpr[K, R1]] =
     Tagger.instance { case InfiniteMappingExpr(k,v) => InfiniteMappingExpr(k,tagR(v)) }

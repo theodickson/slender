@@ -116,6 +116,7 @@ trait Priority1ResolutionImplicits  {
     Resolver.instance { case (h :: t) => resolveH(h) :: resolveT(t) }
 }
 
+
 trait ShreddedResolver[-In,+Out] extends (In => Out) with Serializable
 
 object ShreddedResolver extends LowPriorityShreddedResolverImplicits {
@@ -127,8 +128,8 @@ object ShreddedResolver extends LowPriorityShreddedResolverImplicits {
   def nonShreddedResolver[E]: ShreddedResolver[E,E] = instance { v1 => v1 }
 
   implicit def MultiplyInfResolver[
-  LHS, LHS1, V, C, KT, VB,
-  R1, R2, R3
+   LHS, LHS1, V, C, KT, VB,
+    R1, R2, R3
   ](implicit resolveLeft: ShreddedResolver[LHS,LHS1], eval: ShreddedEval[LHS1,C,_], coll: Collection[C,KT,_],
     tagKey: Tagger[V,KT,V,VB], tagValue: Tagger[V,KT,R1,R2], resolveRight: ShreddedResolver[R2,R3]):
   ShreddedResolver[

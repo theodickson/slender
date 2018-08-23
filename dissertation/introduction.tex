@@ -14,46 +14,59 @@ Spark unfortunately does not offer any tools to deal with these performance issu
 
 \section{Motivating example} {
 
-To demonstrate this issue, let us consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are processed using the following structure of case classes:
+To demonstrate this issue, let us consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are accessed via an \lin{RDD[(Track,Date,Int)]}, and additionally there is an \lin{RDD[(Track,Artist)]} associating tracks to artists. The streaming services wishes to compute a new dataset which contains, for each artist, the aggregate ratings for each track on each date, in a given month. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute an \lin{RDD[(Artist,Map[Track,Map[Date,Int]])]}. The following Spark query would be a standard way to compute this:
+
 \vs\begin{lstlisting}
-case class Rating(artist: Artist, track: Track, value: Int)
-case class Artist(id: Long, name: String)
-case class Track(id: Long,  title: String)
-\vs\end{lstlisting}
-The full dataset can therefore be processed in Spark via an \lstinline{RDD[Rating]}. The streaming service wishes to compute a new dataset containing, for every artist, the set of their tracks that have been rated in the past month and for each track its aggregate rating. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute an \lstinline{RDD[(Artist,Map[Track,Int])]}. The following spark query is the standard way to compute this:
-\vs\begin{lstlisting}
-val ratings: RDD[Rating] //the input set of ratings
-val trackRatingsByArtist: RDD[(Artist,Map[Track,Int])] =
-  ratings.groupBy(_.artist) //group by artist
-    .map { case (artist,ratings) => //for each artist
-      (artist, //return the artist
-       ratings.map { case Rating(_,track,value) => (track,value) } 
-        .reduceByKey(_ + _)
-	.toMap //and aggregate the total ratings for each track
-	)
+val ratings: RDD[(Track,Date,Int)]
+val trackArtists: RDD[(Track,Artist)]
+
+//calculate total ratings for each track on each date,
+//by grouping by track and then aggregating the
+//ratings for each date
+val ratingsByDate: RDD[(Track,Map[Date,Int])] =
+  ratings.groupBy(_._1)
+    .map { case (track,ratings) =>
+      (track,
+        ratings.map { case (_,date,value) => (date,value) }
+          .reduceByKey(_ + _)
+      )
+  }
+
+//calculate the set of ratings by date for each artist,
+//by joining trackArtists to the grouped ratings
+//and then grouping by artist
+val artistRatings: RDD[(Artist,Map[Track,Map[Date,Int]])] =
+  ratingsByDate.join(trackArtists)
+    .map { case (track,(ratings,artist)) => (artist,(track,ratings)) }
+    .groupBy(_._1)
+    .mapValues { case rows =>
+      rows.map { case (_,(track,ratingsByDate)) => (track,ratingsByDate) } toMap
     }
 \end{lstlisting}\vs
-Firstly, this query is likely to exhibit severe load-balancing issues. This is because the initial grouping by artist will aggregate every rating for a given artist into a single row. However, due to the natural power-law dynamics of many social phenomena such as music popularity \cite{musicpowerlaw}, a small number of artists will represent a large proportion of the ratings. In particular, there will probably be some artists with hundreds of thousands or even millions of track ratings in the past month. Thus, the workers which happen to contain such rows will be more likely to run out of memory, potentially crashing the query, and even if they don't, the imbalance will lead to some workers finishing further processing of the ratings far sooner than others, which is an inefficient use of resources.
+
+Firstly, this query is likely to exhibit severe load-balancing issues. This is because the grouping of the ratings by track will aggregate every rating for a given track into a single row. And further, the grouping by artist will aggregate every track rating for that artist into a single row. However, due to the natural power-law dynamics of many social phenomena such as music popularity \cite{musicpowerlaw}, a small number of tracks will represent a large proportion of the ratings, and an even smaller number of artists will represent a large number of these tracks. In particular, there will probably be some artists with hundreds of thousands or even millions of track ratings in the past month. Thus, the workers which happen to contain such rows will be more likely to run out of memory, potentially crashing the query, and even if they don't, the imbalance will lead to some workers finishing further processing of the ratings far sooner than others, which is an inefficient use of resources.
 
 Secondly, this query cannot be \textit{efficiently incrementalised}. This means that its results cannot be updated with an efficient \textit{union} operation, given a new batch of data, without reprocessing the original output in any way. To demonstrate this, suppose that the music service instead wishes to calculate an up-to-date version of this dataset every hour, by processing an \lstinline{RDD} of the ratings for the last hour and combining this with the previous version. That is, we have:
 \vs\begin{lstlisting}
-val oldTrackRatingsByArtist: RDD[(Artist,Map[Track,Int])]
-val ratingsDelta: RDD[Rating]
+val oldArtistRatings: RDD[(Artist,Map[Track,Map[Date,Int]])]
+val ratingsDelta: RDD[(Track,Date,Int)]
 \end{lstlisting}\vs
 and then calculate the above query \textit{trackRatingsByArtist} just for the latest ratings:
 \vs\begin{lstlisting}
-val trackRatingsByArtistDelta: RDD[(Artist,Map[Track,Int])]
+val artistRatingsDelta: RDD[(Artist,Map[Track,Map[Date,Int]])]
 \end{lstlisting}\vs
 Then the RDD:
 \vs\begin{lstlisting}
 val oldTrackRatingsByArtist.union(trackRatingsByArtistDelta)
 \end{lstlisting}\vs
-is not the correctly up-to-date version. It will include duplicate entries for each artist appearing in both the old version and the latest ratings. 
+is not the correctly up-to-date version. It will include duplicate entries for each artist appearing in both the old version and the latest ratings. Further, even if we were to group by the artists and reduce, the reduction
+of the nested maps would be quite expensive, and writing such logic manually would be error-prone. 
 }
+
 
 \section{Shredding} {
 
-Our approach is to transform such queries using a process called \textit{shredding}, which solves the two root causes of the problem. First, Spark only parallelises processing at the top-level, and has no mechanism for distributing inner collections, which is the cause of load imbalance.  Second, the construction of nested collections does not benefit from the algebraic property of distributivity, as we will see in section \ref{}, which is what prevents efficient incrementalisation.
+Our approach is to transform such queries using a process called \textit{shredding}, which solves the two root causes of the problem. First, Spark only parallelises processing at the top-level, and has no mechanism for distributing inner collections, which is the cause of load imbalance.  Second, the construction of nested collections does not benefit from the algebraic property of distributivity, as we will see in Section \ref{nrcexprsection}, which is what prevents efficient incrementalisation.
 
 Shredding does this by pinpointing the places in a query in which nested collections are constructed, and instead replacing them by unique defining labels. Hence, the principal output of a shredded query is flat - that is, ot contains no nested collections. Along with the flat output, the shredding transformation additionally produces a \textit{shredding context}. This is a set of queries which compute the dictionaries defining the inner collections associated to each label. These dictionaries are implemented in such a way that the definitions of the labels can in fact be distributed as well as efficiently updated.
 

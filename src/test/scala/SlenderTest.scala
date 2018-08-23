@@ -4,11 +4,7 @@ import org.apache.spark.streaming.Duration
 import org.scalatest.FunSuiteLike
 
 
-trait TestUtils {
-  def _assert(t: => Boolean): Unit = if (!t) throw new AssertionError("assertion failed.")
-}
-
-trait SlenderSparkTest extends FunSuiteLike {
+trait SlenderSparkTest extends FunSuiteLike with TestUtils {
   Logger.getLogger("org").setLevel(Level.ERROR)
 }
 

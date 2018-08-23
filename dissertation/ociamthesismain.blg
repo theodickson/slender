@@ -9,54 +9,49 @@ A level-1 auxiliary file: evaluation.aux
 A level-1 auxiliary file: incrementalisation.aux
 A level-1 auxiliary file: results.aux
 A level-1 auxiliary file: conclusion.aux
+A level-1 auxiliary file: examples.aux
+A level-1 auxiliary file: appendix1.aux
+A level-1 auxiliary file: appendix2.aux
 The style file: plain.bst
 Database file #1: refs.bib
-Warning--I didn't find a database entry for "draftpaper"
-Warning--I didn't find a database entry for "caseclass"
-Warning--I didn't find a database entry for "compilerasts"
-Warning--I didn't find a database entry for "patternmatch"
-Warning--I didn't find a database entry for "scalalist"
-Warning--I didn't find a database entry for "implicitresolution"
-Warning--I didn't find a database entry for "implicitclass"
-You've used 13 entries,
+You've used 15 entries,
             2118 wiz_defined-function locations,
-            585 strings with 6263 characters,
-and the built_in function-call counts, 4358 in all, are:
-= -- 430
-> -- 203
+            594 strings with 6502 characters,
+and the built_in function-call counts, 4926 in all, are:
+= -- 487
+> -- 228
 < -- 3
-+ -- 81
-- -- 68
-* -- 266
-:= -- 706
-add.period$ -- 42
-call.type$ -- 13
-change.case$ -- 73
++ -- 91
+- -- 76
+* -- 305
+:= -- 806
+add.period$ -- 48
+call.type$ -- 15
+change.case$ -- 83
 chr.to.int$ -- 0
-cite$ -- 13
-duplicate$ -- 155
-empty$ -- 360
-format.name$ -- 68
-if$ -- 936
+cite$ -- 15
+duplicate$ -- 176
+empty$ -- 404
+format.name$ -- 76
+if$ -- 1050
 int.to.chr$ -- 0
-int.to.str$ -- 13
-missing$ -- 7
-newline$ -- 68
-num.names$ -- 26
-pop$ -- 98
+int.to.str$ -- 15
+missing$ -- 9
+newline$ -- 78
+num.names$ -- 30
+pop$ -- 106
 preamble$ -- 1
-purify$ -- 60
+purify$ -- 68
 quote$ -- 0
-skip$ -- 132
+skip$ -- 146
 stack$ -- 0
-substring$ -- 245
-swap$ -- 43
+substring$ -- 280
+swap$ -- 45
 text.length$ -- 3
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 52
+type$ -- 60
 warning$ -- 0
-while$ -- 42
-width$ -- 15
-write$ -- 136
-(There were 7 warnings)
+while$ -- 48
+width$ -- 17
+write$ -- 157
