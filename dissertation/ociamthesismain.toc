@@ -24,7 +24,7 @@
 \contentsline {section}{\numberline {3.1}Representing abstract syntax trees}{23}
 \contentsline {section}{\numberline {3.2}Implementing natural syntax}{26}
 \contentsline {subsection}{\numberline {3.2.1}Operator syntax}{26}
-\contentsline {subsubsection}{\numberline {3.2.1.1}The \lstinline {Expr} typeclass}{27}
+\contentsline {subsubsection}{\numberline {3.2.1.1}The Expr typeclass}{27}
 \contentsline {subsection}{\numberline {3.2.2}For-comprehension syntax}{30}
 \contentsline {subsection}{\numberline {3.2.3}Implicit conversion of literal values}{31}
 \contentsline {section}{\numberline {3.3}Example usage}{31}
@@ -47,16 +47,9 @@
 \contentsline {chapter}{\numberline {6}Experimental results}{53}
 \contentsline {section}{\numberline {6.1}Setup}{53}
 \contentsline {section}{\numberline {6.2}Isolated testing of group operator}{54}
-\contentsline {section}{\numberline {6.3}Complete queries}{56}
-\contentsline {chapter}{\numberline {7}Conclusion}{58}
-\contentsline {section}{\numberline {7.1}Summary of contributions}{58}
-\contentsline {section}{\numberline {7.2}Limitations and future work}{59}
-\contentsline {chapter}{\numberline {8}Sample Title}{61}
-\contentsline {section}{\numberline {8.1}Example section.}{61}
-\contentsline {subsection}{\numberline {8.1.1}Referencing}{61}
-\contentsline {subsection}{\numberline {8.1.2}Including code}{61}
-\contentsline {subsection}{\numberline {8.1.3}Calculus}{62}
-\contentsline {subsection}{\numberline {8.1.4}Figures}{62}
-\contentsline {chapter}{\numberline {A}DSL Codebase}{65}
-\contentsline {chapter}{\numberline {B}Queries}{67}
-\contentsline {chapter}{References}{68}
+\contentsline {section}{\numberline {6.3}Complete queries}{55}
+\contentsline {chapter}{\numberline {7}Conclusion}{59}
+\contentsline {section}{\numberline {7.1}Summary of contributions}{59}
+\contentsline {section}{\numberline {7.2}Limitations and future work}{60}
+\contentsline {chapter}{\numberline {A}DSL Codebase}{62}
+\contentsline {chapter}{References}{84}

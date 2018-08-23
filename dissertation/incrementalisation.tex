@@ -62,7 +62,7 @@ implicit def DStreamRing[K,R](implicit ring: Ring[RDD[(K,R)]]) =
   }
 \end{lstlisting}\vs
 Here we use the DStream methods \lin{transform} and \lin{transformWith}. The former takes a function \lin{RDD[T] => RDD[U]} which it applies to each RDD in the stream, and the later takes a second DStream and a function \lin{(RDD[T],RDD[T1]) => RDD[U]}, which it applies to each pair in sequence of pairs of RDDs produced by zipping together the two DStreams. Thus by providing these functions with the \lin{add} and \lin{negate} operators from the implicitly provided instance of  \lin{Ring} for the RDDs, we achieve the element-wise application of the operators.
-\subsection{Distributive operations}
+\subsection{Distributive operations} \label{distoperatorsdstream}
 The distributive operations $*$, $\cdot$ and $join$ will all need to be implemented by joining the underlying RDDs in some way, in order to pair matching elements (and drop elements with keys not existing in both collections). Unfortunately however, the \lin{join} method for DStreams is not fit for our purposes here, as it only joins two DStreams element-wise. To see the problem, suppose we have two DStreams:
 \begin{lstlisting}
 X: DStream[T] = [X_1,X_2] 
@@ -80,7 +80,7 @@ join(X',Y') &= join((X_1 + X_2),(Y_1 + Y_2)) \\
 &= join(X_1,Y_1) + join(X_1,Y_2) + join(X_2,Y_1) + join(X_2,Y_2)
 \end{split}
 \end{equation*}
-Therefore we can see that this is a stateful operation, since later batches must be joined with earlier batches (e.g. $join(X_1,Y_2)$). Unfortunately, this has meant we have not been able to implement these operations for two DStream operands. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
+Therefore we can see that this is a stateful operation, since later batches must be joined with earlier batches (e.g. $join(X_1,Y_2)$). Unfortunately, this has meant we have not been able to implement these operations for two DStream inputs. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
 \vs\begin{lstlisting}
 val left: DStream[T]
 val right: RDD[T]

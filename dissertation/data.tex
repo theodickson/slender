@@ -1,0 +1,33 @@
+\pgfplotsset{
+        % use this `compat' level or higher to use the feature of specifying
+        % `bar width' in axis units
+        compat=1.7,
+    }
+    
+    \pgfplotstableread[row sep=\\,col sep=&]{
+        no-batches & regular  & shred-inc  & shred-acc \\%   & carG    \\
+        5    & 52.1 & 20.9 & 22.2   \\%& 100000  \\
+        10      & 84.1 & 29.9 & 34.9  \\%& 100000  \\
+        25 & 196 & 53.1 & 55.0 \\%& 1000000 \\
+    }\QOne
+    
+     \pgfplotstableread[row sep=\\,col sep=&]{
+        no-batches & regular  & shred-inc  & shred-acc \\%   & carG    \\
+        5    & 57.4 & 70.3 & 71.5   \\%& 100000  \\
+        10      & 103 & 118 & 121  \\%& 100000  \\
+        25 & 246 & 257 & 270 \\%& 1000000 \\
+    }\QTwo
+    
+    \pgfplotstableread[row sep=\\,col sep=&]{
+        no-batches & regular  & shred-inc  & shred-acc \\%   & carG    \\
+        5    & 107 & 83.0 & 83.8   \\%& 100000  \\
+        10      & 189 & 131 & 135  \\%& 100000  \\
+        25 & 431 & 282 & 289 \\%& 1000000 \\
+    }\QThree
+    
+     \pgfplotstableread[row sep=\\,col sep=&]{
+        no-batches & regular  & shred-inc  & shred-acc \\%   & carG    \\
+        5    & 3.06 & 2.12 & 2.61   \\%& 100000  \\
+        10      & 5.76 & 3.66 & 5.18  \\%& 100000  \\
+        25 & 14.1 & 10.2 & 13.6 \\%& 1000000 \\
+    }\QFour

@@ -33,7 +33,6 @@ case class ExprOps[E:Expr](e: E) {
 }
 
 case class ForComprehensionBuilder[V:Expr, R:Expr, P:Expr](vrp: VariableRingPredicate[V,R,P]) {
-  //todo - get rid of default NumericExpr(1)
 
   val x = vrp.k; val r1 = vrp.r; val p = vrp.p
 

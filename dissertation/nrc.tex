@@ -13,8 +13,8 @@ Figure \ref{nrctypes} formally describes the type system that enables these sema
 \begin{figure}
 \begin{equation*}
 \begin{aligned}
-\R := \prim{Int} \OR \prim{Bool} \OR \R \times  \R \OR \coll{\K}{\R} \\
-\K := \prim{Dom} \OR  [\R]  \OR \prim{Label} \\
+&\R := \prim{Int} \OR \prim{Bool} \OR \R \times  \R \OR \coll{\K}{\R} \\
+&\K := \prim{Dom} \OR  [\R]  \OR \prim{Label} \\
 \end{aligned}
 \qquad
 \begin{aligned}
@@ -57,6 +57,8 @@ $\coll{(\K_1,\prim{Label})}{\prim{Int}}$, along with a dictionary of type $\coll
 
 \section{Expressions} \label{nrcexprsection}
 
+Figure \ref{nrcexprs} introduces the constructions that define the valid expressions in our calculus. In this section we explain these and discuss their algebraic properties.
+
 \begin{figure}
 \begin{equation*}
 \begin{split}
@@ -70,8 +72,6 @@ r := \ & c \OR X \OR \langle r_1, r_2 \rangle \OR \proj{r}{i} \OR \\
 \caption{Valid expressions in the NRC.}
 \label{nrcexprs}
 \end{figure}
-
-Figure \ref{nrcexprs} introduces the constructions that define the valid expressions in our calculus. In this section we explain these and discuss their algebraic properties.
 
 \subsection{Ring expressions} {
 The base expressions of ring type are constants and input collections, denoted by $c$ and $X$ respectively. Constants will be of $\prim{Int}$ or $\prim{Bool}$ type in this restricted formalism, but in practice can be of any numeric type or other primitive type admitting a ring structure. Input collections are datasets of type $\coll{\K}{\R}$, where $\K$ is any valid key type and $\R$ any valid ring type. For example, in our motivating example, the input collection \textit{ratings} is of type $\coll{(Artist \times Track)}{\prim{Int}}$. We also have a standard tupling operator denoted by $\langle , \rangle$ and can project such product types using the notation $\proj{r}{i}$.
@@ -293,6 +293,10 @@ Despite this, we will see in Chapter \ref{results} that even with this restricti
 
 \section{Incremental updates to queries} { \label{deltas}
 
+
+
+In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
+
 \begin{figure}
 \begin{equation*}
 \begin{aligned}
@@ -311,8 +315,6 @@ Despite this, we will see in Chapter \ref{results} that even with this restricti
 \caption{Delta derivation rules for NRC expressions.}
 \label{deltaexprs}
 \end{figure}
-
-In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
 
 Figure \ref{deltaexprs} shows these expressions. The fact that the updates are modelled with addition allows us to exploit the algebraic properties of the operators to derive efficient delta expressions in the majority of cases. For example, we exploit the linearity of $+$ to derive the delta rule:
 \[\delta_X(r_1 + r_2) = \delta_X(r_1) + \delta_X(r_2)\]
@@ -423,6 +425,8 @@ While in this simple example, the nested structure containing various empty cont
 \label{flatdef}
 \end{figure}
 
+The flattening transformation $(\cdot)^F$ is formally defined in Figure \ref{flatdef}. It is a simple recursive definition except for the case of $group$, which constructs key-nested collections. For $group(r)$, supposing $r: \coll{\K_1 \times \K_2}{\R}$, then $group(r): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\R}$. We use the notation $flatGroup(r)$ for the expression of type $\coll{K_1^F\times \Label}{\R^F}$ where the key-nested collections have been replaced by labels.
+
 \begin{figure}
 \begin{equation*}
 \begin{aligned}
@@ -437,8 +441,6 @@ While in this simple example, the nested structure containing various empty cont
 \caption{Definition of $(\cdot)^\Gamma $ transformation.}
 \label{contextdef}
 \end{figure}
-
-The flattening transformation $(\cdot)^F$ is formally defined in Figure \ref{flatdef}. It is a simple recursive definition except for the case of $group$, which constructs key-nested collections. For $group(r)$, supposing $r: \coll{\K_1 \times \K_2}{\R}$, then $group(r): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\R}$. We use the notation $flatGroup(r)$ for the expression of type $\coll{K_1^F\times \Label}{\R^F}$ where the key-nested collections have been replaced by labels.
 
 The definition of $(\cdot)^\G$, given in Figure \ref{contextdef}, is much more involved. In these formulae, we assume the context of collection-typed arguments has two elements $\G_1$ and $\G_2$, as we know from our definition of the types of shredding contexts that the context of a collection $\coll{\K}{\R}$ is of the form $\pair{\K^\G}{\R^\G}$.
 

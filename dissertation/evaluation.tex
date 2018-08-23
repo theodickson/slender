@@ -126,17 +126,18 @@ trait Group[T,O] extends (T => O)
 This is more flexible as it allows us to only provide instances for the valid argument types, and additionally build up the proper return type inductively, since these instances will be built up inductively from the instances for simpler types.
 Taking \lin{Join} as an example, we will need to make implicit instances of available for all pairs of type \lin{T1} and \lin{T2} which represent collections with product-typed keys, where the first elements in the keys are of the same type. For example, a \lin{Map[String::String::HNil,Int]} and a \lin{Map[String::Int::HNil,Map[String,Int]]}. We do this by again writing implicit methods which encode the inductive rules by which these operations are defined. If these implicit methods are available, we can implement a generic join function like this:
 \vs\begin{lstlisting}
-def join[T1,T2,O](t1: T1, t2: T2)(implicit joiner: Join[T1,T2,O]): O =
-  joiner(t1,t2)
+def join[T1,T2,O](t1: T1, t2: T2)
+                    (implicit joiner: Join[T1,T2,O]): O = joiner(t1,t2)
 \end{lstlisting}\vs
 Below we provide some examples of these implicit methods:
 \vs\begin{lstlisting}
-implicit def rddRddMultiply[K, R1, R2, O](implicit dot: Dot[R1, R2, O]) =
-  new Multiply[RDD[(K,R1)], RDD[(K,R2)], RDD[(K,O)]] {
-    def apply(t1: RDD[(K,R1)], t2: RDD[(K,R2)]): RDD[(K,O)] = 
-      t1.join(t2) map { case (k, v) => k -> dot(v._1, v._2) }
+implicit def rddRddMultiply[K, R1, R2, O]
+  (implicit dot: Dot[R1, R2, O]) =
+    new Multiply[RDD[(K,R1)], RDD[(K,R2)], RDD[(K,O)]] {
+      def apply(t1: RDD[(K,R1)], t2: RDD[(K,R2)]): RDD[(K,O)] = 
+        t1.join(t2) map { case (k, v) => k -> dot(v._1, v._2) }
+      }
     }
-}
 \end{lstlisting}\vs
 To multiply two RDDs, we need an instance of \lin{Dot} that can be applied to their dot product to their values. Then we join the two RDDs by key, and calculate each key's new value as the dot product of the values from the two RDDs. Note that any keys which do not appear in both RDDs will disappear, which is correct as this means their new value must be zero. We can also see how this allows the proper return type to be built from the return type \lin{O} of the implicitly provided instance of \lin{Dot}.
 \vs\begin{lstlisting}

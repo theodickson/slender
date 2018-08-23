@@ -125,7 +125,7 @@ In the case of infix syntax, this can be achieved as a result of the fact that S
 
 It remains to implement these methods for all ring-typed expressions. However, there is no common ancestor class for ring-typed expressions - although our explicit case classes all inherit from \lstinline{ExprNode}, products are represented as \lstinline{HList}s which clearly do not. Therefore there is no single place to implement these methods.
 
-\subsubsection{The \lstinline{Expr} typeclass}
+\subsubsection{The Expr typeclass}
 In Scala, to solve this problem, we can use a design pattern borrowed from Haskell called a \textit{typeclass}, and a powerful native feature called an \textit{implicit class}. The discussion in this section may seem excessive for explaining a syntactic feature, and can be skipped by readers less familiar with Scala, but the ideas introduced are used with greater significance later when implementing evaluation, so it is worth explaining them fully for this simpler use case.
 
 A typeclass in Scala is a polymorphic trait with one type argument. For example, our expression typeclass will have the signature:
