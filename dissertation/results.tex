@@ -21,6 +21,17 @@ First we test the performance of shredding the group operator in isolation. This
 
 The idea here is that although we expect shredding without accumulation to be the quickest processing method, it is in some sense not comparable to the regular key-nested evaluation, since in order to compute the full result the RDDs in the DStream need to be aggregated. However, we note that the penalty of this aggregation is dependent on how the output is to be used. If it is being saved in permanent storage, i.e. a database on-disk, whether this aggregation actually incurs a significant cost depends on the update primitives available.
 
+We illustrate the \textit{group-lineitem} query here:
+\vs\begin{lstlisting}
+Group(
+  For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem)
+    Yield (l_orderkey,l_partkey)
+)
+\end{lstlisting}\vs
+
+This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{(\Int \times [\coll{\Int}{\Int}])}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order. Therefore these are quite small inner collections.
+The query \textit{group-customer} groups the customers by nation, therefore creating quite large inner inner collections. The query \textit{group-orders} groups the orders table by customer, and is therefore creates moderately sized inner collections (of average size 14.8). These queries are fully described in Appendix \ref{codebase} in the file \textit{Experiments.scala}.
+
 \begin{table}[]
 \begin{tabular}{|l|l|l|l|l|}
 \hline
@@ -34,19 +45,11 @@ group-orders   & 14.8        & 15.1         & 9.05 \textit{(1.67\texttimes)}    
 \label{groupresults}
 \end{table}
 
-Table \ref{groupresults} shows the results of this isolated testing of group. The queries are described fully in Appendix \ref{queries} but we illustrate the \textit{group-lineitem} query here:
-\vs\begin{lstlisting}
-Group(
-  For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem)
-    Yield (l_orderkey,l_partkey)
-)
-\end{lstlisting}\vs
+Table \ref{groupresults} shows the results of this isolated testing of group. The column \textit{nested-size} shows the average size of the nested collections created in the query.
 
-This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{(\Int \times [\coll{\Int}{\Int}])}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order.
+Firstly, it is notable that indeed shredding is quicker in every case, and further that the accumulated method, while slower than incremental shredding is faster than regular evaluation. This is at least evidence that avoiding the recomputation of the inner collections in the shredded versions is beneficial.
 
-Firstly, it is notable that indeed shredding is quicker in every case, and further that the accumulated method while slower than incremental shredding is faster than regular evaluation. This is at least evidence that avoiding the recomputation of the inner collections in the shredded versions is beneficial.
-
-However, it offers significant benefit in the query \textit{group-lineitem}. The others show less than a 2x gain in speed. This seems to be related to the size of the inner collections created. As the mean size of inner collection increases, the speed decreases relative to standard evaluation. It is hard to say exactly why this is happening but may be to do with overheads involved in computing the dictionary. Especially in our low-parallelism environment, any such overheads would not be offset by the load-balancing benefit we'd otherwise expect from such large inner collections.
+However, it only offers significant benefit in the query \textit{group-lineitem}. The others show less than a 2x gain in speed. This seems to be related to the size of the inner collections created. As the mean size of inner collection increases, the speed decreases relative to standard evaluation. It is hard to say exactly why this is happening but may be to do with overheads involved in computing the dictionaries defining such large inner collections. Especially in our low-parallelism environment, any such overheads would not be offset by the load-balancing benefit we'd otherwise expect from such large inner collections.
 
 \section{Complete queries}
 
@@ -97,7 +100,7 @@ Figure \ref{Q1} demonstrates how Q1 is written using the DSL. The rest of the qu
 \item{Q4 - Joins nation with region to generate all pairs of nation key and region name. Joins with customer on nation key and groups by region name to generate for each region, an inner collection of all of the customers from that region. The customer table is incrementalised.} 
 \end{itemize}
 
-For these more expensive queries, we use a dataset constructed as per the isolated testing of group, but using a random sample of 1000 customers as the basis rather than 10000. We again test three methods of evaluation, regular, shredded, and accumulated-shredded.
+With these more complex queries, the hope is that shredding will reduce recomputation further, by not just preventing reconstructing nested collections but also preventing further processing on these collections, e.g. downstream joins. Since these queries are more expensive, we use a dataset constructed as per the isolated testing of group, but using a random sample of 1000 customers as the basis rather than 10000. We again test three methods of evaluation - regular, shredded, and shredded with accumulation.
 
 \begin{figure}
 \begin{tabular}{cc}
@@ -226,4 +229,3 @@ The results are shown in Figure \ref{mainresults}. For three out of four queries
 It is also worth noting that although accumulating the shredding result is consistently slower than not, the cost is marginal for most queries, and so in environments where this is necessary shredding should still be more efficient than regular evaluation.
 
 For \textit{Q2}, which shredding slows down, this is not necessarily surprising. Since we showed in the isolated testing of group that for some inputs, shredding group may only marginally speed it up, this could mean that the speed up is not worth the cost of creating and maintaining the dictionaries. However, it is notable that even for this query, the differential between regular and shredded evaluation lessens as the number of batches increases. It's possible that with sufficient batches shredding would indeed be faster, as recomputation costs began to outweigh the overheads of shredding.
-

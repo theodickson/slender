@@ -9,9 +9,9 @@ Then we describe the Scala features which enable these ASTs to be generated with
 Finally, we demonstrate its usage by expressing an example query.
 
 
-\section{Representing abstract syntax trees}
+\section{Representation of NRC queries}
 
-As our calculus consists purely in constants, variables, unary operators and binary operators, it is straightforward to represent any expression as an AST, where the leaves are either constants or variables and the other nodes are operators. For example, below we see how a simple usage of the for/yield construct translates into an AST:
+As our calculus consists purely in constants, variables, unary operators and binary operators, it is straightforward to represent any query as an AST, where the leaves are either constants or variables and the other nodes are operators. For example, below we see how a simple usage of the for/yield construct translates into an AST:
 
 \begin{equation*}
 \begin{split}
@@ -45,22 +45,20 @@ case class Variable(name: String) extends ExprNode
 
 In Figure \ref{exprnodes} we present the signatures of the case classes for many of the constructs in our calculus. We omit several of the algebraic operators, as these are exactly analogous to those shown. Note that they all inherit from a common trait \lstinline{ExprNode}, and that they are polymorphic in their construction arguments, so that the compile-time type of an AST node contains the types of all of its child nodes. For example, the node:
 \vs\begin{lstlisting}
-AddExpr(MultiplyExpr(1,2),3)
+AddExpr(MultiplyExpr(LiteralExpr(1),LiteralExpr(2)),LiteralExpr(3))
 \end{lstlisting}\vs
 will have type:
 \vs\begin{lstlisting}
 AddExpr[MultiplyExpr[LiteralExpr[Int],LiteralExpr[Int]],LiteralExpr[Int]]
 \end{lstlisting}\vs.
 This will be crucial later for implementing the evaluation of these ASTs.
-The other omission from the case classes shown is product types. Instead of creating explicit case classes for product types, such as:
+The other omission from the case classes shown is product types. We might have decided to create explicit case classes for product types, such as:
 \vs\begin{lstlisting}
 case class ExprPair[E1,E2](e1: E1, e2: E2) extends ExprNode
 \end{lstlisting}\vs
-We will design the rest of our framework to treat products of these case classes directly as expressions, without any common inheritance, using a design pattern called a \textit{typeclass}, which will be explained later.
+However, this would lead to large amounts of code duplication, as we would have to implement a new case class for every arity of tuple we wished to support, and thus duplicate logic anywhere that these case classes were used. Instead, we will design the rest of our framework to treat products of these case classes directly as expressions, without any common inheritance, using a design pattern called a \textit{typeclass}, which will be explained in \ref{exprtypeclass}.
 
-Additionally, we will not use native Scala tuples to represent such products. This is because Scala tuples have a different type for each arity, with no common ancestor except for the trait \lstinline{Product}, which among other things does not support element access. This makes it impossible to write code which applies common logic to tuples of different arities, something we will have to do in many places when writing the code for evaluation. Instead, in each of these situations we would have to write separate implementations of a class or function for every arity of tuple we wish to support.
-	
-To solve this, we will use Shapeless \cite{shapeless}, a generic programming library for Scala. The key feature of shapeless is the \lstinline{HList} (or \textit{heterogenous list}), which can be thought of as a linked list in which the type of each element may be different but is known at compile time. This is implemented using the following interface:
+Additionally, we will not use native Scala tuples to represent such products. This is because Scala tuples have a different type for each arity, and so would leave us with the same problem as using case classes. To solve this, we will use Shapeless \cite{shapeless}, a generic programming library for Scala. The key feature of shapeless is the \lstinline{HList} (or \textit{heterogenous list}), which can be thought of as a linked list in which the type of each element may be different but is known at compile time. This is implemented using the following interface:
 \vs\begin{lstlisting}
 trait HList
 case class HCons[H,T <: HList](h: H, t: T) extends HList
@@ -125,7 +123,7 @@ In the case of infix syntax, this can be achieved as a result of the fact that S
 
 It remains to implement these methods for all ring-typed expressions. However, there is no common ancestor class for ring-typed expressions - although our explicit case classes all inherit from \lstinline{ExprNode}, products are represented as \lstinline{HList}s which clearly do not. Therefore there is no single place to implement these methods.
 
-\subsubsection{The Expr typeclass}
+\subsubsection{The Expr typeclass} \label{exprtypeclass}
 In Scala, to solve this problem, we can use a design pattern borrowed from Haskell called a \textit{typeclass}, and a powerful native feature called an \textit{implicit class}. The discussion in this section may seem excessive for explaining a syntactic feature, and can be skipped by readers less familiar with Scala, but the ideas introduced are used with greater significance later when implementing evaluation, so it is worth explaining them fully for this simpler use case.
 
 A typeclass in Scala is a polymorphic trait with one type argument. For example, our expression typeclass will have the signature:

@@ -74,7 +74,7 @@ r := \ & c \OR X \OR \langle r_1, r_2 \rangle \OR \proj{r}{i} \OR \\
 \end{figure}
 
 \subsection{Ring expressions} {
-The base expressions of ring type are constants and input collections, denoted by $c$ and $X$ respectively. Constants will be of $\prim{Int}$ or $\prim{Bool}$ type in this restricted formalism, but in practice can be of any numeric type or other primitive type admitting a ring structure. Input collections are datasets of type $\coll{\K}{\R}$, where $\K$ is any valid key type and $\R$ any valid ring type. For example, in our motivating example, the input collection \textit{ratings} is of type $\coll{(Artist \times Track)}{\prim{Int}}$. We also have a standard tupling operator denoted by $\langle , \rangle$ and can project such product types using the notation $\proj{r}{i}$.
+The base expressions of ring type are constants and input collections, denoted by $c$ and $X$ respectively. Constants will be of $\prim{Int}$ or $\prim{Bool}$ type in this restricted formalism, but in practice can be of any numeric type or other primitive type admitting a ring structure. Input collections are datasets of type $\coll{\K}{\R}$, where $\K$ is any valid key type and $\R$ any valid ring type. For example, in our motivating example, the input collection \textit{ratings} is of type $\coll{(User \times Track \times Date)}{\prim{Int}}$. We also have a standard tupling operator denoted by $\langle , \rangle$ and can project such product types using the notation $\proj{r}{i}$.
 
 Next we have $+$, $-$, and $\ast$, the algebraic operators defined by the ring structure of $\R$. It will be important when discussing incrementalisation and parallelisation to note that  $\ast$ is distributive with respect to $+$:
 \[
@@ -91,7 +91,7 @@ The dot product ($\cdot$) is a generalised multiplication operator which accepts
 & (X \cdot Y)(\langle k_1, k_2 \rangle) = X(k_1) \cdot Y(k_2)\textrm{, for all }k_1,k_2: \K
 \end{split}
 \end{equation*}
-This operation can natively implement certain useful operations. For example, the dot product of $\Bag{\K_1}$ and $\Bag{\K_2}$ produces their cartesian product.
+This operation can natively implement certain useful operations. For example, the dot product of a $\Bag{\K_1}$ and a $\Bag{\K_2}$ produces their cartesian product.
 
 The dot product is distributive:
 \vs\begin{equation*}
@@ -113,7 +113,7 @@ It also allows us to extend the native ring multiplication operation to collecti
 & (X*Y)(k) = X(k) \cdot Y(k)
 \end{split}
 \end{equation*}
-We will see how this extension to multiplication allows us to define a for-comprehension construct with very natural semantics.
+We will see in \ref{forcomp} how this extension to multiplication allows us to define a for-comprehension construct with very natural semantics.
 
 Note that when applied to collections, $*$ operator can be described as join-like. This is because a key will only be present (i.e. have non-zero value) in the output collection if it has non-zero value in both of the input collections. However, since it performs this join on the entire key, it is not general enough to model many useful joins. Thus we introduce a separate join operator, which only operates on collections, and joins only on the first element of a product-typed key. It is defined as follows:
 \begin{equation*}
@@ -147,7 +147,7 @@ It is only defined for collection types, and, for example, when applied to a bag
  
 \vs The predicate operator $p(k)$ encapsulates any function accepting a key and returning a boolean. We will see how it enables us to do things such as filter collections.
  
-\vs The \textit{singleton} constructor is $sng$. With $k: \K$ and $r: \R$, $sng(k,r)$ constructs a collection of type $\coll{\K}{\R}$ with the single element $k  \mapsto r$. We will see how this combines with our for-comprehension construct to create nested collections.
+\vs The \textit{singleton} constructor is $sng$. With $k: \K$ and $r: \R$, $sng(k,r)$ constructs a collection of type $\coll{\K}{\R}$ with the single element $k  \mapsto r$. We will see how this combines with our for-comprehension to more generally transform collections.
  
 \vs The infinite mapping $\{x => r\}$ allows us to express functions from key types to value types as collections of infinite domain, where the key is a variable expression $x$ and the value is a ring expression $r$ which may use the variables introduced in $x$. When such an expression is multiplied with a finite collection, the variable expression is bound to each of the keys in the finite collection in order to produce a concrete result.
 
@@ -166,8 +166,8 @@ Hence $Y$ is X filtered to only those keys whose first and second elements are e
 \vs The last ring-typed construct is group, and is the operator which constructs key-nested collections. It is defined on collections with keys of pair type, as follows:
 \begin{equation*}
 \begin{split}
-&X: \coll{\K_1 \times \K_2}{\R} \\
-&group(X): \coll{\K_1 \times [\coll{\K_2}{\R}]}{\prim{Bool}} \\
+&X: \coll{(\K_1 \times \K_2)}{\R} \\
+&group(X): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\prim{Bool}} \\
 &group(X)(\pair{k_1}{k_2'}) = true \iff k_2' = \sum_{(\pair{k_1'}{k_2} \mapsto r) \in X : \ k_1' = k_1} {\{k_2 \mapsto r\}} 
 \end{split}
 \end{equation*}
@@ -179,7 +179,7 @@ This creates a key in the output for each unique first element of the key in the
 &group(X) = \{\langle a, \{b \mapsto 1, c \mapsto 2\} \rangle \mapsto true, \langle b, \{d \mapsto 3 \} \rangle \mapsto true \}
 \end{split}
 \end{equation*}
-While this boolean value may seem redundant, and thus this representation may seem to offer no benefit over the value-nested representation $\coll{\K_1}{(\coll{\K_2}{R})}$, it actually offers a key semantic benefit. It allows us to keep track of values of type $\K_1$ whose nested collections become empty when updating inputs to a query. Using the example above, suppose we receive an update to $X$:
+This key-nested representation offers an important semantic benefit. It allows us to keep track of keys of type $\K_1$ whose nested collections become empty upon updates to the inputs of the query. Using the example above, suppose we receive an update to $X$:
 \begin{equation*}
 \dX = \{(\pair{b}{d} \mapsto -3\}
 \end{equation*}
@@ -202,7 +202,7 @@ And so $b$ disappears from the top-level of our output entirely.
 The base key expressions are either constants, denoted $c$, or variables, denoted $x$, which are strictly those introduced as the keys of an infinite mapping. As with ring expressions, we also have tupling and projection. 
 }
 
-\section{For-comprehension syntax} {
+\section{For-comprehension syntax} { \label{forcomp}
 In this section we introduce several variants of a familiar syntactic construction, the for-comprehension, which will allow many queries to be written more naturally.
 
 Let $X$ be a finite collection of type $\coll{\K}{\R}$, $r_1$ be a ring expression of type $\R_1$, and $x$ be a variable of type $\K$. Our basic for-comprehension syntax is thus defined as:
@@ -234,7 +234,7 @@ Hence, we can instead write the above query as:
 These examples are quite limited in that they are only aggregations of a collection $X$. In order to transform $X$ more generally, we can use the singleton constructor. For example, consider the following query:
 \begin{equation*}
 \begin{split}
-&X: \coll{\K_1 \times \K_2}{\R} \\
+&X: \coll{(\K_1 \times \K_2)}{\R} \\
 &Y = \For{\pair{k_1}{k_2}}{X} \Collect{sng(\pair{k_2}{k_1}, 1)}
 \end{split}
 \end{equation*}
@@ -244,7 +244,7 @@ The inner expression $X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\}$ iterates 
 \begin{equation*}
 X*\{\pair{k_1}{k_2} => sng(\pair{k_2}{k_1},1)\} = \{(a,b) \mapsto \{(b,a) \mapsto 1\}, (c,d) \mapsto \{(d,c) \mapsto 2\}\}
 \end{equation*}
-Then the sum outside this simply aggregates all of the values via bag union, to produce the single collection:
+Then the sum outside this aggregates all of the values via bag union, to produce the single flat collection:
 \begin{equation*}
 \{(b,a) \mapsto 1, (d,c) \mapsto 2\}
 \end{equation*}
@@ -270,8 +270,8 @@ With the for-comprehension syntax, we can now express the query from the motivat
 \end{split}
 \end{equation*}
 
-Here, $trackRatings$ first projects the ratings to just the track and date, thus aggregating for each such pair the total rating. It then groups this by track, thus returning a $\coll{(\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}}$, representing the pairing of each track with its ratings for each date. Then this is joined with the track association table, which adds the artist to each key, producing a $\coll{(\prim{Track} \times (Artist \times [\Bag{\prim{Date}}]))}{\prim{Bool}}$. Finally, $artistTrackRatings$ reorders the elements of the key with a for/yield so that the artist is the first element, and finally applies group in order to produce the final
-$\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times \Bag{\prim{Date}})}{\prim{Bool}}])}{\prim{Bool}}$. This collection will have one key per artist, where the artist is the first element, and the collection of ratings for each track on each day is nested within the second element.
+Here, $trackRatings$ first projects the ratings to just the track and date, thus aggregating for each such pair the total rating across all users. It then groups this by track, returning a $\coll{(\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}}$, representing the pairing of each track with its aggregate rating for each date. Then this is joined with the track association table, which adds the artist to each key, producing a $\coll{(\prim{Track} \times (Artist \times [\Bag{\prim{Date}}]))}{\prim{Bool}}$. Finally, $artistTrackRatings$ reorders the elements of the key with a for/yield so that the artist is the first element, and applies group in order to produce the final
+$\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])}{\prim{Bool}}$. This collection will have one key per artist, where the artist is the first element, and the collection of ratings for each track on each day is nested within the second element.
 }
 
 \section{Restricted construction of key-nested collections}
@@ -287,7 +287,7 @@ The naive way to implement the evaluation of such a query would lead to physical
 Thus, without a dedicated optimiser to examine these queries and detect when nested iterations filtered by predicated correspond to grouping or other primitives, it is not possible evaluate such queries in Spark.
 
 Hence it was decided to forego this operator in favour of the explicit $group$ operator which can be directly evaluated using the \lin{groupBy} method on an RDD, as we will see in Chapter \ref{evaluation}.
-Despite this, we will see in Chapter \ref{results} that even with this restriction we are still able to express a wide range of quite complex queries. 
+Despite this, we will see in Chapter \ref{results} that even with this restriction we are still able to express a wide range of complex queries. 
 
 }
 
@@ -295,7 +295,7 @@ Despite this, we will see in Chapter \ref{results} that even with this restricti
 
 
 
-In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is some expression such that $r^{new}$ = $r + d_X(r)$.
+In this section we introduce \textit{delta expressions}, or expressions which compute the update to a query given an update to its inputs. For example, if we have some expression $r$ with an input collection $X$, and receive an update $\delta X$ for $X$ such that the new value of $X$ is $X^{new} = X + \delta X$, the delta expression $\delta_X(r)$ is the expression such that $r^{new}$ = $r + d_X(r)$.
 
 \begin{figure}
 \begin{equation*}
@@ -339,9 +339,9 @@ sng(e^{new},r) + sng(e^{new},\delta_X(r)) - sng(e^{old},r) &= sng(e,r) + sng(e,\
 &= sng(e,\delta_X(r))
 \end{split}
 \end{equation*}
-which is an efficient incrementalisation. In practice, usage of $sng$ will largely be confined to the for/yield construction where the yielded key is a variable expression, and so will be unaffected by updates to input collections. 
+In practice, usage of $sng$ will largely be confined to the for/yield construction where the yielded key is a variable expression, and so will be unaffected by updates to input collections. 
 
-For $group$, this is because the construction of key-nested collections is fundamentally not distributive or linear. Thus, the only way to compute an updated output is to compute the updated input, apply $group$ to this, and substract the previous output. However, we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over addition.
+For $group$, the delta expression is not efficient because the construction of key-nested collections is fundamentally not distributive or linear. Thus, the only way to compute an updated output is to compute the updated input, apply $group$ to this, and substract the previous output. However, we will see in the next section how shredding removes the need for this recomputation by converting the construction of a key-nested collection into the construction of value-nested collection, which does indeed distribute over addition.
 	
 }
 
@@ -381,7 +381,7 @@ It will be useful to first examine how shredding works at the type level. Figure
 
 The type returned by $(\cdot)^F$ is straightforward - it is recursively defined to simply replace all boxed ring types with the $Label$ type, and it does nothing to primitive types.
 
-The type returned by of $(\cdot)^\Gamma$ slightly more complicated. The base cases of our primitive types contain no key-nested collections and so their context is empty, which is represented by the $\prim{Unit}$ type. Product types have a context consisting of the contexts of their elements, in a matching structure. Collections also have tupled shredding contexts, the first element for the context of it's key and the second for its value.
+The type returned by of $(\cdot)^\Gamma$ slightly more complicated. The base cases of our primitive types contain no key-nested collections and so their context is empty, which is represented by the $\prim{Unit}$ type. Product types have a context consisting of the contexts of their elements, in a matching structure. Collections also have tupled shredding contexts, the first element for the context of its key and the second for its value.
 
 The interesting case is the boxed ring type $[\R]$. Here the shredding context will consist of two parts - first the dictionary defining the flattened boxed value, and second it recursively contains this value's shredding context. This represents the fact that shredding proceeds recursively - for a boxed collection $\coll{\K}{\R}$ either the key or the value may contain further key-nested collections and so it is shredded to produce the collection $\coll{\K^F}{\R^F}$ before producing the dictionary defining the inner labels. Otherwise, we would only be able to obtain the benefits of shredding for inner collections nested only at one level and not at arbitrary depth.
 
@@ -425,7 +425,7 @@ While in this simple example, the nested structure containing various empty cont
 \label{flatdef}
 \end{figure}
 
-The flattening transformation $(\cdot)^F$ is formally defined in Figure \ref{flatdef}. It is a simple recursive definition except for the case of $group$, which constructs key-nested collections. For $group(r)$, supposing $r: \coll{\K_1 \times \K_2}{\R}$, then $group(r): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\R}$. We use the notation $flatGroup(r)$ for the expression of type $\coll{K_1^F\times \Label}{\R^F}$ where the key-nested collections have been replaced by labels.
+The flattening transformation $(\cdot)^F$ is formally defined in Figure \ref{flatdef}. It is a simple recursive definition except for the case of $group$, which constructs key-nested collections. For $group(r)$, supposing $r: \coll{(\K_1 \times \K_2)}{\R}$, then $group(r): \coll{(\K_1 \times [\coll{\K_2}{\R}])}{\R}$. We use the notation $flatGroup(r)$ for the expression of type $\coll{K_1^F\times \Label}{\R^F}$ where the key-nested collections have been replaced by labels.
 
 \begin{figure}
 \begin{equation*}
@@ -446,7 +446,7 @@ The definition of $(\cdot)^\G$, given in Figure \ref{contextdef}, is much more i
 
 The derivations for pairs, $sng$ and infinite mappings are straightforward - we construct the shredding context by simply pairing the contexts of the constituent parts. Sum is also straightforward - since summing a collection removes the keys, we only need the context for the values, so return the second part of the input context only.
 
-For the other operators, it is a little more complicated, as they require combining the corresponding dictionaries. For example, when adding two shredded collections, the two dictionaries for each boxed ring type must be added together to produce a dictionary containing the definitions for the key-nested collections from both collections. This is represented with the union operator.
+For the other operators, it is more complicated, as they require combining the corresponding dictionaries. For example, when adding two shredded collections, the two dictionaries for each boxed ring type must be added together to produce a dictionary containing the definitions for the key-nested collections from both collections. This is represented with the union operator.
 
 For the dot product, we represent the derivation of the shredding context with the operation $\odot$, defined as:
 \begin{equation*}
@@ -462,9 +462,63 @@ For multiplication, the key's context is the intersection of the two operands ke
 
 For $join$, the first element of the key is similarly the intersection of contexts, and the second element of the key pairs the context of the second elements of the inputs. Again, as the value is computed as the dot product of the input values, we use the $\odot$ operation to compute the context of the vaue.
 
-Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shredded, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$.
+Finally, the context for $group(r)$ is denoted $\pair{dict(r^F)}{r^\G}$. This represents the fact that $r$ is recursively shredded, and then the context $r^\G$ is paired with the dictionary defining newly replaced key-nested collections at the top level of $r^F$. When looking up the definition of the inner collections constructed by $group(r)$, first the dictionary $dict(r^F)$ would be used, and if $r$ itself contained further nested collections, the definitions of these would be contained within the context $r^\G$.
 
 We can see now that when shredded, the expression $group(r)$ no longer constructs a key-nested collection. Instead, with $r: \coll{(\K_1 \times \K_2)}{\R}$, it constructs a value-nested collection in the form of $dict(r^F)$ which will be a collection of type $\coll{\Label}{\coll{\K_2}{\R}}$. We will see in Chapters \ref{evaluation} and \ref{incrementalisation} how the implementation of $flatGroup$ and $dict$ enable load-balancing and efficient incrementalisation.
+
+\subsection{Example application}
+
+Recall the example query, which we expressed as an NRC query in \ref{examplequery}. The output is of type $\prim{Output}: \coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])}{\prim{Bool}}$. This represents a collection where each artist is paired with a nested collection of their tracks, where each track is itself paired with a further nested collection of its aggregate ratings by date. While it will be too involved too derive the entire shredded expression here, we will derive the type of the flat output and shredding context, and explain what these mean to give an idea of how shredding works in practice. In the following, we will index the $\Label$ types and omit unit shredding contexts for clarity. Where we have omitted such contexts, we will indicate this by using $\approx$.
+
+First we derive the type of the flat output:
+\begin{equation*}
+\begin{split}
+\prim{Output}^F &=(\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])}{\prim{Bool}})^F \\
+&= \coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])^F}{\prim{Bool}}^F \\
+&= \coll{(\prim{Artist}^F \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}]^F)}{\prim{Bool}} \\
+&= \coll{(\prim{Artist} \times Label_1)}{\prim{Bool}} \\
+\end{split}
+\end{equation*}
+
+The only change is that the outermost nested collections has been replaced by labels, thus giving us a flat output. Note that there is no indication in the flat output that there is a second set of labels defining the further inner collection. We will now derive the type of the shredding context:
+\begin{equation*}
+\begin{split}
+Output^\G &=(\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])}{\prim{Bool}})^\G \\
+&=(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])^\G \times \prim{Unit} \\
+&\approx\prim{Unit} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}]^\G \\
+&\approx [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}]^\G \\
+&=(\coll{\Label_1}{\coll{((\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}})^F}) \times ((\coll{\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}})^\G \\
+\end{split}
+\end{equation*}
+where:
+\begin{equation*}
+\begin{split}
+\coll{((\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}})^F &=\coll{(\prim{Track}^F \times [\Bag{\prim{Date}}]^F)}{\prim{Bool}}^F \\
+&=\coll{(\prim{Track} \times \Label_2)}{\prim{Bool}} \\
+\end{split}
+\end{equation*}
+and:
+\begin{equation*}
+\begin{split}
+((\coll{\prim{Track} \times [\Bag{\prim{Date}}])}{\prim{Bool}})^\G &= (\prim{Track} \times [\Bag{\prim{Date}}])^\G \times Unit\\
+&\approx \prim{Unit} \times [\Bag{\prim{Date}}]^\G \\
+&\approx (\coll{\Label_2}{\Bag{\prim{Date}}^F}) \times \Bag{\prim{Date}}^\G \\
+&= (\coll{\Label_2}{\Bag{\prim{Date}}}) \times (\prim{Unit} \times \prim{Unit}) \\
+&\approx \coll{\Label_2}{\Bag{\prim{Date}}}
+\end{split}
+\end{equation*}
+Hence we have:
+\begin{equation*}
+\begin{split}
+&\prim{Output}^F = \coll{(\prim{Artist} \times Label_1)}{\prim{Bool}} \\
+&\prim{Output}^\G \approx (\coll{Label_1}{\coll{((\prim{Track} \times \Label_2)}{\prim{Bool}}))} \times (\coll{\Label_2}{\Bag{\prim{Date}}}) \\
+\end{split}
+\end{equation*}
+This represents that the inner collection of track ratings by date for each artist is replaced with an identifying label (represented by $\Label_1$) in the flat output. This label is defined in the first dictionary in the context, which has values of type $\coll{(\prim{Track} \times \Label_2)}{\prim{Bool}}$. This underlines the recursive nature of shredding - since the outermost nested collection has another collection nested within it, (which is the ratings for a particular track by date), the definition of the label which replaces itself contains labels (represented by $\Label_2$). The definition of these labels are given by the second dictionary in the context, which is of type $\coll{\Label_2}{\Bag{\prim{Date}}}$.
+
+Since as we will see in Chapter \ref{evaluation}, each of these dictionaries is stored separately in a way in which each can be load-balanced, we not only load-balance top-level inner collections but also inner collections at any level of nesting.
+
+
 
 
 

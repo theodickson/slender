@@ -111,7 +111,7 @@ We can show that this is the correct incrementalisation by considering the delta
 \end{equation*}
 Hence $\dX(X^{i-1}*Y) = x_i*Y$, as required. We use in this that $\delta_X(Y) = 0$ since $Y$ is an RDD and so not dependent on $X$.
 
-\subsection{Group}
+\subsection{The group operator}
 The $group$ operator, not being distributive or linear, is not possible to incrementalise in the efficient way we have incrementalised the other operators. We cannot just apply $group$ to each batch and output the resulting DStream. This can be seen by inspecting the form of the its delta expression:
 \begin{equation*}
 \dX(group(r)) = group(r + \dX(r)) - group(r)
