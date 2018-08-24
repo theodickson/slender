@@ -50,40 +50,35 @@ AddExpr(MultiplyExpr(LiteralExpr(1),LiteralExpr(2)),LiteralExpr(3))
 will have type:
 \vs\begin{lstlisting}
 AddExpr[MultiplyExpr[LiteralExpr[Int],LiteralExpr[Int]],LiteralExpr[Int]]
-\end{lstlisting}\vs.
+\end{lstlisting}\vs
 This will be crucial later for implementing the evaluation of these ASTs.
+
 The other omission from the case classes shown is product types. We might have decided to create explicit case classes for product types, such as:
 \vs\begin{lstlisting}
 case class ExprPair[E1,E2](e1: E1, e2: E2) extends ExprNode
 \end{lstlisting}\vs
 However, this would lead to large amounts of code duplication, as we would have to implement a new case class for every arity of tuple we wished to support, and thus duplicate logic anywhere that these case classes were used. Instead, we will design the rest of our framework to treat products of these case classes directly as expressions, without any common inheritance, using a design pattern called a \textit{typeclass}, which will be explained in \ref{exprtypeclass}.
 
-Additionally, we will not use native Scala tuples to represent such products. This is because Scala tuples have a different type for each arity, and so would leave us with the same problem as using case classes. To solve this, we will use Shapeless \cite{shapeless}, a generic programming library for Scala. The key feature of shapeless is the \lstinline{HList} (or \textit{heterogenous list}), which can be thought of as a linked list in which the type of each element may be different but is known at compile time. This is implemented using the following interface:
+Additionally, we will not use native Scala tuples to represent these products. This is because Scala tuples have a different type for each arity, and so would leave us with the same problem as using case classes. To solve this, we will use Shapeless \cite{shapeless}, a generic programming library for Scala.
+
+The key feature of shapeless is the \lstinline{HList} (or \textit{heterogenous list}), which can be thought of as a linked list in which the type of each element may be different but is known at compile time. This is implemented using the following interface:
 \vs\begin{lstlisting}
 trait HList
 case class HCons[H,T <: HList](h: H, t: T) extends HList
 case object HNil extends HList
 \end{lstlisting}\vs
-\lstinline{HCons} and \lstinline{HNil} act as \lstinline{Cons} and \lstinline{Nil} do in a standard Scala immutable linked list. But, since \lstinline{HCons} is polymorphic in both the type of its head and its tail, an \lstinline{HList} is therefore polymorphic in all of its elements.
-
-It can be noted then that in terms of the expressiveness of types, this offers nothing beyond limiting ourselves to only using \lstinline{Tuple2}, and representing higher arities by nesting these tuples. For example, an \lstinline{HCons[T1,HCons[T2,HCons[T3,HNil]]]} is isomorphic to a \lstinline{Tuple2[T1,Tuple2[T2,Tuple2[T3,Unit]]]]}.
-
-However, the Shapeless library additionally offers many list-like methods for manipulating \lstinline{HList}s, such as concatenation and element access by index, which will be helpful to us later on. It also offers the same syntax for constructing \lstinline{HList}s as can be used to construct regular Scala lists, the double colon (\lstinline{::}). For example, we can construct an \lstinline{HList} isomorphic to the tuple:
-\vs\begin{lstlisting}
-(LiteralExpr(1),LiteralExpr(2),LiteralExpr(3))
-\end{lstlisting}\vs
-using the syntax:
-\vs\begin{lstlisting}
-LiteralExpr(1)::LiteralExpr(2)::LiteralExpr(3)::HNil.
-\end{lstlisting}\vs
-If we were using nesting of Tuple2 values, we would have to write the triple as:
-\vs\begin{lstlisting}
-(LiteralExpr(1),(LiteralExpr(2),(LiteralExpr(3),()))).
-\end{lstlisting}\vs
-
+\lstinline{HCons} and \lstinline{HNil} act as \lstinline{Cons} and \lstinline{Nil} do in a standard Scala immutable linked list, and we can similarly use double colon (\lstinline{::}) syntax to construct HLists. But, since \lstinline{HCons} is polymorphic in both the type of its head and its tail, an \lstinline{HList} is therefore polymorphic in all of its elements. For example, we can express the tuple:
+\begin{lstlisting}
+(1,"a",true): (Int,String,Boolean)
+\end{lstlisting}
+with the equivalent HList:
+\begin{lstlisting}
+1::"a"::true::HNil: HCons[Int,HCons[String,HCons[Boolean,HNil]]]
+\end{lstlisting}
+We therefore only need to write code for \lin{HCons} and \lin{HNil} in order to support tuples of any arity. Such code will work recursively, by first applying some logic to the first element, and then recursively acting on the tail HList.
 
 \section{Implementing natural syntax}
-With the system of ASTs introduced in the previous section, we can represent any NRC query in Scala. However, directly instantiating each case class is extremely cumbersome. For example, to generate the AST for the expression: 
+With the system of ASTs introduced in the previous section, we can represent any NRC query in Scala. However, directly instantiating each case class is extremely cumbersome. For example, to construct the AST for the expression: 
 \begin{equation*}
 \For{x}{X} \Yield{(\For{y}{x} \Collect{y+1})}
 \end{equation*}
@@ -101,7 +96,7 @@ val expr = SumExpr(
   )
 )
 \end{lstlisting}\vs
-In this section we describe how we implement syntax almost identical to the abstract syntax of the calculus introduced in Chapter \ref{nrc} to generate this same AST.
+In this section we describe how we implement syntax almost identical to the abstract syntax of the calculus introduced in Chapter \ref{nrc} to generate ASTs more easily.
 
 \subsection{Operator syntax}
 The first task is to implement prefix syntax for the unary operators and infix syntax for the binary operators. For example, we would like to be able to write:
@@ -117,7 +112,7 @@ MultiplyExpr(NegateExpr(LiteralExpr(1)),LiteralExpr(2))
 \end{lstlisting}
 \vs
 
-Scala has in-built features for implementing such syntax. In the case of prefix syntax, this can be achieved for $-$ by implementing the method \lstinline{unary_-}, since the compiler desugars the expression \lstinline{-LiteralExpr(1)} as \lstinline{LiteralExpr(1).unary_-}.
+Scala has in-built features for implementing such syntax. In the case of prefix syntax, this can be achieved for $(-)$ by implementing the method \lstinline{unary_-}, since the compiler desugars the expression \lstinline{-LiteralExpr(1)} as \lstinline{LiteralExpr(1).unary_-}.
 
 In the case of infix syntax, this can be achieved as a result of the fact that Scala does not require the use of dots or brackets to invoke methods.  \lstinline{LiteralExpr(1) * LiteralExpr(2)} is desugared by the Scala compiler to \lstinline{LiteralExpr(1).*(LiteralExpr(2))}.
 
@@ -143,7 +138,7 @@ These signatures will accept an argument of any type \lin{E}, as long as they ar
 
 Hence, if we write a set of implicit methods which generate instances of \lin{Expr} for all valid expression types, then we can call the method \lin{foo} for any valid expression without providing the instance of \lin{Expr} explicitly.
 
-This means that we first provide an implicit method which generates an instance of \lin{Expr[T]} for any \lin{T} which is one of our explicit AST operator nodes:
+Therefore we must first provide an implicit method which generates an instance of \lin{Expr[T]} for any \lin{T} which is one of our explicit AST operator nodes:
 \vs\begin{lstlisting}
 implicit def ExprNode[E <: ExprNode]: Expr[E] = new Expr[E] {}
 \end{lstlisting} \vs
@@ -162,7 +157,7 @@ Later, we will use this ability to encode inductive rules in a system of implici
 \vs Unfortunately, we cannot directly implement the operators in the \lin{Expr} typeclass, as then they only be available to instances of \lin{Expr[T]} and not the expressions themselves. Instead, we will use an \textit{implicit class}.
 
 An implicit class is like a regular class, except it can only have one explicit construction argument, say of type \lin{T}. The existence of such an implicit class then allows its methods to be used as though they are methods of the type \lin{T}. This happens at compile-time. When the compiler finds method invocations which do not correspond to methods directly available to the object in question, it searches for an implicit class which can be instantiated using the object as the construction argument. If such an implicit class exists and contains a matching method, the object will be translated into an instance of the implicit class.
-For example, suppose the compiler encounters the statement \lin{foo.bar(baz)} where \lin{foo: Foo, bar: Bar, baz: Baz}, and that the class \lin{Foo} notrany of its ancestors contains a method \lin{bar}. However, suppose the following implicit class is in scope:
+For example, suppose the compiler encounters the statement \lin{foo.bar(baz)} where \lin{foo: Foo, bar: Bar, baz: Baz}, and that neither the class \lin{Foo} nor any of its ancestors contains a method \lin{bar}. However, suppose the following implicit class is in scope:
 \vs\begin{lstlisting}
 implicit class FooImplicits(foo: Foo) {
   def bar(baz: Baz) = ...
@@ -191,7 +186,7 @@ def Sng[K:Expr, R:Expr](k: K, r: R): SngExpr[K, R] = SngExpr(k, r)
 
 \subsection{For-comprehension syntax}
 
-Next we would like to be able to use the for/yield and for/collect comprehensions introduced in chapter \ref{nrc}. We only provide a brief overview of this implementation as it uses more standard Scala features which are of less theoretical interest.
+Next we would like to be able to use the for/yield and for/collect comprehensions introduced in Chapter \ref{nrc}. We only provide a brief overview of this implementation as it uses more standard Scala features which are of less theoretical interest.
 
 Although \textit{for} and \textit{yield} are reserved keywords in Scala, we can use their capitalised versions. Therefore, we would like the following expressions to be valid and generate the corresponding ASTs:
 

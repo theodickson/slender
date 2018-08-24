@@ -1,6 +1,6 @@
 \chapter{Experimental results} \label{results}
 
-In this section we discuss the experiments we performed to ascertain the performance benefits of shredding. First we discuss the testing setup and introduce the dataset used. Then we describe the experiments done and discuss their results. These results show that queries can be executed up to 3.7 times faster using shredding, but that not all queries are sped up by shredding.
+In this chapter we discuss the experiments we performed to ascertain the performance benefits of shredding. First we discuss the testing setup and introduce the dataset used. Then we describe the experiments done and discuss their results. These results show that queries can be executed up to 3.7 times faster using shredding, but that not all queries are sped up by shredding.
 
 \section{Setup}
 
@@ -8,7 +8,7 @@ Unfortunately, access to a distributed computing cluster was not secured, which 
 
 The machine we use has 8GB 1600Mhz DDR3 Ram, a 2.6GHZ Intel Core i5 processor and runs Mac OS X 10.11.6. The queries are compiled using Scala 2.11.12 and are run on a local instance of Spark 2.3.0. 
 
-The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business's products, orders, customers and suppliers. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of 10000 of the customers, and then sampling the other tables based on this sample of customers. I.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
+The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business's products, orders, customers and suppliers, and thus allows for many interesting nested queries. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of 10000 of the customers, and then sampling the other tables based on this sample of customers, i.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
 
 \section{Isolated testing of group operator}
 First we test the performance of shredding the group operator in isolation. This is so we can directly assess the benefits of being able to avoid recomputation of the construction of nested collections without the additional overhead of joins which other operators will introduce into the query. We will test this operator across a variety of tables with different distributions of keys, in order to see how performance relates to the size of nested collections. For each query, we will compare three alternative processing methods:
@@ -16,7 +16,7 @@ First we test the performance of shredding the group operator in isolation. This
 \begin{itemize}
 \item{Regular key-nested evaluation (reg). This will involve recomputation with each batch in the DStream, and therefore will have an accumulated output.}
 \item{Shredded evaluation (shred-inc). As this does not involve recomputation, the output will be incremental.}
-\item{Shredded evaluation with accumulation (shred-acc). This will be shredded evaluation, with the output explicitly accumulated after application of the group operator.}
+\item{Shredded evaluation with accumulation (shred-acc). The same as shred-inc but the output is accumulated according to the procedure detailed in Appendix \ref{codebase} in the file \textit{Accumulate.scala}}
 \end{itemize}
 
 The idea here is that although we expect shredding without accumulation to be the quickest processing method, it is in some sense not comparable to the regular key-nested evaluation, since in order to compute the full result the RDDs in the DStream need to be aggregated. However, we note that the penalty of this aggregation is dependent on how the output is to be used. If it is being saved in permanent storage, i.e. a database on-disk, whether this aggregation actually incurs a significant cost depends on the update primitives available.
@@ -88,11 +88,11 @@ val customerNameOrders = For (
 //bag of part names.
 val query = Group(customerNameOrders)
 \end{lstlisting}
-\label{Q1}
 \caption{Full definition of Q1}
+\label{q1-def}
 \end{figure}
 
-Figure \ref{Q1} demonstrates how Q1 is written using the DSL. The rest of the queries are detailed in Appendix \ref{codebase} in the file \textit{Experiments.scala}, but we describe them at a high level here:
+Figure \ref{q1-def} demonstrates how Q1 is written using the DSL. The rest of the queries are detailed in Appendix \ref{codebase} in the file \textit{Experiments.scala}, but we describe them at a high level here:
 
 \begin{itemize}
 \item{Q2 - Joins lineitem with orders to generate all customer/supplier pairs, and then joins with customer and supplier to get their names. Then groups by supplier name to return for each the bag of customers' names who have ordered something from the supplier. The inner values are the number of parts that customer has ordered from that supplier. The orders table is incrementalised, the rest are static.}

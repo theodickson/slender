@@ -23,11 +23,11 @@
 \contentsline {subsection}{\numberline {2.6.3}Example application}{23}
 \contentsline {chapter}{\numberline {3}Implementation of the DSL}{25}
 \contentsline {section}{\numberline {3.1}Representation of NRC queries}{25}
-\contentsline {section}{\numberline {3.2}Implementing natural syntax}{28}
+\contentsline {section}{\numberline {3.2}Implementing natural syntax}{27}
 \contentsline {subsection}{\numberline {3.2.1}Operator syntax}{28}
 \contentsline {subsubsection}{\numberline {3.2.1.1}The Expr typeclass}{29}
-\contentsline {subsection}{\numberline {3.2.2}For-comprehension syntax}{32}
-\contentsline {subsection}{\numberline {3.2.3}Implicit conversion of literal values}{33}
+\contentsline {subsection}{\numberline {3.2.2}For-comprehension syntax}{31}
+\contentsline {subsection}{\numberline {3.2.3}Implicit conversion of literal values}{32}
 \contentsline {section}{\numberline {3.3}Example usage}{33}
 \contentsline {chapter}{\numberline {4}Evaluation of DSL Queries}{35}
 \contentsline {section}{\numberline {4.1}Implementing algebraic operators}{35}

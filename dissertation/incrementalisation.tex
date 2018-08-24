@@ -13,9 +13,9 @@ Access to this sequence of RDDs is controlled by a \lin{DStream[(String,Int)]}, 
 
 \section{Implementing algebraic operators for DStreams}
 
-In order to be able to evaluate queries with DStream inputs, we only need to implement the algebraic operators for DStream operands.  This is because the \lin{Eval} interface is agnostic to the type of the underlying dataset - to evaluate a node it only needs to be able to evaluate its children and be provided an instance of the relevant operator interface to apply to these results. For example, when multiplying two input collections of type \lin{DStream[(K,V)]}, it would first able to evaluate a \lin{LiteralExpr[DStream[(K,V)]]}. Then, evaluating the outer \lin{MultiplyExpr} would just require an instance of \lin{Multiply[DStream[(K,V)],DStream[(K,V)],O]}.
+In order to be able to evaluate queries with DStream inputs, we only need to implement the algebraic operators for DStream operands.  This is because the \lin{Eval} interface is agnostic to the concrete types of the data it is processing - to evaluate a node it only needs to be able to evaluate its children and be provided an instance of the relevant operator interface to apply to these results. For example, when multiplying two input collections of type \lin{DStream[(K,V)]}, it would first have to be able to evaluate a \lin{LiteralExpr[DStream[(K,V)]]}, which our standard implementation of \lin{LiteralExpr} can do, as it just returns the wrapped value. Then, evaluating the outer \lin{MultiplyExpr} would just require an instance of \lin{Multiply[DStream[(K,V)],DStream[(K,V)],O]}.
 
-However, we must make sure that the implementations of the operators respect the delta expressions derived in Section \ref{deltas}, as each RDD in a DStream represents a delta update to the collection represented by the previous RDDs. To enable reasoning about DStreams in this way, we introduce some notation.
+However, we must make sure that the implementations of the operators respect the delta expressions derived in Section \ref{deltas}, as each RDD in a DStream must represent a valid delta update to the collection represented by the previous RDDs. To enable reasoning about DStreams in this way, we introduce some notation.
 \par \noindent Let $X$ be a \lin{DStream[(K,R)]}. Then:
 \begin{equation*}
 \begin{split}
@@ -51,7 +51,7 @@ For addition, suppose we have two DStreams $X$ and $Y$. Since the delta rule is 
 
 For negation, since $\delta_X(-r_1) = -\delta_X(r_1)$, then the delta update to $X^{i-1}$ with respect to $X$ is $-\delta_X(X^{i-1}) = -x_i$. Hence this is also a case of applying the operator element-wise.
 
-These two operators are captured with a new \lin{Ring} instance:
+These two operators are captured with a new \lin{Ring} instance, which implicitly requires an instance of \lin{Ring} for the constituent RDDs of the DStream:
 \vs\begin{lstlisting}
 implicit def DStreamRing[K,R](implicit ring: Ring[RDD[(K,R)]]) =
   new Ring[DStream[(K,R)]] {  
@@ -72,7 +72,7 @@ Then the \lin{join} method works as follows:
 \begin{lstlisting}
 X.join(Y) = [X1.join(Y1), X2.join(Y2)]
 \end{lstlisting}
-While element-wise application worked for the linear operations, it does not work for the distributive operations. To see this, note that the full join of the collections $X'$ and $Y'$ is actually computed as follows:
+While element-wise application works for the linear operations, it does not work for the distributive operations. To see this, note that the full join of the collections $X'$ and $Y'$ is actually computed as follows:
 \begin{equation*}
 \begin{split}
 join(X',Y') &= join((X_1 + X_2),(Y_1 + Y_2)) \\
@@ -80,7 +80,7 @@ join(X',Y') &= join((X_1 + X_2),(Y_1 + Y_2)) \\
 &= join(X_1,Y_1) + join(X_1,Y_2) + join(X_2,Y_1) + join(X_2,Y_2)
 \end{split}
 \end{equation*}
-Therefore we can see that this is a stateful operation, since later batches must be joined with earlier batches (e.g. $join(X_1,Y_2)$). Unfortunately, this has meant we have not been able to implement these operations for two DStream inputs. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
+Where we use the distributivity of join. Therefore we can see that this is a stateful operation, since later batches must be joined with earlier batches (e.g. $join(X_1,Y_2)$). Unfortunately, this has meant we have not been able to implement these operations for two DStream inputs, and are thus largely limited to queries with only one DStream input. However, using the generic \lin{transform} method used earlier in the \lin{Ring} instance for DStreams, a DStream can be joined with a single RDD, as follows:
 \vs\begin{lstlisting}
 val left: DStream[T]
 val right: RDD[T]
@@ -130,7 +130,7 @@ This avoids the potentially expensive subtraction. To do this, we first compute 
 \vs\begin{lstlisting}
 Xacc = [x1, x1+x2, x1+x2+x3]
 \end{lstlisting}
-And then we apply the RDD implementation of group to the individual RDDs element-wise to produce the result. The procedure to compute \lin{Xacc}, using a method on DStreams called \lin{mapWithState} which allows state to be stored between batches, is included in Appendix \ref{codebase} in the file \textit{Streaming.scala}.
+And then we apply the RDD implementation of group to the individual RDDs element-wise to produce the result. The procedure to compute \lin{Xacc}, using a method on DStreams called \lin{mapWithState} which allows state to be stored between batches, is included in Appendix \ref{codebase} in the file \textit{Accumulate.scala}.
 
 
 \section{Shredded evaluation of DStream queries}
