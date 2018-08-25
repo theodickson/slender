@@ -40,9 +40,9 @@ The second and crucial inductive case is the collection type $\coll{\K}{\R}$, wh
 \end{split}
 \end{equation*}
 
-If $\R$ is an $\prim{Int}$, so that $X,Y: \Bag{\K}$, then we can see that $+$ corresponds to bag union. We can also see that $*$ is join-like - a key will only have non-zero value in the resulting collection if it has non-zero value in each of $X$ and $Y$.
+If $\R$ is an $\prim{Int}$, so that $X,Y: \Bag{\K}$, then we can see that $+$ corresponds to bag union. We can also see that $*$ is thus join-like when applied to collections - a key will only have non-zero value in the resulting collection if it has non-zero value in each of $X$ and $Y$. In this way, we equate the existence of a key with it having non-zero value. Hence the zero element $0_{\coll{\K}{\R}}$, which is the empty collection, is equivalent to the collection where every $k \in \K$ is mapped to the zero element $0_R$. This underlines the incrementalisation potential of this algebraic framework, as it means deletions can be modelled with updates to keys with negative value.
 
-In this way, we can use collections themselves as multiplicities. For example, a collection of type $\coll{\K_1}{(\coll{\K_2}{\R})}$ associates a collection of type $\coll{\K_2}{\R}$ to each key of type ${\K_1}$. This is what we call \textit{value} or \textit{ring} nesting and is the first way to obtain nested collections.
+Thus, can use collections themselves as multiplicities. For example, a collection of type $\coll{\K_1}{(\coll{\K_2}{\R})}$ associates a collection of type $\coll{\K_2}{\R}$ to each key of type ${\K_1}$. This is what we call \textit{value} or \textit{ring} nesting and is the first way to obtain nested collections.
 
 \subsection{Key types} {
 
@@ -115,7 +115,7 @@ It also allows us to extend the native ring multiplication operation to collecti
 \end{equation*}
 We will see in \ref{forcomp} how this extension to multiplication allows us to define a for-comprehension construct with very natural semantics.
 
-Note that when applied to collections, $*$ operator can be described as join-like. This is because a key will only be present (i.e. have non-zero value) in the output collection if it has non-zero value in both of the input collections. However, since it performs this join on the entire key, it is not general enough to model many useful joins. Thus we introduce a separate join operator, which only operates on collections, and joins only on the first element of a product-typed key. It is defined as follows:
+As previously mentioned, the $*$ operator can be described as join-like. However, even with this generalisation, it is not general enough to model many useful joins since it joins on the entire key. Thus we introduce a separate join operator, which only operates on collections, and joins only on the first element of a product-typed key. It is defined as follows:
 \begin{equation*}
 \begin{split}
 & X: \coll{(\K,\K_1)}{\R_1},  Y: \coll{(\K,\K_2)}{\R_2} \\
@@ -123,7 +123,7 @@ Note that when applied to collections, $*$ operator can be described as join-lik
 & join(X, Y)(\langle k, \langle k_1, k_2 \rangle \rangle) = X(\langle k, k_1 \rangle) \cdot Y(\langle k, k_2 \rangle)
 \end{split}
 \end{equation*}
-We can see that this is a join as a key $\langle k, \langle k_1, k_2 \rangle \rangle$ will only be non-zero in the output if $\langle k, k_1 \rangle$ is non-zero in $X$ and $\langle k, k_1 \rangle$ is non-zero in $Y$. It is general enough to model all inner joins if we re-order the elements (or columns) of the key such that the element(s) we wish to join on constitute the first element of the key and the other columns are nested within the second element. 
+Thus, a key $\langle k, \langle k_1, k_2 \rangle \rangle$ will only be non-zero in the output if $\langle k, k_1 \rangle$ is non-zero in $X$ and $\langle k, k_2 \rangle$ is non-zero in $Y$. Equivalently, there will be a key  $\langle k, \langle k_1, k_2 \rangle \rangle$ in the output for every pair of keys $\langle k, k_1 \rangle \in X$ and $\langle k', k_2 \rangle \in Y$ such that $k == k'$. Hence, it models an inner join on the first element of the key. It is general enough to model all inner joins if we restructure the elements of a higher arity key as a pair where the element(s) we wish to join on constitute the first element of the key and the others are nested within the second element. 
 
 \noindent The $join$ operator is also distributive:
 \begin{equation*}
@@ -388,18 +388,16 @@ The interesting case is the boxed ring type $[\R]$. Here the shredding context w
 An important thing to note about these definitions is that the structure of the shredding context is fully defined by the type of the shredded query, and additionally mirrors the output type of the shredded query. This has two important benefits: Firstly, as we will show when defining the transformations themselves on our calculus constructs, this allows contexts to be combined when performing operations on shredded queries. For example, if we add two shredded queries, we need to element-wise perform union on their contexts. Secondly, it means that it is unambiguous as to which dictionary corresponds to which labels in the flat output.
 
 To illustrate the process by which we apply the above rules to determine the flat output type and shredding context structure, we show an example of their application for a collection of type $\Bag{[\Bag{\prim{String}}]} = \coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}}$:
+\begin{flalign*}
+(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^F&= \coll{\Label}{\Int^F}\\
+&= \coll{\Label}{\Int}\\
+\end{flalign*}
 \begin{equation*}
 \begin{split}
-(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^F&: \coll{\Label}{\Int^F} \\
-&: \coll{\Label}{\Int}
-\end{split}
-\end{equation*}
-\begin{equation*}
-\begin{split}
-(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^\Gamma&: ([\coll{\String}{\Int}]^\Gamma \times \Int^\Gamma) \\
-&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\coll{\String}{\Int})^\Gamma) \times \Unit) \\
-&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\String^\Gamma \times \Int^\Gamma) \times \Unit) \\
-&: (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\Unit \times \Unit) \times \Unit) \\
+(\coll{[\coll{\prim{String}}{\prim{Int}}]}{\prim{Int}})^\Gamma&= ([\coll{\String}{\Int}]^\Gamma \times \Int^\Gamma) \\
+&= (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\coll{\String}{\Int})^\Gamma) \times \Unit) \\
+&= (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\String^\Gamma \times \Int^\Gamma) \times \Unit) \\
+&= (((\coll{\Label}{(\coll{\String}{\Int})) } \times (\Unit \times \Unit) \times \Unit) \\
 \end{split}
 \end{equation*}
 
@@ -514,9 +512,10 @@ Hence we have:
 &\prim{Output}^\G \approx (\coll{Label_1}{\coll{((\prim{Track} \times \Label_2)}{\prim{Bool}}))} \times (\coll{\Label_2}{\Bag{\prim{Date}}}) \\
 \end{split}
 \end{equation*}
-This represents that the inner collection of track ratings by date for each artist is replaced with an identifying label (represented by $\Label_1$) in the flat output. This label is defined in the first dictionary in the context, which has values of type $\coll{(\prim{Track} \times \Label_2)}{\prim{Bool}}$. This underlines the recursive nature of shredding - since the outermost nested collection has another collection nested within it, (which is the ratings for a particular track by date), the definition of the label which replaces itself contains labels (represented by $\Label_2$). The definition of these labels are given by the second dictionary in the context, which is of type $\coll{\Label_2}{\Bag{\prim{Date}}}$.
+Thus, the inner collection of track ratings by date for each artist is replaced with an identifying label (represented by $\Label_1$) in the flat output. This label is defined in the first dictionary in the context, which has values of type $\coll{(\prim{Track} \times \Label_2)}{\prim{Bool}}$. This underlines the recursive nature of shredding - since the outermost nested collection has another collection nested within it, (which is the ratings for a particular track by date), the definitions of its labels themselves contain labels (represented by $\Label_2$). The definition of these labels are given by the second dictionary in the context, which is of type $\coll{\Label_2}{\Bag{\prim{Date}}}$.
 
-Since as we will see in Chapter \ref{evaluation}, each of these dictionaries is stored separately in a way in which each can be load-balanced, we not only load-balance top-level inner collections but also inner collections at any level of nesting.
+Hence, the output of a shredded query, no matter how deeply it is originally nested, is translated into a flat query, and set of queries (the dictionaries) which construct only a single value-nested collection. Thus, using this automatic and compositional transformation, we have reduced the task of load-balancing and efficiently updating arbitrarily nested queries into doing so only for these simplified nested queries. We will see in Chapter \ref{evaluation} how we can load-balance and efficiently update such queries using a technique called sharding.
+
 
 
 

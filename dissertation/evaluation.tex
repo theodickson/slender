@@ -45,16 +45,17 @@ def add[T](t1: T, t2: T): T = t1 match {
 \end{lstlisting}\vs
 This would require a case for every concrete type we wished to support. This approach is not suitable for several reasons. Principally, it would be infeasible to do this - there are far too many permutations of our type system which would appear even in reasonably complex queries. Secondarily however, this would sacrifice compile-time safety - since this signature accepts arguments of any type \lin{T}, an invocation of it when \lin{T} is not covered by a case statement would still compile, but fail at runtime producing a \lin{MatchError}. Instead, in the following section we detail how to implement such operations with minimal code, and full compile-time safety, while supporting all valid types.
 
-\subsection{The Ring typeclass}
+\subsection{The Ring typeclass} \label{ringtypeclass}
 
 We will again use a typeclass-based system, as it is a very established approach in Scala for implementing algebras. Popular libraries such as Spire \cite{spire}, Cats \cite{cats} and Algebird \cite{algebird} all use this design pattern for algebraic operators.
 
-An instance of our typeclass \lin{Ring[R]} will constitute evidence that \lin{R} is a valid ring type, and it will contain methods to apply the negate operator to a single value of type \lin{R} as well as a method to add two values of type \lin{R}. The other operators will be discussed later as they require a separate design pattern. A simplified presentation of \lin{Ring} is as follows:
+An instance of our typeclass \lin{Ring[R]} will constitute evidence that \lin{R} is a valid ring type, and it will contain methods to apply the negate operator to a single value of type \lin{R} as well as a method to add two values of type \lin{R}. It will also contain a definition of the zero value for the ring type, as this is necessary when implementing certain operators. The other operators will be discussed later as they require a separate design pattern. A simplified presentation of \lin{Ring} is as follows:
 \vs
 \begin{lstlisting}
 trait Ring[R] {
   def add(x1: R, x2: R): R
   def negate(x1: R): R
+  def zero: R
 }
 \end{lstlisting}\vs
 Given this typeclass, we can implement the add function as follows:
@@ -72,6 +73,7 @@ Therefore, similarly to our \lin{Expr} typeclass, we can encode these inductive 
 implicit def IntRing: Ring[Int] = new Ring[Int] {
   def add(t1: Int, t2: Int): Int = t1 + t2
   def negate(t1: Int): Int = -t1
+  def zero: Int = 0
 }
 \end{lstlisting}\vs
 Here is the inductive case for products, which provides an instance of \lin{Ring[H::T]} given instances of \lin{Ring[H]} and \lin{Ring[T]}, by applying element-wise the operations from these instances:
@@ -82,6 +84,7 @@ implicit def ProductRing[H,T <: HList](implicit rH: Ring[H], rT: Ring[T]) =
         rH.add(t1.head, t2.head) :: rT.add(t1.tail,t2.tail)
       def negate(t1: H::T): H::T =
         rH.negate(t1.head) :: rT.negate(t1.tail)
+      def zero: H ::T = rH.zero :: rT.zero
     }
 \end{lstlisting}\vs
 And finally here is the inductive case for RDDs, which provides an instance of \lin{Ring[RDD[(K,R)]]} given an instance of \lin{Ring[R]}:
@@ -92,11 +95,12 @@ implicit def RDDRing[K, R](implicit ring: Ring[R]) =
       x1.union(x2).groupByKey.mapValues(_.reduce(ring.add))
     def negate(x1: RDD[(K,R)]) =
       x1.mapValues(ring.negate)
+    def zero: RDD[(K,R)] = RDD.empty[(K,R)] 
 }
 \end{lstlisting}\vs
 Negation is implemented by negating all the values with the method from the instance of \lin{Ring[R]}. To add two RDDs, we must first union them. For any keys only appearing in one of the two collections, this then contains the correct value already. However for keys appearing in both, this will result in duplicate entries, and so then we must group by the key and add together any values belonging to the same key using the add method from our \lin{Ring[R]} instance. This results in an RDD with unique keys where the values are the sum of the values in the two RDDs that were added, as per the definition of addition for collections.
 
-\subsection{Further operators}
+\subsection{Further operators} \label{furtheroperators}
 Unfortunately, the typeclass design pattern does not encompass summation, multiplication, the dot product, joining or grouping. To understand this, consider the following attempt to incorporate them in our Ring typeclass:
 \vs\begin{lstlisting}
 trait Ring[R] {
@@ -114,7 +118,8 @@ The main issue is that we have no return type for most of these operations - the
 Additionally, we can see that this would imply that we could apply these operators to any ring-typed arguments. This not true - for example we can only sum collection-typed values, and we can only multiply two values if they are both collections with the same key type.
 
 Finally, for the binary operators, this design gives no information for the second ring type \lin{R1}. This leaves us with the same problem as when we attempted to directly implement addition, since the logic to implement them will depend on the second type. Further, for some types the operator will not be defined. For example, for multiplication, if \lin{R} is a collection type, multiplication is only defined if \lin{R1} is also a collection with the same key type.
-\vs Instead, we encapsulate each of these operators in their own trait which extends a Scala function. The definitions of these are as follows:
+
+Instead, we encapsulate each of these operators in their own trait which extends a Scala function. The definitions of these are as follows:
 \vs\begin{lstlisting}
 trait Multiply[T1,T2,O] extends ((T1,T2) => O)
 trait Dot[T1,T2,O] extends ((T1,T2) => O)
@@ -122,33 +127,48 @@ trait Join[T1,T2,O] extends ((T1,T2) => O)
 trait Sum[T,O] extends (T => O)
 trait Group[T,O] extends (T => O)
 \end{lstlisting}\vs
-This is more flexible as it allows us to only provide instances for the valid argument types, and additionally build up the proper return type inductively, since these instances will be built up inductively from the instances for simpler types.
-Taking \lin{Join} as an example, we will need to make implicit instances available for all pairs of types \lin{T1} and \lin{T2} which represent collections with product-typed keys, where the first elements in the keys are of the same type. For example, a \lin{Map[String::String::HNil,Int]} and a \lin{Map[String::Int::HNil,Map[String,Int]]}. We do this by again writing implicit methods which encode the inductive rules by which these operations are defined. If these implicit methods are available, we can implement a generic join function like this:
-\vs\begin{lstlisting}
-def join[T1,T2,O](t1: T1, t2: T2)
-                    (implicit joiner: Join[T1,T2,O]): O = joiner(t1,t2)
-\end{lstlisting}\vs
-Below we provide some examples of these implicit methods:
+These interfaces will be used similarly to typeclasses - we will only require their instances implicitly, and will write implicit methods which inductively construct them. This allows us to bypass the issue of unknown return types, and also allows us to only provide instances for valid argument types, so that we do not sacrifice compile-time safety.
+
+For example, we will only generate instances of \lin{Multiply} for two collections with the same key type \lin{K}, but will allow values of any types \lin{R1} and \lin{R2}. By implicitly requiring an instance of \lin{Dot[R1,R2,O]} for some type \lin{O}, we can thus provide the return type.The following instance of \lin{Multiply} for RDDs illustrates this:
 \vs\begin{lstlisting}
 implicit def rddRddMultiply[K, R1, R2, O]
   (implicit dot: Dot[R1, R2, O]) =
+  //note how return type is constructed using O:
     new Multiply[RDD[(K,R1)], RDD[(K,R2)], RDD[(K,O)]] {
-      def apply(t1: RDD[(K,R1)], t2: RDD[(K,R2)]): RDD[(K,O)] = 
-        t1.join(t2) map { case (k, v) => k -> dot(v._1, v._2) }
+      def apply(t1: RDD[(K,R1)], t2: RDD[(K,R2)]): RDD[(K,O)] =
+        //multiply by joining on the key, and updating the values for
+        //the matching keys to the dot product of the value from
+        //each input 
+        t1.join(t2) map { case (k, (v1,v2)) => (k,dot(v1, v2)) }
       }
     }
 \end{lstlisting}\vs
-To multiply two RDDs, we implicitly require an instance of \lin{Dot} that can be applied to their values. Then we join the two RDDs by key, and calculate each key's new value as the dot product of the values from the two RDDs. Note that any keys which do not appear in both RDDs will disappear, which is correct as this means their new value must be zero. We can also see how this allows the proper return type to be built from the return type \lin{O} of the implicitly provided instance of \lin{Dot}.
+We now provide some more examples. To sum a \lin{Map[K,R]}, we need an instance of \lin{Ring[R]}, and reduce the values in the map using this instance's \lin{add} method:
 \vs\begin{lstlisting}
 implicit def MapSum[K, R](implicit ring: Ring[R]) =
   new Sum[Map[K,R],R] {
     def apply(v1: Map[K,R]): R =
-      v1.values.reduce(ring.add)
+      v1.values.fold(ring.zero)(ring.add)
   }
 \end{lstlisting}\vs
-To sum a \lin{Map[K,R]}, we need an instance of \lin{Ring[R]}, and reduce the values in the map using this instance's \lin{add} method.
+Note how we use the zero value defined in \lin{Ring} to implement this reduction as a \lin{fold}, thus supporting empty maps.
 
-The complete implementations of the algebraic operators are included in Appendix \ref{codebase} in the file \textit{Algebra.scala}.
+To compute the dot product of two \lin{Maps}, we require an instance of \lin{Dot} for their values. Then we compute their cartesian product, returning every pair of keys and the dot product of each pair's values:
+\begin{lstlisting}
+implicit def MapMapDot[K1, K2, R1, R2, O]
+  (implicit dot: Dot[R1, R2, O]): Dot[Map[K1, R1], Map[K2, R2], Map[(K1, K2), O]] =
+    instance { (t1,t2) =>
+      t1.flatMap { case (k1, v1) =>
+        t2.map { case (k2, v2) => (k1, k2) -> dot(v1, v2) }
+      }
+    }
+\end{lstlisting}
+The complete implementations of the algebraic operators are included in Appendix \ref{codebase} in the file \textit{Algebra.scala}. Given these, we can now implement generic functions similarly to addition, which require the instance of the operator implicitly, for example:
+\vs\begin{lstlisting}
+def join[T1,T2,O](t1: T1, t2: T2)
+                    (implicit joiner: Join[T1,T2,O]): O = joiner(t1,t2)
+\end{lstlisting}\vs
+Thus, we can apply these operators to any valid concrete types in a type-safe manner without duplicating logic.
 
 \section{The Eval interface}
 In this section we describe the interface used to evaluate ASTs in our DSL, which builds on the implementations of the algebraic operators.
@@ -256,15 +276,15 @@ implicit def rddInfMappingMultiply[C, K, R1, R2, O, C1]
     }
   }
 \end{lstlisting}\vs
- 
+This concludes the implementation of evaluation for non-shredded queries.
 \section{Shredded evaluation of queries}
 
-In order to produce the shredded output, we introduce a second, similar interface to \lin{Eval}:
+In order to produce the shredded output, we introduce an extended interface which returns both a flat output and a shredding context, as opposed to a single result:
 \vs\begin{lstlisting}
 trait ShreddedEval[Expr,Flat,Ctx <: HList]
   extends ((Expr,Namespace) => (Flat,Ctx))
 \end{lstlisting}\vs
-As opposed to \lin{Eval}, which is a function from an expression tree and a namespace to single result, this is a function from an expression tree and a namespace to both the flat result and the shredding context. We use an HList as the context because it allows us to easily construct and manipulate a product structure with arbitrary levels of nesting, which as shown in \ref{shreddingtypes} is the form that the shredding context takes.
+We use an HList as the context because it allows us to easily construct and manipulate a product structure with arbitrary levels of nesting, which as shown in \ref{shreddingtypes} is the form that the shredding context takes.
 
 The implementations then proceed according to the definition of the shredding transformation. The flat output is produced by replacing key-nested collections with labels, and the context by combining child contexts and constructing dictionaries where key-nested collections have been replaced. For the majority of operators, these implementations are straightforward. We illustrate this with the implementation for a product (i.e. HList) of expressions:
 \vs\begin{lstlisting}

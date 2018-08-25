@@ -14,9 +14,10 @@ Spark unfortunately does not offer any tools to deal with these performance issu
 
 \section{Motivating example} {
 
-To demonstrate this issue, consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are accessed via an \lin{RDD[(User,Track,Date,Int)]}, where each row represents a single integer rating given to a track by a user on a given date. Additionally there is an \lin{RDD[(Track,Artist)]} associating tracks to artists. The streaming services wishes to compute a new dataset which contains, for each artist, the aggregate ratings for each track on each date. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute a new RDD with one row per artist, where each has a nested collection which associates each of the artist's tracks to a further inner collection of aggregate ratings for each date. This RDD would thus have type \lin{RDD[(Artist,Map[Track,Map[Date,Int]])]}. The following Spark query would be a standard way to compute this:
+To demonstrate this issue, consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are accessed via an \lin{RDD[(User,Track,Date,Int)]}, where each row represents a single integer rating given to a track by a user on a given date. Additionally there is an \lin{RDD[(Track,Artist)]} associating tracks to artists. The streaming services wishes to compute a new dataset which contains, for each artist, the aggregate ratings for each track on each date. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute a new RDD with one row per artist, where each has a nested collection which associates each of the artist's tracks to a further inner collection of aggregate ratings for each date. This RDD would thus have type \lin{RDD[(Artist,Map[Track,Map[Date,Int]])]}. Figure \ref{exsparkquery} describes a Spark query which would be a standard way to to compute this.
 
-\vs\begin{lstlisting}
+\begin{figure}
+\begin{lstlisting}
 val ratings: RDD[(User,Track,Date,Int)]
 val trackArtists: RDD[(Track,Artist)]
 
@@ -42,7 +43,10 @@ val artistRatings: RDD[(Artist,Map[Track,Map[Date,Int]])] =
     .mapValues { case rows =>
       rows.map { case (_,(track,ratingsByDate)) => (track,ratingsByDate) } toMap
     }
-\end{lstlisting}\vs
+\end{lstlisting}
+\caption{Spark query to compute the aggregate track ratings by date for each artist.}
+\label{exsparkquery}
+\end{figure}
 
 Firstly, this query is likely to exhibit severe load-balancing issues. This is because the grouping of the ratings by track will aggregate every rating for a given track into a single row. And further, the grouping by artist will then aggregate every track rating for that artist into a single row. However, due to the natural power-law dynamics of many social phenomena such as music popularity \cite{musicpowerlaw}, a small number of tracks will represent a large proportion of the ratings, and an even smaller number of artists will represent a large number of these tracks. In particular, there will probably be some artists with hundreds of thousands or even millions of track ratings, while others have hundreds or fewer. Thus, the workers which happen to contain such rows will be more likely to run out of memory, potentially crashing the query, and even if they don't, the imbalance will lead to some workers finishing further processing of the ratings far sooner than others, which is an inefficient use of resources.
 
