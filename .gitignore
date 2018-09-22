@@ -3,3 +3,17 @@ target/*
 metastore_db/*
 project/*
 derby.log
+_checkpoint/*
+*.log
+*.pdf
+*.gz
+*.aux
+dissertation/chapter1.aux
+
+*.aux
+
+dissertation/chapter1.aux
+
+dissertation/ociamthesismain.synctex.gz
+
+*.zip

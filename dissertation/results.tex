@@ -1,0 +1,328 @@
+\chapter{Experimental results} \label{results}
+
+In this chapter we discuss the experiments we performed to ascertain the performance benefits of shredding. First we discuss the testing setup and introduce the dataset used. Then we describe the experiments done and discuss their results. These results show that queries can be executed up to 5.5 times faster using shredding, but that not all queries are sped up by shredding.
+
+\section{Setup}
+
+Unfortunately, access to a distributed computing cluster was not secured, which made testing of the framework on static queries difficult, as without significant parallelisation, it would have been hard to test the load-balancing benefits of shredding. However, even without parallelisation, the incrementalisation benefits would be achievable, and so it was decided to test on streamed queries using DStreams.
+
+The machine we use has 8GB 1600Mhz DDR3 Ram, a 2.6GHZ Intel Core i5 processor and runs Mac OS X 10.11.6. The queries are compiled using Scala 2.11.12 and are run on a local instance of Spark 2.3.0. 
+
+The dataset used is that supplied with the TPC-H \cite{tpch} database benchmark tool. While the queries are not related to those in the benchmark, the dataset has a standard relational schema modelling a business's products, orders, customers and suppliers, and thus allows for many interesting nested queries. In order to execute queries successfully on our restricted setup, we sample this dataset by first taking a random sample of the customers, and then sampling the other tables based on this sample of customers, i.e. we take all the orders from our sample customers, and all the suppliers required to fulfill those orders. This is to retain the original distributions of the data.
+
+\section{Isolated testing of group operator}
+First we test the performance of shredding the group operator in isolation. This is so we can directly assess the benefits of being able to avoid recomputation of the construction of nested collections without the additional overhead of joins which other operators will introduce into the query. We will test this operator across a variety of tables with different distributions of keys, in order to see how performance relates to the size of nested collections. We use a sample based on 10,000 customers, and we split the streamed tables into 10 random, evenly sized batches. For each query, we will compare three alternative processing methods:
+
+\begin{itemize}
+\item{Regular key-nested evaluation (reg). This will involve recomputation with each batch in the DStream, and therefore will have an accumulated output.}
+\item{Shredded evaluation (shred-inc). As this does not involve recomputation, the output will be incremental.}
+\item{Shredded evaluation with accumulation (shred-acc). The same as shred-inc but the output is accumulated according to the procedure detailed in Appendix \ref{codebase} in the file \textit{Accumulate.scala}}
+\end{itemize}
+
+The idea here is that although we expect shredding without accumulation to be the quickest processing method, it is in some sense not comparable to the regular key-nested evaluation, since in order to compute the full result the RDDs in the DStream need to be aggregated. However, we note that the penalty of this aggregation is dependent on how the output is to be used. If it is being saved in permanent storage, i.e. a database on-disk, whether this aggregation actually incurs a significant cost depends on the update primitives available.
+
+We illustrate the \textit{group-lineitem} query here:
+\vs\begin{lstlisting}
+Group(
+  For ((l_orderkey,l_partkey,l_suppkey) <-- lineitem)
+    Yield (l_orderkey,l_partkey)
+)
+\end{lstlisting}\vs
+
+This query projects lineitem to just the order key and part key using a for-comprehension, to create a $\Bag{\Int \times \Int}$. It then then applies the group operator to this, to produce a collection of type $\coll{(\Int \times [\coll{\Int}{\Int}])}{\prim{Bool}}$. This represents order keys paired with an inner bag of the part keys from that order.
+The other three queries are similarly a simple group operation after potentially reordering the key elements, and are fully described in Appendix \ref{codebase} in the file \textit{Experiments.scala}.
+
+\begin{figure}
+\begin{tikzpicture}
+\begin{axis}[
+    title=Testing of group operator,
+     width=1\textwidth,
+    height=.7\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Query},
+    xtick=data,
+    xticklabels from table={\GroupData}{query},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north east,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\GroupData};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\GroupData};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\GroupData};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+   \legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+\caption{Test results of isolated group queries}
+\label{groupresults}
+\end{figure}
+
+\begin{table}[]
+\begin{tabular}{|l|l|l|}
+\hline
+Query          & Mean inner collection size & Standard deviation of inner collection size \\ \hline
+group-customer & 400                        & 25.0                                        \\ \hline
+group-lineitem & 3.93                       & 2.01                                        \\ \hline
+group-orders   & 14.8                       & 3.79                                        \\ \hline
+group-partSupp & 2.15                       & 1.43                                        \\ \hline
+\end{tabular}
+\caption{Distributions of nested collections in isolated group queries}
+\label{groupstats}
+\end{table}
+
+Figure \ref{groupresults} shows the results of this isolated testing of group. Table \ref{groupstats} describes the distributions of the nested collections created by these queries.
+
+Firstly, it is notable that indeed shredding is quicker in every case, and further that the accumulated method, while slower than incremental shredding is faster than regular evaluation. This is at least evidence that avoiding the recomputation of the inner collections in the shredded versions is beneficial.
+
+However, it only offers significant benefit in the query \textit{group-lineitem} (4.18$\times$) and \textit{group-partSupp} (3.71$\times$). The others show less than a $2\times$ gain in speed. This seems to be related to the size of the inner collections created. As the mean size of inner collection increases, the speed decreases relative to standard evaluation. It is hard to say exactly why this is happening but may be to do with overheads involved in computing the dictionaries defining such large inner collections. In our low-parallelism environment, any such overheads would not be offset by the load-balancing benefit we'd otherwise expect from creating and updating large inner collections.
+
+\section{Complete queries}
+
+We now present the test result for a set of complete queries, which create outputs with varying levels of nesting, and requiring varying numbers of joins. Note that as per the limitation discussed in \ref{distoperatorsdstream}, each query only streams one input table. We will also test across varying numbers of batches to test how the shredding responds to the number of updates requires when computing a result. The rest of the inputs are static RDDs.
+\begin{figure}
+\begin{lstlisting}
+//the lineitem table is a DStream
+//the other tables are RDDs.
+
+//Project the partorders table to just the part keys and order keys:
+val partOrders = For((l_orderkey, l_partkey, __) <-- lineitem)
+                        Yield( l_partkey, l_orderkey)
+
+//Join these to the part table, projecting to just order key
+//and part name. Then, group by order key to create 
+//an inner bag of part names for each part key.
+val orderPartNames = Group(
+   For ((__, orderKey0, partName0) <-- partOrders.join(part))
+     Yield (orderKey0, partName0)
+ )
+
+//Join to the order table, and project to customer key, 
+//order date and the inner bag of part names
+val customerOrders =
+  For ((__, partNames0, custKey0, orderDate0) <-- orderPartNames.join(orders))
+    Yield (custKey0, orderDate0, partNames0)
+
+//Join to the customer table, and project to the customer name,
+//the order date, and the inner bag of part names:
+val customerNameOrders = For (
+  (__, orderDate1, partNames1, custName0, __) <-- customerOrders.join(customer)
+) Yield (custName0, orderDate1, partNames1)
+
+//group by the customer name, to create for each customer name an 
+//inner collection of order dates, paired with its own inner 
+//bag of part names.
+val query = Group(customerNameOrders)
+\end{lstlisting}
+\caption{Full definition of Q1}
+\label{q1-def}
+\end{figure}
+
+Figure \ref{q1-def} demonstrates how Q1 is written using the DSL. The other queries are detailed in Appendix \ref{codebase} in the file \textit{Experiments.scala}, but we describe them at a high level here:
+
+\begin{itemize}
+\item{Q2 - Joins lineitem with orders to generate all customer/supplier pairs, and then joins with customer and supplier to get their names. Then groups by supplier name to return for each the bag of customers' names who have ordered something from the supplier. The inner values are the number of parts that customer has ordered from that supplier. The orders table is incrementalised, the rest are static.}
+\item{Q3 - Joins the partSupp table with the supplier table to generate all pairs of part key and supplier name. Then joins lineitem with orders and customer to generate all pairs of part key and customer name. Groups each of these by part key, and joins them together to return for each part key, an inner collection of supplier names and an inner collection of customer names. The partSupp table is incrementalised.}
+\item{Q4 - Joins nation with region to generate all pairs of nation key and region name. Joins with customer on nation key and groups by region name to generate for each region, an inner collection of all of the customers from that region. The customer table is incrementalised.}
+\item{Q5 - Joins part with partSupp to generate for each part name, the inner collection of all suppliers who supply that part. The partSupp table is incrementalised.}
+\item{Q6 - Groups partSupp by supplier to generate the inner collection for each supplier of all parts they supply. Joins this to the supplier table and groups by their nation to return for each nation, all suppliers and the parts they supply. The partSupp table is incrementalised.}
+\end{itemize}
+
+With these more complex queries, the hope is that shredding will reduce recomputation further, by not just preventing reconstructing nested collections but also preventing further processing on these collections, e.g. downstream joins. Since these queries are more expensive, we use a dataset constructed as per the isolated testing of group, but using a random sample of 1,000 customers as the basis rather than 10,000. We again test three methods of evaluation - regular, shredded, and shredded with accumulation.
+
+\begin{figure}
+\begin{tabular}{cc}
+\begin{tikzpicture}
+\begin{axis}[
+    title=Q1,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QOne}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QOne};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QOne};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QOne};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+    \legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+& \begin{tikzpicture}
+\begin{axis}[
+    title=Q2,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QTwo}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QTwo};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QTwo};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QTwo};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+    %\legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+
+\\ \\
+
+\begin{tikzpicture}
+\begin{axis}[
+    title=Q3,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QThree}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QThree};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QThree};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QThree};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+    %\legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+& \begin{tikzpicture}
+\begin{axis}[
+    title=Q4,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QFour}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QFour};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QFour};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QFour};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+   % \legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+
+\\ \\
+
+\begin{tikzpicture}
+\begin{axis}[
+    title=Q5,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QFive}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QFive};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QFive};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QFive};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+    %\legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+& \begin{tikzpicture}
+\begin{axis}[
+    title=Q6,
+     width=0.5\textwidth,
+    height=.4\textwidth,
+    ymin=0,
+    %yticklabel style={/pgf/number format/fixed},
+    ymajorticks=false,
+    ylabel={Time taken (seconds)},
+    xlabel={Number of batches},
+    xtick=data,
+    xticklabels from table={\QSix}{no-batches},
+    bar width=0.2,
+    ybar=2pt,
+    enlarge x limits={abs=0.55},
+    nodes near coords,
+    nodes near coords style={font=\tiny},
+    legend pos=north west,
+    legend style={legend columns=-1},
+]
+    \addplot table [x expr=\coordindex,y=regular]{\QSix};
+    \addplot table [x expr=\coordindex,y=shred-inc]{\QSix};
+    \addplot table [x expr=\coordindex,y=shred-acc]{\QSix};
+    %\addplot table [x expr=\coordindex,y=carG]{\mydata};
+
+   % \legend{regular, shred-inc, shred-acc}
+\end{axis}
+\end{tikzpicture}
+
+\end{tabular}
+\caption{Test results of complete queries.}
+\label{mainresults}
+\end{figure}
+
+The results are shown in Figure \ref{mainresults}. For five out of six queries, shredding is faster, whether accumulated or not. Although in \textit{Q1}, it reaches $3.7\times$ faster than regular evaluation and in \textit{Q5}, $5.5\times$ faster, for the other three it is not significantly faster. However, we highlight the very consistent pattern that shredding becomes faster relative to regular evaluation as the number of batches increases. This is a natural result of the fact that without shredding, recomputation is required with each batch, so each batch, no matter how small, triggers recomputation of the query for all previous batches.
+
+It is also worth noting that although accumulating the shredding result is consistently slower than not, the cost is marginal for most queries, and so in environments where this is necessary shredding should still be more efficient than regular evaluation.
+
+For \textit{Q2}, which shredding actually slows down, this is not necessarily surprising. Since we showed in the isolated testing of group that for some inputs, shredding group only has marginal benefit, which we believe is related to our limited testing environment. When additional overheads are added in more complex queries, and the shredding contexts maintained become more complex, this may penalise shredded evaluation further, making it slower than regular evaluation. However, it is notable that even for this query, the differential between regular and shredded evaluation lessens as the number of batches increases. It's possible that with sufficient batches shredding would indeed be faster, as recomputation costs began to outweigh the overheads of shredding.
+
+Overall, the results are not particularly significant, but do show some promise. And, in addition to the limitations of the testing environment, we are limited in our analysis due to difficulty in examining and profiling the individual Spark jobs which are generated by the evaluation methods, which is beyond the scope of this work. We provide recommendations for future research directions to overcome these issues in \ref{limitations}.  

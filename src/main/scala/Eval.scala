@@ -1,243 +1,87 @@
+/**The Eval interface - computes the regular (non-shredded) result of any valid expression*/
+
 package slender
 
-import shapeless.ops.hlist.Tupler
-import shapeless.ops.tuple.At
-import shapeless.{::, Generic, HList, HNil, Nat, Select}
-import shapeless.syntax.HListOps
+import shapeless.{::, HList, HNil}
 
-trait Eval[-E,+T] extends ((E,BoundVars) => T) with Serializable
-
-case class Label[R <: RingExpr,T](expr: R, vars: BoundVars, eval: Eval[R,T]) extends Serializable {
-  def get: T = eval(expr,vars)
-  def varString = vars.toList.map { case (variable,value) => s"$variable=$value" } mkString (",")
-  override def toString = s"Label($varString)"
-}
+trait Eval[-E,+T] extends ((E,Namespace) => T) with Serializable
 
 object Eval {
 
-  def instance[E,T](f: (E,BoundVars) => T): Eval[E,T] = new Eval[E,T] {
-    def apply(v1: E, v2: BoundVars): T = f(v1,v2)
+  def instance[E,T](f: (E,Namespace) => T): Eval[E,T] = new Eval[E,T] {
+    def apply(v1: E, v2: Namespace): T = f(v1,v2)
   }
 
-  implicit def VariableEval[T]: Eval[TypedVariable[T],T] = new Eval[TypedVariable[T],T] {
-    def apply(v1: TypedVariable[T], v2: BoundVars): T = v2(v1.name).asInstanceOf[T]
+  /**To evaluate a variable, retrieve its value from the namespace and cast it to the expected type*/
+  implicit def VariableEval[T]: Eval[TypedVariable[T],T] = instance {
+    case (tv,bvs) => bvs(tv.name).asInstanceOf[T]
   }
 
-  implicit def UnusedVariableEval: Eval[UnusedVariable,Any] = new Eval[UnusedVariable,Any] {
-    def apply(v1: UnusedVariable, v2: BoundVars): Any = null
-  }
+  implicit def UnusedVariableEval: Eval[UnusedVariable,Any] = instance { (_,_) => null }
 
+  /**Simply return the value held in the LiteralExpr*/
+  implicit def LiteralEval[V,ID]: Eval[LiteralExpr[V,ID],V] = instance { (v1, _) => v1.value }
 
-  implicit def PrimitiveKeyExprEval[V]: Eval[PrimitiveKeyExpr[V],V] = new Eval[PrimitiveKeyExpr[V],V] {
-    def apply(v1: PrimitiveKeyExpr[V], v2: BoundVars): V = v1.value
-  }
-
-  implicit def NumericExprEval[V]: Eval[NumericExpr[V],V] = new Eval[NumericExpr[V],V] {
-    def apply(v1: NumericExpr[V], v2: BoundVars): V = v1.value
-  }
-
-  implicit def PhysicalCollectionEval[C[_,_],K,R]: Eval[PhysicalCollection[C,K,R],C[K,R]] =
-    new Eval[PhysicalCollection[C, K, R],C[K,R]] {
-      def apply(v1: PhysicalCollection[C,K,R], v2: BoundVars): C[K,R] = v1.value
-  }
-
-//  implicit def InfiniteMappingEval[V <: VariableExpr { type Type = KT },R <: RingExpr,KT,RT]
-//  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
-//    new Eval[InfiniteMappingExpr[V,R],KT => RT] {
-//      def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT =
-//        (k: KT) => evalR(v1.value,v2 ++ v1.key.bind(k))
-//    }
-
-  implicit def InfiniteMappingEval[V <: VariableExpr,R <: RingExpr,KT,RT]
-  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: VarBinder[V, KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
-    new Eval[InfiniteMappingExpr[V,R],KT => RT] {
-      def apply(v1: InfiniteMappingExpr[V,R], v2: BoundVars): KT => RT =
-        (k: KT) => evalR(v1.value,v2 ++ varBinder(v1.key, k))
+  /**Construct the anonymous function representing the infinite mapping which takes a key value, binds it in the
+    * namespace, and evaluates the body with the updated namespace.
+    */
+  implicit def InfiniteMappingEval[V,R,KT,RT]
+  (implicit evalK: Eval[V,KT], evalR: Eval[R,RT], varBinder: Binder[V,KT]): Eval[InfiniteMappingExpr[V,R],KT => RT] =
+    instance { case (InfiniteMappingExpr(v,r),bvs) =>
+      (k: KT) => evalR(r,bvs ++ varBinder(v, k))
     }
 
+  /**Algebraic operators - these recursively evaluate their children and then, with an implicitly provided instance
+    * of the relevant operator interface computes the result of applying the operator to the child results
+    */
+  implicit def MultiplyEval[E1,E2,T1,T2,O]
+  (implicit evalL: Eval[E1,T1], evalR: Eval[E2,T2], mult: Multiply[T1,T2,O]): Eval[MultiplyExpr[E1,E2],O] =
+    instance { case (MultiplyExpr(l,r),vars) => mult(evalL(l,vars),evalR(r,vars)) }
 
-  implicit def MultiplyEval[E1 <: RingExpr,E2 <: RingExpr,T1,T2,O](implicit eval1: Eval[E1,T1],
-                                                                   eval2: Eval[E2,T2],
-                                                                   mult: Multiply[T1,T2,O]): Eval[MultiplyExpr[E1,E2],O] =
-    new Eval[MultiplyExpr[E1,E2],O] {
-      def apply(v1: MultiplyExpr[E1,E2], v2: BoundVars): O = mult(eval1(v1.c1,v2),eval2(v1.c2,v2))
-    }
+  implicit def DotEval[E1,E2,T1,T2,O]
+  (implicit evalL: Eval[E1,T1], evalR: Eval[E2,T2], dot: Dot[T1,T2,O]): Eval[DotExpr[E1,E2],O] =
+    instance { case (DotExpr(l,r),vars) => dot(evalL(l,vars),evalR(r,vars)) }
 
-  implicit def DotEval[E1 <: RingExpr,E2 <: RingExpr,T1,T2,O](implicit eval1: Eval[E1,T1],
-                                                              eval2: Eval[E2,T2],
-                                                              dot: Dot[T1,T2,O]): Eval[DotExpr[E1,E2],O] =
-    new Eval[DotExpr[E1,E2],O] {
-      def apply(v1: DotExpr[E1,E2], v2: BoundVars): O = dot(eval1(v1.c1,v2),eval2(v1.c2,v2))
-    }
+  implicit def JoinEval[E1,E2,T1,T2,O]
+  (implicit evalL: Eval[E1,T1], evalR: Eval[E2,T2], join: Join[T1,T2,O]): Eval[JoinExpr[E1,E2],O] =
+    instance { case (JoinExpr(l,r),vars) => join(evalL(l,vars),evalR(r,vars)) }
 
-  implicit def JoinEval[E1 <: RingExpr,E2 <: RingExpr,T1,T2,O](implicit eval1: Eval[E1,T1],
-                                                              eval2: Eval[E2,T2],
-                                                               join: Join[T1,T2,O]): Eval[JoinExpr[E1,E2],O] =
-    new Eval[JoinExpr[E1,E2],O] {
-      def apply(v1: JoinExpr[E1,E2], v2: BoundVars): O = join(eval1(v1.c1,v2),eval2(v1.c2,v2))
-    }
+  implicit def AddEval[E1,E2,T]
+  (implicit evalL: Eval[E1,T], evalR: Eval[E2,T], ring: Ring[T]): Eval[AddExpr[E1,E2],T] =
+    instance { case (AddExpr(l,r),vars) => ring.add(evalL(l,vars),evalR(r,vars)) }
 
-  implicit def AddEval[E1 <: RingExpr,E2 <: RingExpr,T](implicit eval1: Eval[E1,T],
-                                                        eval2: Eval[E2,T],
-                                                        ring: Ring[T]): Eval[AddExpr[E1,E2],T] =
-    new Eval[AddExpr[E1,E2],T] {
-      def apply(v1: AddExpr[E1,E2], v2: BoundVars): T = ring.add(eval1(v1.c1,v2),eval2(v1.c2,v2))
-    }
+  implicit def SumEval[E,C,O]
+  (implicit eval: Eval[E,C], sum: Sum[C,O]): Eval[SumExpr[E],O] =
+    instance { case (SumExpr(c),vars) => sum(eval(c,vars)) }
 
-  implicit def SumEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], sum: Sum[C[K,R],O]):
-  Eval[SumExpr[E],O] = new Eval[SumExpr[E],O] {
-    def apply(v1: SumExpr[E], v2: BoundVars): O = sum(eval(v1.c1,v2))
+  implicit def GroupEval[E,C,O]
+  (implicit eval: Eval[E,C], group: Group[C,O]): Eval[GroupExpr[E],O] =
+    instance { case (GroupExpr(c),vars) => group(eval(c,vars)) }
+
+  implicit def NotEval[E,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NotExpr[E],T] =
+    instance { case (NotExpr(c),vars) => ring.not(eval(c,vars)) }
+
+  implicit def NegateEval[E,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NegateExpr[E],T] =
+    instance { case (NegateExpr(c),vars) => ring.negate(eval(c,vars)) }
+
+  implicit def SngEval[K,R,TK,TR]
+  (implicit evalK: Eval[K,TK], evalR: Eval[R,TR]): Eval[SngExpr[K,R],Map[TK,TR]] =
+    instance { case (SngExpr(k,r),vars) => Map(evalK(k,vars) -> evalR(r,vars)) }
+
+  implicit def ApplyExprEval[K,T,U]
+  (implicit eval: Eval[K,T]): Eval[ApplyExpr[K,T,U],U] = instance {
+    case (ApplyExpr(k,f),bvs) => f(eval(k,bvs))
   }
 
-  implicit def GroupEval[E <: RingExpr,C[_,_],K,R,O](implicit eval: Eval[E,C[K,R]], group: Group[C[K,R],O]):
-  Eval[GroupExpr[E],O] = new Eval[GroupExpr[E],O] {
-    def apply(v1: GroupExpr[E], v2: BoundVars): O = group(eval(v1.c1,v2))
-  }
-
-  implicit def NotEval[E <: RingExpr,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NotExpr[E],T] = new Eval[NotExpr[E],T] {
-    def apply(v1: NotExpr[E], v2: BoundVars): T = ring.not(eval(v1.c1,v2))
-  }
-
-  implicit def NegateEval[E <: RingExpr,T](implicit eval: Eval[E,T], ring: Ring[T]): Eval[NegateExpr[E],T] = new Eval[NegateExpr[E],T] {
-    def apply(v1: NegateExpr[E], v2: BoundVars): T = ring.negate(eval(v1.c1,v2))
-  }
-
-  implicit def SngEval[K <: KeyExpr,R <: RingExpr,TK,TR](implicit evalK: Eval[K,TK], evalR: Eval[R,TR]):
-  Eval[SngExpr[K,R],Map[TK,TR]] = new Eval[SngExpr[K,R],Map[TK,TR]] {
-    def apply(v1: SngExpr[K,R], v2: BoundVars): Map[TK,TR] = Map(evalK(v1.key,v2) -> evalR(v1.value,v2))
-  }
-
-  implicit def BoxedRingEval[R <: RingExpr,T](implicit eval: Eval[R,T], ring: Ring[T]): Eval[BoxedRingExpr[R],T] =
-    new Eval[BoxedRingExpr[R],T] {
-      //todo - rethink filtering here and overall
-      def apply(v1: BoxedRingExpr[R],v2: BoundVars): T = ring.filterZeros(eval(v1.c1,v2))
-    }
-
-  implicit def ToRingEval[E <: Expr,RT](implicit eval: Eval[E,RT], ring: Ring[RT]): Eval[ToRingExpr[E],RT] =
-    new Eval[ToRingExpr[E],RT] {
-      def apply(v1: ToRingExpr[E],v2: BoundVars): RT = eval(v1.c1,v2)
-    }
-
-  implicit def LabelEval[R <: RingExpr,T](implicit eval: Eval[R,T]): Eval[LabelExpr[R],Label[R,T]] =
-    new Eval[LabelExpr[R],Label[R,T]] {
-      //todo = filter vars to free variables actually in v1.c1
-      override def apply(v1: LabelExpr[R], v2: BoundVars): Label[R, T] = Label[R,T](v1.c1,v2,eval)
-    }
-
-  implicit def EqualsPredicateEval[K1 <: KeyExpr,K2 <: KeyExpr,T](implicit eval1: Eval[K1,T], eval2: Eval[K2,T]) =
-    new Eval[EqualsPredicate[K1,K2],Int] {
-      def apply(v1: EqualsPredicate[K1,K2], v2: BoundVars): Int = if (eval1(v1.c1,v2) == eval2(v1.c2,v2)) 1 else 0
-    }
-
-  implicit def IntPredicateEval[K1 <: KeyExpr,K2 <: KeyExpr](implicit eval1: Eval[K1,Int], eval2: Eval[K2,Int]) =
-    new Eval[IntPredicate[K1,K2],Int] {
-      def apply(v1: IntPredicate[K1,K2], v2: BoundVars): Int = if (v1.p(eval1(v1.c1,v2),eval2(v1.c2,v2))) 1 else 0
-    }
-
-  implicit def ProductKeyEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
-    Eval[ProductKeyExpr[Exprs], T] =
-      instance { case (ProductKeyExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
-
-  implicit def ProductRingEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
-  Eval[ProductRingExpr[Exprs], T] =
-    instance { case (ProductRingExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
-
-  implicit def ProductVariableEval[Exprs <: HList,O <: HList,T](implicit eval: Eval[Exprs,O], tupler: Tupler.Aux[O,T]):
-  Eval[ProductVariableExpr[Exprs], T] =
-    instance { case (ProductVariableExpr(exprs),bvs) => tupler(eval(exprs,bvs)) }
-
+  /**A product expression is evaluated by evaluating the head and tail and Cons'ing these together. Therefore we
+    * have a base case which evaluates HNil in a product expression to HNil.
+    */
   implicit def HNilEval: Eval[HNil,HNil] = instance[HNil,HNil] { case (HNil,_) => HNil }
 
-  implicit def HConsEval[H <: Expr,T <: HList,HO,TO <: HList]
+  implicit def HConsEval[H,T <: HList,HO,TO <: HList]
     (implicit evalH: Eval[H,HO], evalT: Eval[T,TO]): Eval[H :: T, HO :: TO] = instance[H::T,HO::TO] {
       case (h :: t,bvs) => evalH(h, bvs) :: evalT(t, bvs)
     }
-
-//  implicit def ProjectKeyEval[K <: KeyExpr,N <: Nat,T,O](implicit eval: Eval[K,T], at: At.Aux[T,N,O]):
-//  Eval[ProjectKeyExpr[K,N],O] = instance { (e,bvs) => at(eval(e,bvs)) }
-
-
-  implicit def Product2Eval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2](implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]): Eval[Product2Expr[K1, K2], (T1, T2)] {
-    def apply(v1: Product2Expr[K1, K2], v2: slender.BoundVars): (T1, T2)
-  } =
-    new Eval[Product2Expr[K1,K2],(T1,T2)] {
-      def apply(v1: Product2Expr[K1,K2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
-    }
-
-  implicit def Product3Eval[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr,T1,T2,T3]
-  (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2], eval3: Eval[K3,T3]): Eval[Product3Expr[K1, K2, K3], (T1, T2, T3)] {
-    def apply(v1: Product3Expr[K1, K2, K3], v2: slender.BoundVars): (T1, T2, T3)
-  } =
-    new Eval[Product3Expr[K1,K2,K3],(T1,T2,T3)] {
-      def apply(v1: Product3Expr[K1,K2,K3], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2),eval3(v1.c3,v2))
-    }
-
-//  implicit def Tuple2KeyEval[K1 <: KeyExpr, K2 <: KeyExpr,T1,T2](implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]) =
-//    new Eval[Tuple2KeyExpr[K1,K2],(T1,T2)] {
-//      def apply(v1: Tuple2KeyExpr[K1,K2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
-//    }
-//
-//  implicit def Tuple3KeyEval[K1 <: KeyExpr, K2 <: KeyExpr, K3 <: KeyExpr,T1,T2,T3]
-//  (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2], eval3: Eval[K3,T3]) =
-//    new Eval[Tuple3KeyExpr[K1,K2,K3],(T1,T2,T3)] {
-//      def apply(v1: Tuple3KeyExpr[K1,K2,K3], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2),eval3(v1.c3,v2))
-//    }
-//
-//  implicit def Tuple2RingEval[K1 <: RingExpr, K2 <: RingExpr,T1,T2](implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2]) =
-//    new Eval[Tuple2RingExpr[K1,K2],(T1,T2)] {
-//      def apply(v1: Tuple2RingExpr[K1,K2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
-//    }
-//
-//  implicit def Tuple3RingEval[K1 <: RingExpr, K2 <: RingExpr, K3 <: RingExpr,T1,T2,T3]
-//  (implicit eval1: Eval[K1,T1], eval2: Eval[K2,T2], eval3: Eval[K3,T3]) =
-//    new Eval[Tuple3RingExpr[K1,K2,K3],(T1,T2,T3)] {
-//      def apply(v1: Tuple3RingExpr[K1,K2,K3], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2),eval3(v1.c3,v2))
-//    }
-//
-//  implicit def Tuple2VariableEval[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],T1,T2]
-//  (implicit eval1: Eval[V1,T1], eval2: Eval[V2,T2]): Eval[Tuple2VariableExpr[V1,V2],(T1,T2)] =
-//    new Eval[Tuple2VariableExpr[V1,V2],(T1,T2)] {
-//      def apply(v1: Tuple2VariableExpr[V1,V2], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2))
-//    }
-//
-//  implicit def Tuple3VariableEval[V1 <: VariableExpr[V1],V2 <: VariableExpr[V2],V3 <: VariableExpr[V3],T1,T2,T3]
-//  (implicit eval1: Eval[V1,T1], eval2: Eval[V2,T2], eval3: Eval[V3,T3]): Eval[Tuple3VariableExpr[V1,V2,V3],(T1,T2,T3)] =
-//    new Eval[Tuple3VariableExpr[V1,V2,V3],(T1,T2,T3)] {
-//      def apply(v1: Tuple3VariableExpr[V1,V2,V3], v2: BoundVars) = (eval1(v1.c1,v2),eval2(v1.c2,v2),eval3(v1.c3,v2))
-//    }
-//
-//  implicit def Project2_1KeyEval[K <: KeyExpr with C1Expr,KT1](implicit eval: Eval[K,(KT1,_)]) =
-//    new Eval[Project1KeyExpr[K],KT1] { def apply(v1: Project1KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._1 }
-//
-//  implicit def Project2_2KeyEval[K <: KeyExpr with C2Expr,KT2](implicit eval: Eval[K,(_,KT2)]) =
-//    new Eval[Project2KeyExpr[K],KT2] { def apply(v1: Project2KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._2 }
-//
-//  implicit def Project3_1KeyEval[K <: KeyExpr with C1Expr,KT1](implicit eval: Eval[K,(KT1,_,_)]) =
-//    new Eval[Project1KeyExpr[K],KT1] { def apply(v1: Project1KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._1 }
-//
-//  implicit def Project3_2KeyEval[K <: KeyExpr with C2Expr,KT2](implicit eval: Eval[K,(_,KT2,_)]) =
-//    new Eval[Project2KeyExpr[K],KT2] { def apply(v1: Project2KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._2 }
-//
-//  implicit def Project3_3KeyEval[K <: KeyExpr with C3Expr,KT3](implicit eval: Eval[K,(_,_,KT3)]) =
-//    new Eval[Project3KeyExpr[K],KT3] { def apply(v1: Project3KeyExpr[K], v2: BoundVars) = eval(v1.c1,v2)._3 }
-//
-//
-//  implicit def Project2_1RingEval[K <: RingExpr with C1Expr,KT1](implicit eval: Eval[K,(KT1,_)]) =
-//    new Eval[Project1RingExpr[K],KT1] { def apply(v1: Project1RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._1 }
-//
-//  implicit def Project2_2RingEval[K <: RingExpr with C2Expr,KT2](implicit eval: Eval[K,(_,KT2)]) =
-//    new Eval[Project2RingExpr[K],KT2] { def apply(v1: Project2RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._2 }
-//
-//  implicit def Project3_1RingEval[K <: RingExpr with C1Expr,KT1](implicit eval: Eval[K,(KT1,_,_)]) =
-//    new Eval[Project1RingExpr[K],KT1] { def apply(v1: Project1RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._1 }
-//
-//  implicit def Project3_2RingEval[K <: RingExpr with C2Expr,KT2](implicit eval: Eval[K,(_,KT2,_)]) =
-//    new Eval[Project2RingExpr[K],KT2] { def apply(v1: Project2RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._2 }
-//
-//  implicit def Project3_3RingEval[K <: RingExpr with C3Expr,KT3](implicit eval: Eval[K,(_,_,KT3)]) =
-//    new Eval[Project3RingExpr[K],KT3] { def apply(v1: Project3RingExpr[K], v2: BoundVars) = eval(v1.c1,v2)._3 }
-
-
 }
 
 
