@@ -12,7 +12,7 @@ Spark unfortunately does not offer any tools to deal with these performance issu
 
 }
 
-\section{Motivating example} {
+\section{Motivating example} { \label{motivatingexample}
 
 To demonstrate this issue, consider the following scenario. A streaming music service allows listeners to rate tracks as they listen to them, with either a like (+1) or a dislike (-1). These ratings are accessed via an \lin{RDD[(User,Track,Date,Int)]}, where each row represents a single integer rating given to a track by a user on a given date. Additionally there is an \lin{RDD[(Track,Artist)]} associating tracks to artists. The streaming services wishes to compute a new dataset which contains, for each artist, the aggregate ratings for each track on each date. They wish to store this data in nested form so that it can efficiently provide the results in JSON form for an endpoint in the service's public API. Therefore they must compute a new RDD with one row per artist, where each has a nested collection which associates each of the artist's tracks to a further inner collection of aggregate ratings for each date. This RDD would thus have type \lin{RDD[(Artist,Map[Track,Map[Date,Int]])]}. Figure \ref{exsparkquery} describes a Spark query which would be a standard way to to compute this.
 
@@ -108,7 +108,7 @@ The main contributions of this work are as follows:
 \item{We provide a Scala DSL which allows users to easily write NRC queries with natural syntax. Queries written in this way can be automatically evaluated, with or without the shredding transformation applied, with the full runtime safety guarantees of the Scala compiler. This DSL works with both local collections and Spark collections, and is easily extensible to other frameworks thanks to a clean, modular design based largely on the typeclass pattern.}
 \item{We introduce an updated version of the NRC which enabled the automatic evaluation of queries in Spark, by replacing constructs which proved hard to translate to valid Spark code.}
 \item{We present a novel and generally applicable technique for inferring the types of variables within a Scala DSL at compile-time, thus avoiding the need to manually tag them. }
-\item{\textit{(summary of performance benefits)}}
+\item{We show performance gains of up to $5.5\times$ when using the shredding transformation on streamed queries in Spark.}
 \end{itemize}
 }
 

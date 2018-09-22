@@ -2,7 +2,6 @@ package slender
 
 import java.sql.Timestamp
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class TpchRdds(sampleName: String = "10_customers")(implicit spark: SparkSession) {

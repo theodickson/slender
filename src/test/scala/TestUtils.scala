@@ -111,7 +111,7 @@ trait TestUtils {
           val currentTime = currentTimeMillis()
           val interval = currentTime - time
           totalTime += interval
-          //          println(s"$counter - $totalTime ($interval) ($count)")
+          //println(s"$counter - $totalTime ($interval) ($count)")
           time = currentTime
           if (counter == limit) {println(s"$counter - $totalTime ($interval) ($count)"); done = true}
         }
@@ -126,7 +126,12 @@ trait TestUtils {
   def rddToDStream[T:ClassTag](rdd: RDD[T], n: Int = 5, ssc: StreamingContext): DStream[T] = {
     val rddWithIds: RDD[(T,Long)] = rdd.zipWithUniqueId
     val queue = new mutable.Queue[RDD[T]]
-    (0 until n).map(i => rddWithIds.filter(_._2 % n == i)).foreach { r => queue.enqueue(r.map(_._1)) }
+    (0 until n).map(i => rddWithIds.filter(_._2 % n == i))
+      .foreach { r =>
+        val toAdd = r.map(_._1)
+        toAdd.cache.count
+        queue.enqueue(toAdd)
+      }
     ssc.queueStream(queue, true)
   }
 }

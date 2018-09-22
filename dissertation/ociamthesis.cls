@@ -104,10 +104,7 @@
 {\large \vspace*{40mm} {\logo \par} \vspace*{25mm}}
     {{\Large \@author} \par}
 {\large \vspace*{1ex}
-    {{\@college} \par}
 \vspace*{1ex}
-    {University of Oxford \par}
-    {{\large \vspace*{1ex} Supervised by Dr Milos Nikolic} \par}
 \vspace*{25mm}
     {{\submittedtext} \par}
 \vspace*{1ex}
@@ -116,7 +113,7 @@
     {\@degreedate}}
   \end{center}
       \vspace*{2ex}
-      Word count: 9999
+      Word count: 16,507
   \null\vfill
 \end{alwayssingle}}
 

@@ -274,7 +274,7 @@ Here, $trackRatings$ first projects the ratings to just the track and date, thus
 $\coll{(\prim{Artist} \times [\coll{(\prim{Track} \times [\Bag{\prim{Date}]})}{\prim{Bool}}])}{\prim{Bool}}$. This collection will have one key per artist, where the artist is the first element, and the collection of ratings for each track on each day is nested within the second element.
 }
 
-\section{Restricted construction of key-nested collections}
+\section{Restricted construction of key-nested collections} \label{nrclimit}
 The $group$ operator is the only way in this calculus to construct key-nested collections. We recognise that this is quite restrictive. In fact, in \cite{draftpaper}, the variant of the NRC used does not include this construct, but instead uses a more general construct $toK$ which boxes arbitrary sub-queries of ring type. Unfortunately, although this allows for a more general query language, the queries written in this way proved highly impractical to implement within Spark. For example, to express the grouping of a collection $X: \Bag{\K_1 \times \K_2}$ by the first element of the key, the following query would be used:
 \begin{equation*}
 \begin{split}

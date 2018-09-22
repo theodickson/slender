@@ -48,8 +48,9 @@
 \contentsline {chapter}{\numberline {6}Experimental results}{55}
 \contentsline {section}{\numberline {6.1}Setup}{55}
 \contentsline {section}{\numberline {6.2}Isolated testing of group operator}{56}
-\contentsline {section}{\numberline {6.3}Complete queries}{57}
-\contentsline {chapter}{\numberline {7}Conclusion}{62}
-\contentsline {section}{\numberline {7.1}Summary of contributions}{62}
-\contentsline {section}{\numberline {7.2}Limitations and future work}{63}
-\contentsline {chapter}{References}{65}
+\contentsline {section}{\numberline {6.3}Complete queries}{58}
+\contentsline {chapter}{\numberline {7}Conclusion}{63}
+\contentsline {section}{\numberline {7.1}Summary of contributions}{63}
+\contentsline {section}{\numberline {7.2}Limitations and future work}{64}
+\contentsline {chapter}{References}{67}
+\contentsline {chapter}{\numberline {A}DSL Codebase}{69}
